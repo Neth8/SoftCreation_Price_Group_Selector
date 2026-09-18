@@ -73,7 +73,7 @@ button,input,select,textarea{font:inherit}.app{max-width:1680px;margin:auto;padd
 </style>
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.1</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.2</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <div class="topbar">
     <div class="brand"><div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div><div class="brandtext"><b>Business Quotation System <span style="font-size:9px;color:#078f92">v4</span></b><span>Label Pricing • Cost Snapshots • Profit Reports • Device Quotations • User Audit</span></div></div>
@@ -1794,7 +1794,7 @@ function enhanceProductionWorkflowV8(){
   VIEW_PERMS.production='production_manage';VIEW_PERMS.stores='stores_receive';
   state.productionRequests=state.productionRequests||[];state.notifications=state.notifications||[];state.grns=state.grns||[];
   const style=document.createElement('style');style.textContent=`
-  .prod-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}.prod-kpi{background:#f7fbfc;border:1px solid #d6e6e8;border-radius:13px;padding:12px}.prod-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.prod-kpi b{font-size:19px}.prod-board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.prod-col{background:#f5f8f9;border:1px solid #dce7e9;border-radius:12px;padding:8px;min-height:160px}.prod-col h4{margin:2px 3px 8px;color:#087f83}.prod-card{background:#fff;border:1px solid #d5e4e6;border-left:5px solid #079c9f;border-radius:10px;padding:10px;margin-bottom:8px}.prod-card.urgent{border-left-color:#d74a4a}.prod-card.finished{border-left-color:#16885b}.prod-meta{font-size:10px;color:#65767d;line-height:1.5}.prod-status{font-weight:900;font-size:10px;padding:4px 7px;border-radius:12px;background:#e8f6f6;color:#087f83}.prod-history{border-left:2px solid #bddadc;margin:8px 0 0 5px;padding-left:10px;font-size:10px}.supply-pill{display:inline-block;padding:3px 7px;border-radius:12px;font-size:9px;font-weight:900;background:#e9f7f1;color:#087247}.supply-pill.production{background:#fff1d3;color:#995d00}.notification-dot{background:#d74a4a;color:#fff;border-radius:50%;font-size:9px;padding:2px 5px}.grn-ok{color:#087247;font-weight:900}.grn-bad{color:#bd2525;font-weight:900}.proof-thumb{max-width:180px;max-height:110px;border-radius:8px;border:1px solid #d5e4e6}.production-line{display:grid;grid-template-columns:28px 1.4fr 1fr .8fr 1fr;gap:7px;align-items:center;padding:8px;border-bottom:1px solid #e3ecee}.production-line input,.production-line select{padding:8px}.prod-summary-note{background:#eefafa;border:1px solid #b9dfdf;border-radius:10px;padding:9px;margin:8px 0;font-size:10px}@media(max-width:900px){.prod-kpis,.prod-board{grid-template-columns:1fr 1fr}.production-line{grid-template-columns:24px 1fr}.production-line>*{grid-column:2}.production-line>input[type=checkbox]{grid-column:1;grid-row:1/5}}@media(max-width:560px){.prod-kpis,.prod-board{grid-template-columns:1fr}}
+  .prod-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}.prod-kpi{background:#f7fbfc;border:1px solid #d6e6e8;border-radius:13px;padding:12px}.prod-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.prod-kpi b{font-size:19px}.prod-board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.prod-col{background:#f5f8f9;border:1px solid #dce7e9;border-radius:12px;padding:8px;min-height:160px}.prod-col h4{margin:2px 3px 8px;color:#087f83}.prod-card{position:relative;background:#fff;border:1px solid #d5e4e6;border-left:5px solid #079c9f;border-radius:10px;padding:10px;margin-bottom:8px}.prod-card.urgent{border-left-color:#d74a4a}.prod-card.finished{border-left-color:#16885b}.prod-card.has-unread-update{padding-bottom:44px}.prod-update-gif{position:absolute;right:8px;bottom:8px;width:64px;height:32px;object-fit:contain;z-index:5;pointer-events:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,.18))}.prod-meta{font-size:10px;color:#65767d;line-height:1.5}.prod-status{font-weight:900;font-size:10px;padding:4px 7px;border-radius:12px;background:#e8f6f6;color:#087f83}.prod-history{border-left:2px solid #bddadc;margin:8px 0 0 5px;padding-left:10px;font-size:10px}.supply-pill{display:inline-block;padding:3px 7px;border-radius:12px;font-size:9px;font-weight:900;background:#e9f7f1;color:#087247}.supply-pill.production{background:#fff1d3;color:#995d00}.notification-dot{background:#d74a4a;color:#fff;border-radius:50%;font-size:9px;padding:2px 5px}.grn-ok{color:#087247;font-weight:900}.grn-bad{color:#bd2525;font-weight:900}.proof-thumb{max-width:180px;max-height:110px;border-radius:8px;border:1px solid #d5e4e6}.production-line{display:grid;grid-template-columns:28px 1.4fr 1fr .8fr 1fr;gap:7px;align-items:center;padding:8px;border-bottom:1px solid #e3ecee}.production-line input,.production-line select{padding:8px}.prod-summary-note{background:#eefafa;border:1px solid #b9dfdf;border-radius:10px;padding:9px;margin:8px 0;font-size:10px}@media(max-width:900px){.prod-kpis,.prod-board{grid-template-columns:1fr 1fr}.production-line{grid-template-columns:24px 1fr}.production-line>*{grid-column:2}.production-line>input[type=checkbox]{grid-column:1;grid-row:1/5}}@media(max-width:560px){.prod-kpis,.prod-board{grid-template-columns:1fr}}
   `;document.head.appendChild(style);
   const nav=document.querySelector('.nav'),settings=document.querySelector('[data-view="settings"]');
   [['production','Production'],['stores','Stores / GRN']].forEach(([id,label])=>{const b=document.createElement('button');b.className='navbtn';b.dataset.view=id;b.textContent=label;b.onclick=()=>showView(id);nav.insertBefore(b,settings)});
@@ -1814,8 +1814,11 @@ function notifyV8(user,title,message,ref){state.notifications.unshift({id:uid('n
 function renderProductionNotificationsV8(){const n=(state.notifications||[]).filter(x=>!x.read&&(currentUser?.role==='admin'||x.user===currentUser?.username));$('prodNotifications').innerHTML=n.length?`<div class="notice"><b>${n.length} update(s)</b>${n.slice(0,5).map(x=>`<div style="margin-top:4px"><span class="notification-dot">!</span> <b>${esc(x.title)}</b> — ${esc(x.message)} <button class="btn ghost sm" onclick="readNotificationV8('${x.id}')">Read</button></div>`).join('')}</div>`:''}
 function readNotificationV8(id){const n=state.notifications.find(x=>x.id===id);if(n)n.read=true;saveState();renderProductionNotificationsV8()}
 function renderProductionBoard(){if(!$('prodBoard'))return;renderProductionNotificationsV8();const q=($('prodSearch')?.value||'').toLowerCase(),f=$('prodStatusFilter')?.value||'';let a=(state.productionRequests||[]).filter(productionVisibleV8).filter(r=>(!f||r.status===f)&&[r.orderNo,r.piSerial,r.customerName,r.size,r.material].join(' ').toLowerCase().includes(q));const count=s=>a.filter(x=>x.status===s).length;$('prodKpis').innerHTML=[['Total',a.length],['Requested',count('Requested')],['In Production',count('In Production')],['Finished',count('Finished')],['Dispatched',count('Dispatched')]].map(x=>`<div class="prod-kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');const groups=[['New / Planned',['Requested','Approved','Planned']],['Production',['In Production']],['QC / Finished',['QC Check','Finished']],['Logistics',['Dispatched','Received','GRN Closed']]];$('prodBoard').innerHTML=groups.map(([title,statuses])=>`<div class="prod-col"><h4>${title}</h4>${a.filter(r=>statuses.includes(r.status)).map(r=>productionCardV8(r)).join('')||'<div class="empty">No jobs</div>'}</div>`).join('')}
-function productionCardV8(r){return `<div class="prod-card ${prodStatusClassV8(r.status)}"><div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(r.orderNo)}</b><span class="prod-status">${esc(r.status)}</span></div><div><b>${esc(r.customerName)}</b></div><div class="prod-meta">${esc(r.size)} • ${esc(r.material)} • ${esc(r.layout)}<br>${money(r.requestQty)} ${esc(r.unit)} • ${money(r.pcs)} pcs/roll<br>PI ${esc(r.piSerial)} • Need ${esc(r.needDate||'-')}<br>Sales: ${esc(r.ownerDisplay||r.ownerUser||'-')}</div><div class="actions"><button class="btn ghost sm" onclick="openProductionV8('${r.id}')">Open</button><button class="btn green sm" onclick="downloadProductionImageV8('${r.id}')">Image</button>${r.status==='Finished'?`<button class="btn navy sm" onclick="openDispatchV8('${r.id}')">Dispatch</button>`:''}</div></div>`}
-function openProductionV8(id){const r=state.productionRequests.find(x=>x.id===id);if(!r)return;$('prodDetailMeta').textContent=`${r.orderNo} • ${r.piSerial} • ${r.customerName}`;const canProd=currentUser?.role==='admin'||hasPerm('production_manage');$('prodDetailBody').innerHTML=`<div class="grid"><div class="field"><label>Status</label><select id="prodEditStatus" ${canProd?'':'disabled'}>${['Requested','Approved','Planned','In Production','QC Check','Finished'].map(s=>`<option ${r.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Planned / Need Date</label><input id="prodEditDate" type="date" value="${esc(r.needDate||'')}" ${canProd?'':'disabled'}></div><div class="field"><label>Shift</label><select id="prodEditShift" ${canProd?'':'disabled'}><option value="day" ${r.shift==='day'?'selected':''}>Day Shift</option><option value="night" ${r.shift==='night'?'selected':''}>Night Shift</option></select></div><div class="field"><label>Priority</label><select id="prodEditPriority" ${canProd?'':'disabled'}><option value="normal" ${r.priority==='normal'?'selected':''}>Normal</option><option value="urgent" ${r.priority==='urgent'?'selected':''}>Urgent</option></select></div><div class="field full"><label>Production / QC Note</label><textarea id="prodEditNote" ${canProd?'':'disabled'}>${esc(r.lastNote||'')}</textarea></div></div><div class="prod-summary-note"><b>${esc(r.customerName)}</b> • ${esc(r.size)} / ${esc(r.material)} / ${esc(r.layout)} / ${money(r.pcs)} pcs per roll • Requested ${money(r.requestQty)} ${esc(r.unit)}</div><div class="prod-history">${(r.history||[]).map(h=>`<div><b>${esc(h.status)}</b> — ${esc(h.by)} • ${new Date(h.at).toLocaleString()}${h.note?`<br>${esc(h.note)}`:''}</div>`).join('')}</div><div class="actions">${canProd?`<button class="btn primary" onclick="saveProductionUpdateV8('${r.id}')">Save Update</button>`:''}<button class="btn green" onclick="downloadProductionImageV8('${r.id}')">Download Request Image</button></div>`;$('productionDetailModal').classList.add('show')}
+function productionCardV8(r){
+  const unread=window.spgsProductionIsUnread?window.spgsProductionIsUnread(r):false;
+  return `<div class="prod-card ${prodStatusClassV8(r.status)} ${unread?'has-unread-update':''}"><div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(r.orderNo)}</b><span class="prod-status">${esc(r.status)}</span></div><div><b>${esc(r.customerName)}</b></div><div class="prod-meta">${esc(r.size)} • ${esc(r.material)} • ${esc(r.layout)}<br>${money(r.requestQty)} ${esc(r.unit)} • ${money(r.pcs)} pcs/roll<br>PI ${esc(r.piSerial)} • Need ${esc(r.needDate||'-')}<br>Sales: ${esc(r.ownerDisplay||r.ownerUser||'-')}</div><div class="actions"><button class="btn ghost sm" onclick="openProductionV8('${r.id}')">Open</button><button class="btn green sm" onclick="downloadProductionImageV8('${r.id}')">Image</button>${r.status==='Finished'?`<button class="btn navy sm" onclick="openDispatchV8('${r.id}')">Dispatch</button>`:''}</div>${unread?`<img class="prod-update-gif" src="data:image/gif;base64,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" title="New production update" alt="New update">`:''}</div>`
+}
+function openProductionV8(id){const r=state.productionRequests.find(x=>x.id===id);if(!r)return;if(window.spgsMarkProductionSeen)window.spgsMarkProductionSeen(id);$('prodDetailMeta').textContent=`${r.orderNo} • ${r.piSerial} • ${r.customerName}`;const canProd=currentUser?.role==='admin'||hasPerm('production_manage');$('prodDetailBody').innerHTML=`<div class="grid"><div class="field"><label>Status</label><select id="prodEditStatus" ${canProd?'':'disabled'}>${['Requested','Approved','Planned','In Production','QC Check','Finished'].map(s=>`<option ${r.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Planned / Need Date</label><input id="prodEditDate" type="date" value="${esc(r.needDate||'')}" ${canProd?'':'disabled'}></div><div class="field"><label>Shift</label><select id="prodEditShift" ${canProd?'':'disabled'}><option value="day" ${r.shift==='day'?'selected':''}>Day Shift</option><option value="night" ${r.shift==='night'?'selected':''}>Night Shift</option></select></div><div class="field"><label>Priority</label><select id="prodEditPriority" ${canProd?'':'disabled'}><option value="normal" ${r.priority==='normal'?'selected':''}>Normal</option><option value="urgent" ${r.priority==='urgent'?'selected':''}>Urgent</option></select></div><div class="field full"><label>Production / QC Note</label><textarea id="prodEditNote" ${canProd?'':'disabled'}>${esc(r.lastNote||'')}</textarea></div></div><div class="prod-summary-note"><b>${esc(r.customerName)}</b> • ${esc(r.size)} / ${esc(r.material)} / ${esc(r.layout)} / ${money(r.pcs)} pcs per roll • Requested ${money(r.requestQty)} ${esc(r.unit)}</div><div class="prod-history">${(r.history||[]).map(h=>`<div><b>${esc(h.status)}</b> — ${esc(h.by)} • ${new Date(h.at).toLocaleString()}${h.note?`<br>${esc(h.note)}`:''}</div>`).join('')}</div><div class="actions">${canProd?`<button class="btn primary" onclick="saveProductionUpdateV8('${r.id}')">Save Update</button>`:''}<button class="btn green" onclick="downloadProductionImageV8('${r.id}')">Download Request Image</button></div>`;$('productionDetailModal').classList.add('show')}
 function saveProductionUpdateV8(id){const r=state.productionRequests.find(x=>x.id===id);if(!r||!(currentUser?.role==='admin'||hasPerm('production_manage')))return;const old=r.status;r.status=$('prodEditStatus').value;r.needDate=$('prodEditDate').value;r.shift=$('prodEditShift').value;r.priority=$('prodEditPriority').value;r.lastNote=$('prodEditNote').value.trim();r.history=r.history||[];r.history.push({status:r.status,note:r.lastNote,by:currentUser.display,username:currentUser.username,at:new Date().toISOString()});if(old!==r.status&&r.status==='Finished'){notifyV8(r.ownerUser,'Production Finished',`${r.orderNo} for ${r.customerName} is finished (${money(r.requestQty)} ${r.unit}).`,r.id);const pi=state.docs.find(d=>d.id===r.piId);if(pi)pi.productionStatus='Part / all production finished'}audit('PRODUCTION_UPDATE',`${r.orderNo}: ${old} → ${r.status}`);saveState();renderProductionBoard();renderStoresQueueV8();openProductionV8(id);toast('Production update saved')}
 function productionSvgV8(r){const hist=(r.history||[]).slice(-4),lines=hist.map((h,i)=>`<text x="85" y="${855+i*42}" font-size="18" fill="#52646a">${esc(h.status)} • ${esc(h.by)} • ${esc(new Date(h.at).toLocaleString())}</text>`).join('');return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200"><defs><linearGradient id="g" x2="1"><stop stop-color="#078f92"/><stop offset="1" stop-color="#0bb0b7"/></linearGradient></defs><rect width="1200" height="1200" fill="#f3f8f9"/><rect width="1200" height="175" fill="url(#g)"/><text x="65" y="78" font-size="42" font-family="Arial" font-weight="800" fill="white">SoftCreation</text><text x="65" y="128" font-size="26" font-family="Arial" fill="white">PRODUCTION REQUEST &amp; FACTORY PLAN</text><rect x="55" y="210" width="1090" height="900" rx="28" fill="white" stroke="#cfe2e4" stroke-width="3"/><text x="85" y="270" font-size="30" font-family="Arial" font-weight="800" fill="#172f36">${esc(r.orderNo)}</text><text x="820" y="270" font-size="22" font-family="Arial" font-weight="800" fill="#078f92">${esc(r.status.toUpperCase())}</text><text x="85" y="330" font-size="20" font-family="Arial" fill="#667980">PI / REF</text><text x="320" y="330" font-size="24" font-family="Arial" font-weight="700">${esc(r.piSerial)} / ${esc(r.poRef||'-')}</text><text x="85" y="385" font-size="20" font-family="Arial" fill="#667980">CUSTOMER</text><text x="320" y="385" font-size="24" font-family="Arial" font-weight="700">${esc(r.customerName)}</text><text x="85" y="440" font-size="20" font-family="Arial" fill="#667980">ITEM / SIZE</text><text x="320" y="440" font-size="24" font-family="Arial" font-weight="700">${esc(r.size)}</text><text x="85" y="495" font-size="20" font-family="Arial" fill="#667980">SPECIFICATION</text><text x="320" y="495" font-size="24" font-family="Arial" font-weight="700">${esc(r.material)} • ${esc(r.layout)} • ${money(r.pcs)} pcs/roll</text><rect x="85" y="545" width="1030" height="120" rx="18" fill="#eaf8f7"/><text x="115" y="590" font-size="20" font-family="Arial" fill="#087f83">PRODUCTION QUANTITY</text><text x="115" y="640" font-size="42" font-family="Arial" font-weight="900" fill="#172f36">${money(r.requestQty)} ${esc(r.unit)}</text><text x="700" y="590" font-size="20" font-family="Arial" fill="#087f83">REQUIRED DATE</text><text x="700" y="640" font-size="30" font-family="Arial" font-weight="800">${esc(r.needDate||'-')}</text><text x="85" y="725" font-size="20" font-family="Arial" fill="#667980">INSTRUCTIONS</text><foreignObject x="85" y="745" width="1000" height="85"><div xmlns="http://www.w3.org/1999/xhtml" style="font:22px Arial;color:#273b42">${esc(r.instructions||'Confirm material, size, winding, label count and packing quality before dispatch.')}</div></foreignObject><text x="85" y="820" font-size="20" font-family="Arial" font-weight="800" fill="#087f83">STATUS HISTORY</text>${lines}<text x="85" y="1060" font-size="18" font-family="Arial" fill="#667980">Sales owner: ${esc(r.ownerDisplay||r.ownerUser)} • Generated ${esc(new Date().toLocaleString())}</text><rect x="55" y="1135" width="1090" height="8" fill="url(#g)"/></svg>`}
 function svgCanvasV8(svg,w=1200,h=1200){return new Promise((res,rej)=>{const b=new Blob([svg],{type:'image/svg+xml'}),u=URL.createObjectURL(b),im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);URL.revokeObjectURL(u);res(c)};im.onerror=rej;im.src=u})}
@@ -2132,6 +2135,110 @@ let spgsReady=false,
     if(key.startsWith('eyJ'))h.Authorization='Bearer '+key;
     return h;
   }
+  let spgsProductionSeen={};
+  let spgsProductionSeenReady=false;
+
+
+async function spgsLoadProductionSeen(){
+    spgsProductionSeen={};
+    spgsProductionSeenReady=false;
+    const username=currentUser?.username;
+    if(!username)return;
+    try{
+        const rows=await spgsFetch(
+            `/spgs_production_seen?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&username=eq.${encodeURIComponent(username)}&select=production_id,seen_at`
+        );
+        (rows||[]).forEach(row=>{spgsProductionSeen[row.production_id]=row.seen_at});
+        spgsProductionSeenReady=true;
+    }catch(e){
+        console.error('Production seen status load failed',e);
+    }
+}
+
+
+function spgsProductionIsUnread(r){
+
+    if(
+        !spgsProductionSeenReady ||
+        !currentUser?.username ||
+        !r?.id ||
+        !r?._spgsUpdatedAt
+    ){
+        return false;
+    }
+
+    const updated=
+        Date.parse(r._spgsUpdatedAt)||0;
+
+    const seen=
+        Date.parse(
+            spgsProductionSeen[r.id]||''
+        )||0;
+
+    return updated>seen;
+}
+
+
+async function spgsMarkProductionSeen(id){
+
+    const username=
+        currentUser?.username;
+
+    if(!username || !id)return;
+
+    const job=(state.productionRequests||[]).find(x=>x.id===id);
+    const seenAt=job?._spgsUpdatedAt || new Date().toISOString();
+
+
+    // Immediately remove GIF from screen.
+    spgsProductionSeen[id]=seenAt;
+
+    try{
+        renderProductionBoard();
+    }catch(e){}
+
+
+    try{
+
+        await spgsFetch(
+            '/spgs_production_seen' +
+            '?on_conflict=workspace,production_id,username',
+            {
+                method:'POST',
+
+                headers:{
+                    'Content-Type':'application/json',
+                    'Prefer':
+                      'resolution=merge-duplicates,return=minimal'
+                },
+
+                body:JSON.stringify({
+                    workspace:SPGS_WORKSPACE,
+                    production_id:id,
+                    username:username,
+                    seen_at:seenAt
+                })
+            }
+        );
+
+    }catch(e){
+
+        console.error(
+            'Production seen save failed',
+            e
+        );
+    }
+}
+
+
+window.spgsProductionIsUnread=
+    spgsProductionIsUnread;
+
+window.spgsMarkProductionSeen=
+    spgsMarkProductionSeen;
+
+window.spgsLoadProductionSeen=
+    spgsLoadProductionSeen;
   async function spgsFetch(path,options={}){
     const res=await fetch(SPGS_REST+path,{...options,headers:spgsHeaders(options.headers||{})});
     if(!res.ok){const body=await res.text().catch(()=>res.statusText);throw new Error(`Supabase ${res.status}: ${body.slice(0,500)}`)}
@@ -2154,7 +2261,20 @@ let spgsReady=false,
     copy.current=null;
     return copy;
   }
-  async function spgsLoadProduction(){
+let spgsProductionHashes={};
+
+function spgsCleanProductionPayload(r){
+    const x={...r};
+    delete x._spgsUpdatedAt;
+    return x;
+}
+
+function spgsProductionSignature(r){
+    return JSON.stringify(spgsCleanProductionPayload(r));
+}
+
+async function spgsLoadProduction(){
+
     const rows=await spgsFetch(
         `/spgs_production_requests` +
         `?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}` +
@@ -2162,47 +2282,77 @@ let spgsReady=false,
         `&order=updated_at.desc`
     );
 
-    return (rows||[])
-        .map(x=>x.payload)
-        .filter(x=>x && x.id);
+    const jobs=(rows||[])
+        .map(row=>({
+            ...(row.payload||{}),
+            _spgsUpdatedAt:row.updated_at
+        }))
+        .filter(x=>x.id);
+
+    spgsProductionHashes={};
+
+    jobs.forEach(r=>{
+        spgsProductionHashes[r.id]=
+            spgsProductionSignature(r);
+    });
+
+    return jobs;
 }
-
-
 async function spgsSyncProduction(force=false){
 
-    state.productionRequests=state.productionRequests||[];
+    state.productionRequests=
+        state.productionRequests||[];
 
-    const sig=JSON.stringify(state.productionRequests);
+    const changed=[];
 
-    // Don't write production table when nothing in Production changed.
-    if(!force && sig===spgsProductionJson)return;
+    for(const r of state.productionRequests){
 
-    if(state.productionRequests.length){
+        if(!r?.id)continue;
 
-        const rows=state.productionRequests.map(r=>({
+        const payload=
+            spgsCleanProductionPayload(r);
+
+        const sig=
+            JSON.stringify(payload);
+
+        if(
+            !force &&
+            spgsProductionHashes[r.id]===sig
+        ){
+            continue;
+        }
+
+        changed.push({
             workspace:SPGS_WORKSPACE,
             id:r.id,
             order_no:r.orderNo||'',
             status:r.status||'Requested',
             owner_user:r.ownerUser||'',
-            payload:r,
+            payload:payload,
             updated_at:new Date().toISOString()
-        }));
-
-        await spgsFetch(
-            '/spgs_production_requests?on_conflict=workspace,id',
-            {
-                method:'POST',
-                headers:{
-                    'Content-Type':'application/json',
-                    'Prefer':'resolution=merge-duplicates,return=minimal'
-                },
-                body:JSON.stringify(rows)
-            }
-        );
+        });
     }
 
-    spgsProductionJson=JSON.stringify(state.productionRequests);
+    if(!changed.length)return;
+
+    await spgsFetch(
+        '/spgs_production_requests' +
+        '?on_conflict=workspace,id',
+        {
+            method:'POST',
+            headers:{
+                'Content-Type':'application/json',
+                'Prefer':
+                  'resolution=merge-duplicates,return=minimal'
+            },
+            body:JSON.stringify(changed)
+        }
+    );
+
+    changed.forEach(row=>{
+        spgsProductionHashes[row.id]=
+            JSON.stringify(row.payload);
+    });
 }
 async function spgsStartProductionRealtime(){
 
@@ -2253,6 +2403,8 @@ async function spgsStartProductionRealtime(){
                     if(id){
                         state.productionRequests=
                             state.productionRequests.filter(x=>x.id!==id);
+                        delete spgsProductionHashes[id];
+                        delete spgsProductionSeen[id];
                     }
 
                 }
@@ -2260,7 +2412,13 @@ async function spgsStartProductionRealtime(){
                 // INSERT / UPDATE
                 else{
 
-                    const incoming=change.new?.payload;
+                  const incoming={
+    ...(change.new?.payload||{}),
+
+    _spgsUpdatedAt:
+        change.new?.updated_at ||
+        new Date().toISOString()
+};
 
                     if(!incoming || !incoming.id)return;
 
@@ -2274,6 +2432,7 @@ async function spgsStartProductionRealtime(){
                     }else{
                         state.productionRequests.unshift(incoming);
                     }
+                    spgsProductionHashes[incoming.id]=spgsProductionSignature(incoming);
                 }
 
                 // Prevent the realtime event being written back again.
@@ -2473,6 +2632,7 @@ spgsProductionJson=
         if(u){currentUser={id:u.id,username:u.username,display:u.display,role:u.role};$('loginScreen').style.display='none';$('currentUserChip').textContent=`${u.display} • ${u.role}`}
         else{sessionStorage.removeItem('sc_active_user_v75_clean');currentUser=null;$('loginScreen').style.display='flex'}
       }
+      if(currentUser?.username)await spgsLoadProductionSeen();
       refreshAll();
       try{applyUserAccess()}catch(e){}
       try{refreshBranchCustomerProfiles()}catch(e){}
@@ -2488,7 +2648,19 @@ spgsProductionJson=
   loginUser=async function(){
     if(!spgsReady&&!spgsBootError)await spgsReadyPromise;
     if(!spgsReady){toast('Cloud database is not connected');return}
-    return spgsExistingLogin();
+    const result=spgsExistingLogin();
+    if(currentUser?.username){
+      await spgsLoadProductionSeen();
+      try{renderProductionBoard()}catch(e){}
+    }
+    return result;
+  };
+
+  const spgsExistingLogout=logoutUser;
+  logoutUser=function(){
+    spgsProductionSeen={};
+    spgsProductionSeenReady=false;
+    return spgsExistingLogout.apply(this,arguments);
   };
 
   window.spgsResetSupabaseKey=function(){localStorage.removeItem(SPGS_KEY_STORE);location.reload()};
