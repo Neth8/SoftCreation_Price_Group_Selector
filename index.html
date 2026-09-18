@@ -2102,11 +2102,19 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
 /* SPGS Supabase bridge - cloud persistence + application-user table.
    Business/pricing/document logic above is intentionally left unchanged. */
 (function(){
-  const SPGS_REST='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
+  const SPGS_REST='https://qyxgamverzdmhtvezbft.supabase.co';
   const SPGS_WORKSPACE='softcreation_main';
   const SPGS_KEY_STORE='spgs_supabase_browser_key_v1';
   const SPGS_LOCAL_KEYS=['sc_qpi_v85_branch_portal_clean','sc_qpi_v84_clean_release_20260917'];
-  let spgsReady=false,spgsBootError=null,spgsSaveTimer=null,spgsSaving=false,spgsSaveAgain=false,spgsLastUsersJson='';
+let spgsReady=false,
+    spgsBootError=null,
+    spgsSaveTimer=null,
+    spgsSaving=false,
+    spgsSaveAgain=false,
+    spgsLastUsersJson='',
+    spgsProductionJson='',
+    spgsProductionClient=null,
+    spgsProductionChannel=null;
 
   function spgsApiKey(){
     let key=localStorage.getItem(SPGS_KEY_STORE)||'';
@@ -2141,10 +2149,190 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
   }
   function spgsCloudPayload(){
     const copy=JSON.parse(JSON.stringify(state));
+    delete copy.productionRequests;
     delete copy.users;
     copy.current=null;
     return copy;
   }
+  async function spgsLoadProduction(){
+    const rows=await spgsFetch(
+        `/spgs_production_requests` +
+        `?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}` +
+        `&select=id,payload,updated_at` +
+        `&order=updated_at.desc`
+    );
+
+    return (rows||[])
+        .map(x=>x.payload)
+        .filter(x=>x && x.id);
+}
+
+
+async function spgsSyncProduction(force=false){
+
+    state.productionRequests=state.productionRequests||[];
+
+    const sig=JSON.stringify(state.productionRequests);
+
+    // Don't write production table when nothing in Production changed.
+    if(!force && sig===spgsProductionJson)return;
+
+    if(state.productionRequests.length){
+
+        const rows=state.productionRequests.map(r=>({
+            workspace:SPGS_WORKSPACE,
+            id:r.id,
+            order_no:r.orderNo||'',
+            status:r.status||'Requested',
+            owner_user:r.ownerUser||'',
+            payload:r,
+            updated_at:new Date().toISOString()
+        }));
+
+        await spgsFetch(
+            '/spgs_production_requests?on_conflict=workspace,id',
+            {
+                method:'POST',
+                headers:{
+                    'Content-Type':'application/json',
+                    'Prefer':'resolution=merge-duplicates,return=minimal'
+                },
+                body:JSON.stringify(rows)
+            }
+        );
+    }
+
+    spgsProductionJson=JSON.stringify(state.productionRequests);
+}
+async function spgsStartProductionRealtime(){
+
+    const ok=await loadScript(
+        'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+        ()=>window.supabase && window.supabase.createClient
+    );
+
+    if(!ok){
+        throw new Error('Supabase Realtime library could not be loaded');
+    }
+
+    const key=spgsApiKey();
+
+    spgsProductionClient=window.supabase.createClient(
+        'https://qyxgamverzdmhtvezbft.supabase.co',
+        key,
+        {
+            auth:{
+                persistSession:false,
+                autoRefreshToken:false,
+                detectSessionInUrl:false
+            }
+        }
+    );
+
+    spgsProductionChannel=spgsProductionClient
+        .channel('spgs-production-'+SPGS_WORKSPACE)
+
+        .on(
+            'postgres_changes',
+            {
+                event:'*',
+                schema:'public',
+                table:'spgs_production_requests',
+                filter:`workspace=eq.${SPGS_WORKSPACE}`
+            },
+
+            change=>{
+
+                state.productionRequests=state.productionRequests||[];
+
+                // DELETE
+                if(change.eventType==='DELETE'){
+
+                    const id=change.old?.id;
+
+                    if(id){
+                        state.productionRequests=
+                            state.productionRequests.filter(x=>x.id!==id);
+                    }
+
+                }
+
+                // INSERT / UPDATE
+                else{
+
+                    const incoming=change.new?.payload;
+
+                    if(!incoming || !incoming.id)return;
+
+                    const index=
+                        state.productionRequests.findIndex(
+                            x=>x.id===incoming.id
+                        );
+
+                    if(index>=0){
+                        state.productionRequests[index]=incoming;
+                    }else{
+                        state.productionRequests.unshift(incoming);
+                    }
+                }
+
+                // Prevent the realtime event being written back again.
+                spgsProductionJson=
+                    JSON.stringify(state.productionRequests);
+
+                // Keep local backup current.
+                spgsWriteLocal();
+
+
+                // Update Production screen immediately.
+                try{
+                    if(
+                        $('production') &&
+                        $('production').classList.contains('active')
+                    ){
+                        renderProductionBoard();
+                    }
+                }catch(e){
+                    console.warn(
+                        'Production board realtime render failed',
+                        e
+                    );
+                }
+
+
+                // Production dispatch information is also used here.
+                try{
+                    if(
+                        $('stores') &&
+                        $('stores').classList.contains('active')
+                    ){
+                        renderStoresQueueV8();
+                    }
+                }catch(e){}
+
+                console.log(
+                    'Production realtime:',
+                    change.eventType,
+                    change.new?.order_no ||
+                    change.old?.order_no ||
+                    ''
+                );
+            }
+        )
+
+        .subscribe(status=>{
+            console.log(
+                'Production realtime status:',
+                status
+            );
+
+            if(status==='SUBSCRIBED'){
+                console.log(
+                    'SoftCreation Production realtime connected'
+                );
+            }
+        });
+}
   function spgsLocalPayload(){
     const copy=JSON.parse(JSON.stringify(state));
     copy.users=(copy.users||[]).map(u=>{const x={...u};delete x.password;return x});
@@ -2194,7 +2382,11 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
     if(!spgsReady)return;
     if(spgsSaving){spgsSaveAgain=true;return}
     spgsSaving=true;
-    try{await spgsWriteCloudState();await spgsSyncUsers()}
+    try{
+    await spgsWriteCloudState();
+    await spgsSyncUsers();
+    await spgsSyncProduction();
+}
     catch(e){console.error('SPGS cloud save failed',e);toast('Cloud save failed - local copy kept')}
     finally{spgsSaving=false;if(spgsSaveAgain){spgsSaveAgain=false;spgsSchedule(80)}}
   }
@@ -2230,12 +2422,49 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
         state={...state,...payload,current:localCurrent||null,users:cloudUsers};
         migrateV7();migrateUserPrivileges();
       }
+// ------------------------------------
+// Production dedicated cloud bootstrap
+// ------------------------------------
 
+const cloudProduction=await spgsLoadProduction();
+
+if(cloudProduction.length){
+
+    // Existing production table wins.
+    state.productionRequests=cloudProduction;
+
+}else{
+
+    // First upgrade from old v8.7:
+    // productionRequests already in state are copied to
+    // the new realtime table.
+    state.productionRequests=
+        state.productionRequests||[];
+
+    if(state.productionRequests.length){
+        await spgsSyncProduction(true);
+    }
+}
+
+spgsProductionJson=
+    JSON.stringify(state.productionRequests||[]);
       if(!state.users.length)throw new Error('spgs_users is empty. Run the supplied SQL and refresh.');
       state.users.forEach(u=>{u.companyLinkType=u.companyLinkType||'';u.companyLinkId=u.companyLinkId||''});
       await spgsSyncUsers(true);
       spgsLastUsersJson=JSON.stringify(state.users);
       spgsReady=true;
+      try{
+    await spgsStartProductionRealtime();
+}catch(e){
+    console.error(
+        'Production realtime could not start',
+        e
+    );
+
+    toast(
+        'Production realtime offline - normal cloud save still works'
+    );
+}
       spgsWriteLocal();
 
       const session=(()=>{try{return JSON.parse(sessionStorage.getItem('sc_active_user_v75_clean')||'null')}catch(e){return null}})();
