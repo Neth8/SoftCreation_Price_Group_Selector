@@ -1795,7 +1795,26 @@ function enhanceProductionWorkflowV8(){
   VIEW_PERMS.production='production_manage';VIEW_PERMS.productionproducts='products_view';VIEW_PERMS.stores='stores_receive';
   state.productionRequests=state.productionRequests||[];state.notifications=state.notifications||[];state.grns=state.grns||[];
   const style=document.createElement('style');style.textContent=`
-  .prod-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}.prod-kpi{background:#f7fbfc;border:1px solid #d6e6e8;border-radius:13px;padding:12px}.prod-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.prod-kpi b{font-size:19px}.prod-board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.prod-col{background:#f5f8f9;border:1px solid #dce7e9;border-radius:12px;padding:8px;min-height:160px}.prod-col h4{margin:2px 3px 8px;color:#087f83}.prod-card{position:relative;background:#fff;border:1px solid #d5e4e6;border-left:5px solid #079c9f;border-radius:10px;padding:10px;margin-bottom:8px}.prod-card.urgent{border-left-color:#d74a4a}.prod-card.finished{border-left-color:#16885b}.prod-card.has-unread-update{padding-bottom:72px}.prod-update-gif{position:absolute;right:8px;bottom:8px;width:58px;height:58px;object-fit:contain;z-index:5;pointer-events:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,.18))}.prod-meta{font-size:10px;color:#65767d;line-height:1.5}.prod-status{font-weight:900;font-size:10px;padding:4px 7px;border-radius:12px;background:#e8f6f6;color:#087f83}.prod-history{border-left:2px solid #bddadc;margin:8px 0 0 5px;padding-left:10px;font-size:10px}.supply-pill{display:inline-block;padding:3px 7px;border-radius:12px;font-size:9px;font-weight:900;background:#e9f7f1;color:#087247}.supply-pill.production{background:#fff1d3;color:#995d00}.notification-dot{background:#d74a4a;color:#fff;border-radius:50%;font-size:9px;padding:2px 5px}.grn-ok{color:#087247;font-weight:900}.grn-bad{color:#bd2525;font-weight:900}.proof-thumb{max-width:180px;max-height:110px;border-radius:8px;border:1px solid #d5e4e6}.production-line{display:grid;grid-template-columns:28px 1.4fr 1fr .8fr 1fr;gap:7px;align-items:center;padding:8px;border-bottom:1px solid #e3ecee}.production-line input,.production-line select{padding:8px}.prod-summary-note{background:#eefafa;border:1px solid #b9dfdf;border-radius:10px;padding:9px;margin:8px 0;font-size:10px}.pp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}.pp-kpi{background:linear-gradient(135deg,#f7fbfc,#fff);border:1px solid #d6e6e8;border-radius:14px;padding:13px}.pp-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.pp-kpi b{display:block;font-size:21px;margin-top:4px}.pp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pp-card{background:#fff;border:1px solid #d5e4e6;border-radius:15px;padding:14px;box-shadow:0 7px 20px rgba(21,54,66,.06)}.pp-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pp-card-title{font-size:15px;font-weight:1000;color:#17353d}.pp-spec{font-size:10px;color:#64777f;line-height:1.5;margin-top:3px}.pp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}.pp-stat{border-radius:11px;padding:9px;text-align:center;background:#f5f8f9;border:1px solid #e0eaec}.pp-stat.total{background:#eef8fa}.pp-stat.ongoing{background:#fff7df;border-color:#efdda9}.pp-stat.finished{background:#eaf8f0;border-color:#cce8d8}.pp-stat span{display:block;font-size:8px;font-weight:1000;color:#687b82;text-transform:uppercase}.pp-stat b{display:block;font-size:18px;margin-top:2px}.pp-stat small{font-size:8px;color:#788890}.pp-card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:11px;padding-top:10px;border-top:1px dashed #dce8ea}.pp-mini{font-size:9px;color:#62747d;line-height:1.5}.pp-progress{height:7px;background:#edf2f3;border-radius:99px;overflow:hidden;margin-top:10px}.pp-progress>span{display:block;height:100%;background:linear-gradient(90deg,#079c9f,#16885b);border-radius:99px}.pp-job-status{display:inline-block;padding:3px 7px;border-radius:999px;font-size:8px;font-weight:900;background:#eef5f6;color:#46636c}.pp-job-status.ongoing{background:#fff1ce;color:#8c6200}.pp-job-status.finished{background:#e3f6eb;color:#087247}.pp-detail-spec{background:#eefafa;border:1px solid #c4e3e3;border-radius:12px;padding:11px;margin-bottom:12px}@media(max-width:1100px){.pp-grid{grid-template-columns:1fr 1fr}}@media(max-width:900px){.prod-kpis,.prod-board,.pp-kpis{grid-template-columns:1fr 1fr}.production-line{grid-template-columns:24px 1fr}.production-line>*{grid-column:2}.production-line>input[type=checkbox]{grid-column:1;grid-row:1/5}}@media(max-width:620px){.pp-grid,.pp-kpis{grid-template-columns:1fr}.pp-stats{grid-template-columns:1fr 1fr 1fr}}@media(max-width:560px){.prod-kpis,.prod-board{grid-template-columns:1fr}}
+  .prod-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}.prod-kpi{background:#f7fbfc;border:1px solid #d6e6e8;border-radius:13px;padding:12px}.prod-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.prod-kpi b{font-size:19px}.prod-board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.prod-col{background:#f5f8f9;border:1px solid #dce7e9;border-radius:12px;padding:8px;min-height:160px}.prod-col h4{margin:2px 3px 8px;color:#087f83}.prod-card{position:relative;background:#fff;border:1px solid #d5e4e6;border-left:5px solid #079c9f;border-radius:10px;padding:10px;margin-bottom:8px}.prod-card.urgent{border-left-color:#d74a4a}.prod-card.finished{border-left-color:#16885b}.prod-card.has-unread-update{padding-bottom:72px}.prod-update-gif{position:absolute;right:8px;bottom:8px;width:58px;height:58px;object-fit:contain;z-index:5;pointer-events:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,.18))}.prod-meta{font-size:10px;color:#65767d;line-height:1.5}.prod-status{font-weight:900;font-size:10px;padding:4px 7px;border-radius:12px;background:#e8f6f6;color:#087f83}.prod-history{border-left:2px solid #bddadc;margin:8px 0 0 5px;padding-left:10px;font-size:10px}.supply-pill{display:inline-block;padding:3px 7px;border-radius:12px;font-size:9px;font-weight:900;background:#e9f7f1;color:#087247}.supply-pill.production{background:#fff1d3;color:#995d00}.notification-dot{background:#d74a4a;color:#fff;border-radius:50%;font-size:9px;padding:2px 5px}.grn-ok{color:#087247;font-weight:900}.grn-bad{color:#bd2525;font-weight:900}.proof-thumb{max-width:180px;max-height:110px;border-radius:8px;border:1px solid #d5e4e6}.production-line{display:grid;grid-template-columns:28px 1.4fr 1fr .8fr 1fr;gap:7px;align-items:center;padding:8px;border-bottom:1px solid #e3ecee}.production-line input,.production-line select{padding:8px}.prod-summary-note{background:#eefafa;border:1px solid #b9dfdf;border-radius:10px;padding:9px;margin:8px 0;font-size:10px}.pp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}.pp-kpi{background:linear-gradient(135deg,#f7fbfc,#fff);border:1px solid #d6e6e8;border-radius:14px;padding:13px}.pp-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.pp-kpi b{display:block;font-size:21px;margin-top:4px}.pp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pp-card{background:#fff;border:1px solid #d5e4e6;border-radius:15px;padding:14px;box-shadow:0 7px 20px rgba(21,54,66,.06)}.pp-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pp-card-title{font-size:15px;font-weight:1000;color:#17353d}.pp-spec{font-size:10px;color:#64777f;line-height:1.5;margin-top:3px}.pp-stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:7px;
+    margin-top:12px
+}.pp-stat{border-radius:11px;padding:9px;text-align:center;background:#f5f8f9;border:1px solid #e0eaec}.pp-stat.total{background:#eef8fa}.pp-stat.ongoing{background:#fff7df;border-color:#efdda9}.pp-stat.finished{background:#eaf8f0;border-color:#cce8d8}..pp-stat.difference{
+    background:#fff0f0;
+    border-color:#f1bcbc;
+}
+
+.pp-stat.difference span{
+    color:#b42318;
+}
+
+.pp-stat.difference b{
+    color:#d32f2f;
+}pp-stat span{display:block;font-size:8px;font-weight:1000;color:#687b82;text-transform:uppercase}.pp-stat b{display:block;font-size:18px;margin-top:2px}.pp-stat small{font-size:8px;color:#788890}.pp-card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:11px;padding-top:10px;border-top:1px dashed #dce8ea}.pp-mini{font-size:9px;color:#62747d;line-height:1.5}.pp-progress{height:7px;background:#edf2f3;border-radius:99px;overflow:hidden;margin-top:10px}.pp-progress>span{display:block;height:100%;background:linear-gradient(90deg,#079c9f,#16885b);border-radius:99px}.pp-job-status{display:inline-block;padding:3px 7px;border-radius:999px;font-size:8px;font-weight:900;background:#eef5f6;color:#46636c}.pp-job-status.ongoing{background:#fff1ce;color:#8c6200}.pp-job-status.finished{background:#e3f6eb;color:#087247}.pp-detail-spec{background:#eefafa;border:1px solid #c4e3e3;border-radius:12px;padding:11px;margin-bottom:12px}@media(max-width:1100px){.pp-grid{grid-template-columns:1fr 1fr}}@media(max-width:900px){.prod-kpis,.prod-board,.pp-kpis{grid-template-columns:1fr 1fr}.production-line{grid-template-columns:24px 1fr}.production-line>*{grid-column:2}.production-line>input[type=checkbox]{grid-column:1;grid-row:1/5}}@media(max-width:620px){
+    .pp-grid,.pp-kpis{grid-template-columns:1fr}
+    .pp-stats{grid-template-columns:1fr 1fr}
+}@media(max-width:560px){.prod-kpis,.prod-board{grid-template-columns:1fr}}
   `;document.head.appendChild(style);
   const nav=document.querySelector('.nav'),settings=document.querySelector('[data-view="settings"]');
   [['production','Production'],['productionproducts','Products'],['stores','Stores / GRN']].forEach(([id,label])=>{const b=document.createElement('button');b.className='navbtn';b.dataset.view=id;b.textContent=label;b.onclick=()=>showView(id);nav.insertBefore(b,settings)});
@@ -1843,7 +1862,56 @@ function renderProductionProducts(){
   const filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc].join(' ').toLowerCase().includes(q)));
   const totals=groups.reduce((a,g)=>({total:a.total+g.total,ongoing:a.ongoing+g.ongoing,finished:a.finished+g.finished}),{total:0,ongoing:0,finished:0});
   if($('productionProductsKpis'))$('productionProductsKpis').innerHTML=[['Unique Products',groups.length,'specifications'],['Total Production',totals.total,'requested qty'],['Ongoing',totals.ongoing,'active production'],['Finished',totals.finished,'incl. logistics']].map(([k,v,n])=>`<div class="pp-kpi"><span>${k}</span><b>${money(v)}</b><div class="small">${n}</div></div>`).join('');
-  grid.innerHTML=filtered.length?filtered.map(g=>{const pct=g.total>0?Math.max(0,Math.min(100,g.finished/g.total*100)):0;return `<div class="pp-card"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag">${g.totalJobs} job${g.totalJobs===1?'':'s'}</span></div><div class="pp-stats"><div class="pp-stat total"><span>Total</span><b>${money(g.total)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat ongoing"><span>Ongoing</span><b>${money(g.ongoing)}</b><small>${g.ongoingJobs} job${g.ongoingJobs===1?'':'s'}</small></div><div class="pp-stat finished"><span>Finished</span><b>${money(g.finished)}</b><small>${g.finishedJobs} job${g.finishedJobs===1?'':'s'}</small></div></div><div class="pp-progress" title="Finished against requested total"><span style="width:${pct.toFixed(1)}%"></span></div><div class="pp-card-foot"><div class="pp-mini">Logistics: <b>${money(g.logistics)} ${esc(g.unit)}</b><br>Finished progress: ${pct.toFixed(0)}%</div><button class="btn ghost sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">View Jobs</button></div></div>`}).join(''):'<div class="empty" style="grid-column:1/-1">No matching production products.</div>';
+  grid.innerHTML=filtered.length?filtered.map(g=>{
+
+    const pct=g.total>0
+        ?Math.max(
+            0,
+            Math.min(
+                100,
+                g.finished/g.total*100
+            )
+        )
+        :0;
+
+    const difference=Math.max(
+        0,
+        Number(g.total||0)
+        - Number(g.ongoing||0)
+        - Number(g.finished||0)
+    );
+
+    return `<div class="pp-card"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag">${g.totalJobs} job${g.totalJobs===1?'':'s'}</span></div><div class="pp-stats">
+
+    <div class="pp-stat total">
+        <span>Total</span>
+        <b>${money(g.total)}</b>
+        <small>${esc(g.unit)}</small>
+    </div>
+
+    <div class="pp-stat ongoing">
+        <span>Ongoing</span>
+        <b>${money(g.ongoing)}</b>
+        <small>
+            ${g.ongoingJobs} job${g.ongoingJobs===1?'':'s'}
+        </small>
+    </div>
+
+    <div class="pp-stat finished">
+        <span>Finished</span>
+        <b>${money(g.finished)}</b>
+        <small>
+            ${g.finishedJobs} job${g.finishedJobs===1?'':'s'}
+        </small>
+    </div>
+
+    <div class="pp-stat difference">
+        <span>Difference</span>
+        <b>${money(difference)}</b>
+        <small>${esc(g.unit)}</small>
+    </div>
+
+</div><div class="pp-progress" title="Finished against requested total"><span style="width:${pct.toFixed(1)}%"></span></div><div class="pp-card-foot"><div class="pp-mini">Logistics: <b>${money(g.logistics)} ${esc(g.unit)}</b><br>Finished progress: ${pct.toFixed(0)}%</div><button class="btn ghost sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">View Jobs</button></div></div>`}).join(''):'<div class="empty" style="grid-column:1/-1">No matching production products.</div>';
 }
 function openProductionProductDetailsV103(encodedKey){
   const key=decodeURIComponent(encodedKey),g=productionProductGroupsV103().find(x=>x.key===key);if(!g)return;
