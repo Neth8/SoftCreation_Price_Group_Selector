@@ -1884,7 +1884,7 @@ function renderProductionProducts(){
     return `<div class="pp-card"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag">${g.totalJobs} job${g.totalJobs===1?'':'s'}</span></div><div class="pp-stats">
 
     <div class="pp-stat total">
-        <span>Total</span>
+        <span>Requested</span>
         <b>${money(g.total)}</b>
         <small>${esc(g.unit)}</small>
     </div>
@@ -1906,7 +1906,7 @@ function renderProductionProducts(){
     </div>
 
     <div class="pp-stat difference">
-        <span>Difference</span>
+        <span>Pending</span>
         <b>${money(difference)}</b>
         <small>${esc(g.unit)}</small>
     </div>
