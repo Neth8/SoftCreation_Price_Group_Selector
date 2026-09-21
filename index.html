@@ -1529,14 +1529,75 @@ function enhanceV5UI(){
  document.body.insertAdjacentHTML('beforeend',`<div id="categoryModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Price Category</b><button class="closex" onclick="closeModal('categoryModal')">×</button></div><div class="modal-body"><input id="catId" type="hidden"><div class="grid"><div class="field"><label>Name</label><input id="catName"></div><div class="field"><label>Margin %</label><input id="catMargin" type="number" step="0.0001"></div><div class="field"><label>Cost Basis</label><select id="catBase"><option value="full">Full Excel Cost</option><option value="scale">Scale Excel Cost</option></select></div><div class="field"><label><input id="catApproval" type="checkbox"> Manager approval required</label></div><div class="field full"><label>Item Types</label><label><input id="cat_label" type="checkbox"> Label</label> <label><input id="cat_device" type="checkbox"> Device</label> <label><input id="cat_product" type="checkbox"> Ribbon/Paper</label></div><div class="field"><label><input id="catActive" type="checkbox"> Active</label></div></div><div class="actions"><button class="btn primary" onclick="saveCategory()">Save</button><button class="btn red" onclick="deleteCategory()">Delete</button></div></div></div></div>
  <div id="productModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Ribbon / Paper Roll Master</b><button class="closex" onclick="closeModal('productModal')">×</button></div><div class="modal-body"><input id="prodId" type="hidden"><div class="grid"><div class="field"><label>Type</label><select id="prodType" onchange="productTypeUI()"><option value="ribbon">Ribbon</option><option value="paper">Paper Roll</option></select></div><div class="field"><label>Width (mm)</label><input id="prodWidth" type="number"></div></div><div id="ribbonFields" class="grid"><div class="field"><label>Length (m)</label><input id="prodLength" type="number"></div><div class="field"><label>Ribbon Material</label><input id="prodMaterial" placeholder="Premium Wax"></div><div class="field"><label>Color</label><input id="prodColor" value="Black"></div></div><div id="paperFields" class="grid"><div class="field"><label>Diameter (mm)</label><input id="prodDiameter" type="number"></div><div class="field"><label>Paper Type</label><select id="prodPaperType"><option>Thermal</option><option>Non Thermal</option></select></div><div class="field"><label>Coating</label><select id="prodCoating"><option>Normal</option><option>Top Coated</option></select></div></div><div class="grid"><div class="field"><label>Unit Cost</label><input id="prodCost" type="number" step="0.01"></div><div class="field"><label>Base Sale Price</label><input id="prodPrice" type="number" step="0.01"></div><div class="field"><label>Supplier</label><input id="prodSupplier"></div><div class="field full"><label>Price Categories (max 3)</label><div id="prodCategories"></div></div></div><div class="actions"><button class="btn primary" onclick="saveProduct()">Save</button><button class="btn red" onclick="deleteProduct()">Delete</button></div></div></div></div><div id="productPickerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Add Ribbon / Paper Roll</b><button class="closex" onclick="closeModal('productPickerModal')">×</button></div><div id="productPickerList" class="modal-body"></div></div></div><div id="savedPricesModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Customer Saved Label Prices</b><button class="closex" onclick="closeModal('savedPricesModal')">×</button></div><div id="savedPricesBody" class="modal-body"></div></div></div>`);
  const it=document.querySelector('.item-tools');if(it){const b=document.createElement('button');b.className='btn ghost';b.textContent='Ribbon / Paper';b.onclick=openProductPicker;it.appendChild(b)}
- const cm=$('customerModal').querySelector('.modal-body');cm.insertAdjacentHTML('beforeend','<div class="section">PRICE CATEGORIES (SELECT UP TO 3)</div><div id="custCategoryChoices" class="grid"></div><div class="actions"><button class="btn ghost" type="button" onclick="viewCustomerSavedPrices()">View Saved Sizes & Prices</button></div>');
+const cm=$('customerModal').querySelector('.modal-body');
+cm.insertAdjacentHTML(
+    'beforeend',
+    '<div class="section">PRICE CATEGORIES</div><div id="custCategoryChoices" class="grid"></div><div class="actions"><button class="btn ghost" type="button" onclick="viewCustomerSavedPrices()">View Saved Sizes & Prices</button></div>'
+);
  const dg=$('deviceModal').querySelector('.grid');dg.insertAdjacentHTML('beforeend','<div class="field"><label>Supplier</label><input id="devSupplier"></div><div class="field"><label>Warranty Period</label><input id="devWarranty" placeholder="12 months"></div><div class="field full"><label>Price Categories (max 3)</label><div id="devCategories"></div></div>');
  const pd=$('profitDelivery').closest('.field');pd.style.display='none';pd.insertAdjacentHTML('afterend','<div class="field"><label>Delivery Mode</label><select id="deliveryMode" onchange="renderProfitReport()"><option value="charge">Charge Customer</option><option value="free">Free / Company Absorbed</option><option value="pickup">Pickup / Not Applicable</option></select></div><div class="field"><label>Distance from Kurunegala (km)</label><input id="deliveryKm" type="number" step="0.1" oninput="renderProfitReport()"></div><div class="field"><label>Rate per km (LKR)</label><input id="deliveryRate" type="number" step="0.01" value="25" oninput="renderProfitReport()"></div><div class="field"><label>Amount Charged to Customer</label><input id="deliveryCharge" type="number" step="0.01" oninput="renderProfitReport()"></div><div class="field full"><div class="notice">Use the customer Google Maps link to check route distance from Kurunegala, then enter km here. Automatic distance requires a Google Maps API key when hosted.</div></div>');
 }
 enhanceV5UI();
+const openCustomerModalV5=openCustomerModal;
 
-const openCustomerModalV5=openCustomerModal;openCustomerModal=function(id=''){openCustomerModalV5(id);const c=state.customers.find(x=>x.id===id)||{};$('custCategoryChoices').innerHTML=categoryChecks(c.priceCategoryIds||[],'custCat');enforceThree('custCat')};
-const saveCustomerV5=saveCustomer;saveCustomer=async function(){const ids=checkedCategories('custCat'),id=$('custId').value||'';await saveCustomerV5();const sid=id||$('customerSelect').value,c=state.customers.find(x=>x.id===sid);if(c){c.priceCategoryIds=ids;saveState();calculateLabelPrice()}};
+openCustomerModal=function(id=''){
+
+    openCustomerModalV5(id);
+
+    const c=
+        state.customers.find(
+            x=>x.id===id
+        )||{};
+
+    $('custCategoryChoices').innerHTML=
+        categoryChecks(
+            c.priceCategoryIds||[],
+            'custCat'
+        );
+};
+const saveCustomerV5=saveCustomer;
+
+saveCustomer=async function(){
+
+    /*
+       CUSTOMER PRICE CATEGORIES
+       NO MAXIMUM LIMIT
+    */
+    const ids=[
+        ...document.querySelectorAll(
+            'input[name="custCat"]:checked'
+        )
+    ].map(x=>x.value);
+
+
+    const id=
+        $('custId').value||
+        '';
+
+
+    await saveCustomerV5();
+
+
+    const sid=
+        id||
+        $('customerSelect').value;
+
+
+    const c=
+        state.customers.find(
+            x=>x.id===sid
+        );
+
+
+    if(c){
+
+        c.priceCategoryIds=ids;
+
+        saveState();
+
+        calculateLabelPrice();
+    }
+};
 function viewCustomerSavedPrices(){const id=$('custId').value||$('customerSelect').value,c=state.customers.find(x=>x.id===id);if(!c)return toast('Save/select a customer first');$('savedPricesBody').innerHTML=`<div><b>${esc(c.name)}</b></div><div class="small">Categories: ${(c.priceCategoryIds||[]).map(id=>esc(state.priceCategories.find(x=>x.id===id)?.name||'')).join(', ')||'All active categories'}</div><table class="table"><thead><tr><th>Size / Material</th><th>Price</th><th>Mode</th><th>Category</th><th>Date</th></tr></thead><tbody>${(c.priceHistory||[]).map(x=>`<tr><td>${esc([x.size,x.material,x.layout,x.pcs].filter(Boolean).join(' / '))}</td><td>LKR ${money(x.price)}</td><td>${esc(x.mode||'')}</td><td>${esc(x.tier||'')}</td><td>${esc((x.date||'').slice(0,10))}</td></tr>`).join('')||'<tr><td colspan="5">No saved prices</td></tr>'}</tbody></table>`;$('savedPricesModal').classList.add('show')}
 
 const openDeviceModalV5=openDeviceModal;openDeviceModal=function(id=''){openDeviceModalV5(id);const d=state.devices.find(x=>x.id===id)||{};$('devSupplier').value=d.supplier||'';$('devWarranty').value=d.warranty||'';$('devCategories').innerHTML=categoryChecks(d.categoryIds||[],'devCat');enforceThree('devCat')};
