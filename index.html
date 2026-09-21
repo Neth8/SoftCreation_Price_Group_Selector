@@ -2245,7 +2245,41 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
     return true
   }
   window.poAdminPasswordOK=poAdminPasswordOK;
+function poItemRowsChanged(oldLines=[],newLines=[]){
 
+    const clean=lines=>(lines||[]).map(l=>({
+        id:String(l.id||''),
+        description:String(l.description||'').trim(),
+        spec:String(l.spec||'').trim(),
+        unit:String(l.unit||'').trim(),
+        qty:Number(l.qty||0),
+        unitPrice:Number(l.unitPrice||0)
+    }));
+
+    const oldClean=clean(oldLines);
+    const newClean=clean(newLines);
+
+    if(oldClean.length!==newClean.length)return true;
+
+    for(let i=0;i<oldClean.length;i++){
+
+        const a=oldClean[i];
+        const b=newClean[i];
+
+        if(
+            a.id!==b.id ||
+            a.description!==b.description ||
+            a.spec!==b.spec ||
+            a.unit!==b.unit ||
+            a.qty!==b.qty ||
+            a.unitPrice!==b.unitPrice
+        ){
+            return true;
+        }
+    }
+
+    return false;
+}
   window.renderPurchaseOrders=function(){
     if(!$('poList'))return;state.purchaseOrders=state.purchaseOrders||[];if(currentUser?.role!=='admin'&&!hasPerm('purchase_orders_view')){$('poList').innerHTML='<div class="empty">Purchase Orders access is not enabled for this user.</div>';return}
     const a=state.purchaseOrders||[],q=($('poSearch')?.value||'').trim().toLowerCase(),sf=$('poStatusFilter')?.value||'',filtered=a.filter(po=>(!sf||po.status===sf)&&(!q||[po.poNo,po.supplier?.name,po.supplierRef,...(po.lines||[]).map(l=>l.description+' '+l.spec)].join(' ').toLowerCase().includes(q))).sort((x,y)=>String(y.updatedAt||y.createdAt||'').localeCompare(String(x.updatedAt||x.createdAt||'')));
@@ -2307,15 +2341,325 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
     if(!requirePerm('purchase_orders_view','use purchase orders'))return;const po=state.purchaseOrders.find(x=>x.id===id)||{id:'',poNo:poNumberNext(),date:today(),expectedDate:'',status:'Draft',currency:'USD',vatMode:'none',supplier:{},lines:[],shippingCharge:0,otherCharge:0,discount:0,history:[]};
     $('poId').value=po.id||'';$('poNumber').value=po.poNo||poNumberNext();$('poStatus').value=po.status||'Draft';$('poDate').value=po.date||today();$('poExpectedDate').value=po.expectedDate||'';$('poSupplier').value=po.supplier?.name||'';$('poSupplierContact').value=po.supplier?.contact||'';$('poSupplierPhone').value=po.supplier?.phone||'';$('poSupplierEmail').value=po.supplier?.email||'';$('poSupplierCountry').value=po.supplier?.country||'';$('poSupplierAddress').value=po.supplier?.address||'';$('poCurrency').value=po.currency||'USD';$('poVatMode').value=po.vatMode||'none';$('poPaymentTerms').value=po.paymentTerms||'';$('poShippingMethod').value=po.shippingMethod||'';$('poSupplierRef').value=po.supplierRef||'';$('poShippingCharge').value=po.shippingCharge||'';$('poOtherCharge').value=po.otherCharge||'';$('poDiscount').value=po.discount||'';$('poNotes').value=po.notes||'';$('poLineRows').innerHTML='';(po.lines?.length?po.lines:[{}]).forEach(l=>{addPurchaseOrderLine(l);const tr=$('poLineRows').lastElementChild;if(tr)tr.dataset.lineId=l.id||uid('pol')});$('poHistory').innerHTML=poHistoryHtml(po);$('poModalTitle').textContent=po.id?`Purchase Order — ${po.poNo}`:'New Supplier Purchase Order';$('poMarkSentBtn').style.display=po.id&&!['Sent','Supplier Confirmed','Partially Received','Received','Cancelled'].includes(po.status)?'inline-block':'none';$('poReceiveBtn').style.display=po.id&&!['Draft','Cancelled','Received'].includes(po.status)?'inline-block':'none';refreshPOAutoCompleteLists();renderPOEditorTotals();$('purchaseOrderModal').classList.add('show')
   };
+window.savePurchaseOrder=function(keepOpen=false){
 
-  window.savePurchaseOrder=function(keepOpen=false){
-    if(!requirePerm('purchase_orders_view','save purchase orders'))return null;
-    const existingId=$('poId').value,id=existingId||uid('po'),old=state.purchaseOrders.find(x=>x.id===id)||{},lines=collectPOLines();
-    if(!$('poSupplier').value.trim())return toast('Supplier name is required');
-    if(!lines.length||lines.some(l=>!l.description||!(l.qty>0)))return toast('Add at least one item with description and ordered quantity');
-    if(!poAdminPasswordOK(`save ${old.poNo||$('poNumber').value||'this Purchase Order'}`))return null;
-    const now=new Date().toISOString(),selected=$('poStatus').value,po={...old,id,poNo:$('poNumber').value||poNumberNext(),date:$('poDate').value||today(),expectedDate:$('poExpectedDate').value||'',supplier:{name:$('poSupplier').value.trim(),contact:$('poSupplierContact').value.trim(),phone:$('poSupplierPhone').value.trim(),email:$('poSupplierEmail').value.trim(),country:$('poSupplierCountry').value.trim(),address:$('poSupplierAddress').value.trim()},currency:$('poCurrency').value,vatMode:$('poVatMode').value||'none',paymentTerms:$('poPaymentTerms').value.trim(),shippingMethod:$('poShippingMethod').value.trim(),supplierRef:$('poSupplierRef').value.trim(),lines,shippingCharge:Number($('poShippingCharge').value||0),otherCharge:Number($('poOtherCharge').value||0),discount:Number($('poDiscount').value||0),notes:$('poNotes').value.trim(),createdAt:old.createdAt||now,createdBy:old.createdBy||currentUser?.username||'',createdByDisplay:old.createdByDisplay||currentUser?.display||currentUser?.username||'',updatedAt:now,updatedBy:currentUser?.username||'',history:Array.isArray(old.history)?[...old.history]:[]};po.status=poDerivedStatus(po,selected);if(!old.id)po.history.push({status:'Draft',note:'Purchase order created',by:currentUser?.display||currentUser?.username||'',at:now});else if(old.status!==po.status)po.history.push({status:po.status,note:`Status changed from ${old.status||'Draft'} to ${po.status}`,by:currentUser?.display||currentUser?.username||'',at:now});const i=state.purchaseOrders.findIndex(x=>x.id===id);if(i>=0)state.purchaseOrders[i]=po;else state.purchaseOrders.unshift(po);audit('SAVE_PURCHASE_ORDER',`${po.poNo} ${po.supplier.name} ${po.status}`);saveState();refreshPOAutoCompleteLists();renderPurchaseOrders();if(keepOpen){$('poId').value=id;$('poHistory').innerHTML=poHistoryHtml(po)}else closeModal('purchaseOrderModal');toast(`Purchase Order ${po.poNo} saved`);return po
-  };
+    if(!requirePerm(
+        'purchase_orders_view',
+        'save purchase orders'
+    ))return null;
+
+
+    const existingId=$('poId').value;
+
+    const id=
+        existingId ||
+        uid('po');
+
+    const old=
+        state.purchaseOrders.find(x=>x.id===id) ||
+        {};
+
+    const lines=collectPOLines();
+
+
+    if(!$('poSupplier').value.trim()){
+        toast('Supplier name is required');
+        return null;
+    }
+
+
+    if(
+        !lines.length ||
+        lines.some(
+            l=>!l.description || !(l.qty>0)
+        )
+    ){
+        toast(
+            'Add at least one item with description and ordered quantity'
+        );
+        return null;
+    }
+
+
+    /*
+       ADMIN PASSWORD ONLY WHEN ITEM ROWS OF
+       AN EXISTING PO HAVE BEEN CHANGED.
+    */
+    if(
+        old.id &&
+        poItemRowsChanged(
+            old.lines||[],
+            lines
+        )
+    ){
+
+        if(
+            !poAdminPasswordOK(
+                `edit item details in ${old.poNo||$('poNumber').value||'this Purchase Order'}`
+            )
+        ){
+            return null;
+        }
+    }
+
+
+    const now=
+        new Date().toISOString();
+
+    const selected=
+        $('poStatus').value;
+
+
+    const po={
+        ...old,
+
+        id,
+
+        poNo:
+            $('poNumber').value ||
+            poNumberNext(),
+
+        date:
+            $('poDate').value ||
+            today(),
+
+        expectedDate:
+            $('poExpectedDate').value ||
+            '',
+
+
+        supplier:{
+
+            name:
+                $('poSupplier').value.trim(),
+
+            contact:
+                $('poSupplierContact').value.trim(),
+
+            phone:
+                $('poSupplierPhone').value.trim(),
+
+            email:
+                $('poSupplierEmail').value.trim(),
+
+            country:
+                $('poSupplierCountry').value.trim(),
+
+            address:
+                $('poSupplierAddress').value.trim()
+        },
+
+
+        currency:
+            $('poCurrency').value,
+
+        vatMode:
+            $('poVatMode').value ||
+            'none',
+
+        paymentTerms:
+            $('poPaymentTerms').value.trim(),
+
+        shippingMethod:
+            $('poShippingMethod').value.trim(),
+
+        supplierRef:
+            $('poSupplierRef').value.trim(),
+
+
+        lines,
+
+
+        shippingCharge:
+            Number(
+                $('poShippingCharge').value ||
+                0
+            ),
+
+        otherCharge:
+            Number(
+                $('poOtherCharge').value ||
+                0
+            ),
+
+        discount:
+            Number(
+                $('poDiscount').value ||
+                0
+            ),
+
+        notes:
+            $('poNotes').value.trim(),
+
+
+        createdAt:
+            old.createdAt ||
+            now,
+
+        createdBy:
+            old.createdBy ||
+            currentUser?.username ||
+            '',
+
+        createdByDisplay:
+            old.createdByDisplay ||
+            currentUser?.display ||
+            currentUser?.username ||
+            '',
+
+
+        updatedAt:
+            now,
+
+        updatedBy:
+            currentUser?.username ||
+            '',
+
+
+        history:
+            Array.isArray(old.history)
+                ? [...old.history]
+                : []
+    };
+
+
+    po.status=
+        poDerivedStatus(
+            po,
+            selected
+        );
+
+
+    if(!old.id){
+
+        po.history.push({
+
+            status:'Draft',
+
+            note:
+                'Purchase order created',
+
+            by:
+                currentUser?.display ||
+                currentUser?.username ||
+                '',
+
+            at:now
+        });
+
+    }
+    else{
+
+        /*
+           RECORD ITEM EDIT IN HISTORY
+        */
+        if(
+            poItemRowsChanged(
+                old.lines||[],
+                lines
+            )
+        ){
+
+            po.history.push({
+
+                status:
+                    po.status ||
+                    'Draft',
+
+                note:
+                    'Purchase Order item details edited with administrator approval',
+
+                by:
+                    currentUser?.display ||
+                    currentUser?.username ||
+                    '',
+
+                at:now
+            });
+        }
+
+
+        if(old.status!==po.status){
+
+            po.history.push({
+
+                status:
+                    po.status,
+
+                note:
+                    `Status changed from ${old.status||'Draft'} to ${po.status}`,
+
+                by:
+                    currentUser?.display ||
+                    currentUser?.username ||
+                    '',
+
+                at:now
+            });
+        }
+    }
+
+
+    const i=
+        state.purchaseOrders.findIndex(
+            x=>x.id===id
+        );
+
+
+    if(i>=0){
+
+        state.purchaseOrders[i]=po;
+
+    }
+    else{
+
+        state.purchaseOrders.unshift(po);
+    }
+
+
+    audit(
+        'SAVE_PURCHASE_ORDER',
+        `${po.poNo} ${po.supplier.name} ${po.status}`
+    );
+
+
+    saveState();
+
+    refreshPOAutoCompleteLists();
+
+    renderPurchaseOrders();
+
+
+    /*
+       Used internally by Mark Sent etc.
+    */
+    if(keepOpen){
+
+        $('poId').value=id;
+
+        $('poHistory').innerHTML=
+            poHistoryHtml(po);
+
+    }
+    else{
+
+        /*
+           NORMAL SAVE:
+           CLOSE PO CARD AUTOMATICALLY
+        */
+        closeModal(
+            'purchaseOrderModal'
+        );
+    }
+
+
+    toast(
+        `Purchase Order ${po.poNo} saved`
+    );
+
+
+    return po;
+};
   window.markCurrentPurchaseOrderSent=function(){const po=savePurchaseOrder(true);if(po)markPurchaseOrderSent(po.id)};
   window.markPurchaseOrderSent=function(id){const po=state.purchaseOrders.find(x=>x.id===id);if(!po)return;po.status='Sent';po.updatedAt=new Date().toISOString();po.updatedBy=currentUser?.username||'';po.history=po.history||[];po.history.push({status:'Sent',note:'Purchase order marked as sent to supplier',by:currentUser?.display||currentUser?.username||'',at:po.updatedAt});saveState();renderPurchaseOrders();openPurchaseOrder(id);toast('PO marked as Sent')};
   window.openCurrentPOReceipt=function(){const id=$('poId').value;if(id)openPurchaseOrderReceipt(id)};
