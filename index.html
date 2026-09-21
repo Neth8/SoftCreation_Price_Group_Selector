@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.7</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.8</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <div class="topbar">
     <div class="brand"><div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div><div class="brandtext"><b>Business Quotation System <span style="font-size:9px;color:#078f92">v4</span></b><span>Label Pricing • Cost Snapshots • Profit Reports • Device Quotations • User Audit</span></div></div>
@@ -2344,9 +2344,78 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
       const entered=Number(l.unitPrice||0),unitPrice=vatMode?entered/vatFactor:entered,amount=Number(l.qty||0)*unitPrice;
       return `<tr><td><b>${esc(l.description||'')}</b></td><td>${esc(l.spec||'-')}</td><td class="r">${money(l.qty)} ${esc(l.unit||'')}</td><td class="r">${esc(poCurrency(currency))} ${money(unitPrice)}</td><td class="r"><b>${esc(poCurrency(currency))} ${money(amount)}</b></td></tr>`
     }).join('');
-    const commercial=vatMode
-      ?`<div class="commercial-summary po-commercial-summary"><div class="sumtitle">Commercial Summary</div><div class="sumrow"><span>Items Subtotal (VAT Incl.)</span><b>${esc(poMoney(t.subtotal,currency))}</b></div>${t.shipping?`<div class="sumrow"><span>Shipping / Freight</span><b>${esc(poMoney(t.shipping,currency))}</b></div>`:''}${t.other?`<div class="sumrow"><span>Other Charges</span><b>${esc(poMoney(t.other,currency))}</b></div>`:''}${t.discount?`<div class="sumrow"><span>Discount</span><b>- ${esc(poMoney(t.discount,currency))}</b></div>`:''}<div class="sumrow"><span>Subtotal / Net (Excl. VAT)</span><b>${esc(poMoney(t.net,currency))}</b></div><div class="sumrow"><span>VAT ${money(vatRate)}%</span><b>${esc(poMoney(t.vat,currency))}</b></div><div class="sumrow grand"><span>TOTAL (Incl. VAT)</span><b>${esc(poMoney(t.total,currency))}</b></div></div>`
-      :`<div class="commercial-summary po-commercial-summary"><div class="sumtitle">Commercial Summary</div><div class="sumrow"><span>Subtotal</span><b>${esc(poMoney(t.subtotal,currency))}</b></div>${t.shipping?`<div class="sumrow"><span>Shipping / Freight</span><b>${esc(poMoney(t.shipping,currency))}</b></div>`:''}${t.other?`<div class="sumrow"><span>Other Charges</span><b>${esc(poMoney(t.other,currency))}</b></div>`:''}${t.discount?`<div class="sumrow"><span>Discount</span><b>- ${esc(poMoney(t.discount,currency))}</b></div>`:''}<div class="sumrow grand"><span>TOTAL PURCHASE ORDER VALUE</span><b>${esc(poMoney(t.total,currency))}</b></div></div>`;
+const commercial=vatMode
+
+?`<div class="commercial-summary po-commercial-summary">
+<div class="sumtitle">Commercial Summary</div>
+
+${t.shipping?`
+<div class="sumrow">
+  <span>Shipping / Freight</span>
+  <b>${esc(poMoney(t.shipping,currency))}</b>
+</div>`:''}
+
+${t.other?`
+<div class="sumrow">
+  <span>Other Charges</span>
+  <b>${esc(poMoney(t.other,currency))}</b>
+</div>`:''}
+
+${t.discount?`
+<div class="sumrow">
+  <span>Discount</span>
+  <b>- ${esc(poMoney(t.discount,currency))}</b>
+</div>`:''}
+
+<div class="sumrow">
+  <span>Subtotal / Net (Excl. VAT)</span>
+  <b>${esc(poMoney(t.net,currency))}</b>
+</div>
+
+<div class="sumrow">
+  <span>VAT ${money(vatRate)}%</span>
+  <b>${esc(poMoney(t.vat,currency))}</b>
+</div>
+
+<div class="sumrow grand">
+  <span>TOTAL (Incl. VAT)</span>
+  <b>${esc(poMoney(t.total,currency))}</b>
+</div>
+
+</div>`
+
+:`<div class="commercial-summary po-commercial-summary">
+<div class="sumtitle">Commercial Summary</div>
+
+<div class="sumrow">
+  <span>Items Subtotal</span>
+  <b>${esc(poMoney(t.subtotal,currency))}</b>
+</div>
+
+${t.shipping?`
+<div class="sumrow">
+  <span>Shipping / Freight</span>
+  <b>${esc(poMoney(t.shipping,currency))}</b>
+</div>`:''}
+
+${t.other?`
+<div class="sumrow">
+  <span>Other Charges</span>
+  <b>${esc(poMoney(t.other,currency))}</b>
+</div>`:''}
+
+${t.discount?`
+<div class="sumrow">
+  <span>Discount</span>
+  <b>- ${esc(poMoney(t.discount,currency))}</b>
+</div>`:''}
+
+<div class="sumrow grand">
+  <span>GRAND TOTAL</span>
+  <b>${esc(poMoney(t.total,currency))}</b>
+</div>
+
+</div>`;
     const terms=[
       ['Payment Terms',po.paymentTerms||'As mutually agreed with the supplier.'],
       ['Shipping Method',po.shippingMethod||'As mutually agreed with the supplier.'],
