@@ -249,7 +249,15 @@ img,video,canvas,iframe{max-width:100%}
   body{background:#f4f8fa}
   body.mobile-nav-open{overflow:hidden}
   .app{padding:8px 8px 20px}
-  .topbar.app-shell-header{top:4px;border-radius:14px}
+  /* Android / Capacitor WebView: backdrop-filter on a fixed child's ancestor can
+     turn the sticky header into the containing block. Disable it on mobile so the
+     drawer is anchored to the viewport, not to the header height. */
+  .topbar.app-shell-header{
+    top:4px;
+    border-radius:14px;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+  }
   .topbar-main{min-height:58px;padding:8px 8px 8px 11px;gap:8px}
   .brandmark{font-size:23px;letter-spacing:-1.5px}
   .brandtext b{font-size:11px}.brandtext span{display:none}.shell-version{font-size:8px;padding:1px 5px}
@@ -259,9 +267,45 @@ img,video,canvas,iframe{max-width:100%}
   .user-avatar{width:32px;height:32px;border-radius:10px}
   .user-profile-menu{position:fixed;top:62px;right:8px;width:min(300px,calc(100vw - 16px));z-index:1100}
 
-  .nav-backdrop{display:block;position:fixed;inset:0;background:rgba(12,31,38,.42);backdrop-filter:blur(1px);opacity:0;visibility:hidden;transition:.18s;z-index:997}
-  .nav-shell{position:fixed;left:0;top:0;bottom:0;width:min(320px,86vw);padding:0;background:#fff;border:0;border-right:1px solid #dbe7e9;box-shadow:18px 0 50px rgba(13,47,53,.20);transform:translateX(-103%);transition:transform .22s ease;z-index:998;overflow-y:auto}
-  body.mobile-nav-open .nav-shell{transform:translateX(0)}
+  .nav-backdrop{
+    display:block;
+    position:fixed!important;
+    inset:0;
+    width:100vw;
+    height:100vh;
+    height:100dvh;
+    background:rgba(12,31,38,.42);
+    backdrop-filter:blur(1px);
+    -webkit-backdrop-filter:blur(1px);
+    opacity:0;
+    visibility:hidden;
+    transition:.18s;
+    z-index:997;
+  }
+  .nav-shell{
+    position:fixed!important;
+    left:0;
+    top:0;
+    bottom:auto;
+    width:min(320px,86vw);
+    height:100vh;
+    height:100dvh;
+    max-height:100vh;
+    max-height:100dvh;
+    padding:0;
+    background:#fff;
+    border:0;
+    border-right:1px solid #dbe7e9;
+    box-shadow:18px 0 50px rgba(13,47,53,.20);
+    transform:translate3d(-103%,0,0);
+    transition:transform .22s ease;
+    z-index:998;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  body.mobile-nav-open .nav-shell{transform:translate3d(0,0,0)}
   body.mobile-nav-open .nav-backdrop{opacity:1;visibility:visible}
   .mobile-nav-head{display:flex;align-items:center;justify-content:space-between;min-height:68px;padding:12px 13px 11px 16px;border-bottom:1px solid #e9f0f1;background:linear-gradient(135deg,#f5fbfb,#fff)}
   .mobile-nav-head>div{display:flex;flex-direction:column}.mobile-nav-head b{font-size:14px}.mobile-nav-head span{font-size:10px;color:#72858e;margin-top:3px}
