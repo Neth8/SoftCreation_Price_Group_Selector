@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.8</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.6</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <div class="topbar">
     <div class="brand"><div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div><div class="brandtext"><b>Business Quotation System <span style="font-size:9px;color:#078f92">v4</span></b><span>Label Pricing • Cost Snapshots • Profit Reports • Device Quotations • User Audit</span></div></div>
@@ -1529,75 +1529,14 @@ function enhanceV5UI(){
  document.body.insertAdjacentHTML('beforeend',`<div id="categoryModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Price Category</b><button class="closex" onclick="closeModal('categoryModal')">×</button></div><div class="modal-body"><input id="catId" type="hidden"><div class="grid"><div class="field"><label>Name</label><input id="catName"></div><div class="field"><label>Margin %</label><input id="catMargin" type="number" step="0.0001"></div><div class="field"><label>Cost Basis</label><select id="catBase"><option value="full">Full Excel Cost</option><option value="scale">Scale Excel Cost</option></select></div><div class="field"><label><input id="catApproval" type="checkbox"> Manager approval required</label></div><div class="field full"><label>Item Types</label><label><input id="cat_label" type="checkbox"> Label</label> <label><input id="cat_device" type="checkbox"> Device</label> <label><input id="cat_product" type="checkbox"> Ribbon/Paper</label></div><div class="field"><label><input id="catActive" type="checkbox"> Active</label></div></div><div class="actions"><button class="btn primary" onclick="saveCategory()">Save</button><button class="btn red" onclick="deleteCategory()">Delete</button></div></div></div></div>
  <div id="productModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Ribbon / Paper Roll Master</b><button class="closex" onclick="closeModal('productModal')">×</button></div><div class="modal-body"><input id="prodId" type="hidden"><div class="grid"><div class="field"><label>Type</label><select id="prodType" onchange="productTypeUI()"><option value="ribbon">Ribbon</option><option value="paper">Paper Roll</option></select></div><div class="field"><label>Width (mm)</label><input id="prodWidth" type="number"></div></div><div id="ribbonFields" class="grid"><div class="field"><label>Length (m)</label><input id="prodLength" type="number"></div><div class="field"><label>Ribbon Material</label><input id="prodMaterial" placeholder="Premium Wax"></div><div class="field"><label>Color</label><input id="prodColor" value="Black"></div></div><div id="paperFields" class="grid"><div class="field"><label>Diameter (mm)</label><input id="prodDiameter" type="number"></div><div class="field"><label>Paper Type</label><select id="prodPaperType"><option>Thermal</option><option>Non Thermal</option></select></div><div class="field"><label>Coating</label><select id="prodCoating"><option>Normal</option><option>Top Coated</option></select></div></div><div class="grid"><div class="field"><label>Unit Cost</label><input id="prodCost" type="number" step="0.01"></div><div class="field"><label>Base Sale Price</label><input id="prodPrice" type="number" step="0.01"></div><div class="field"><label>Supplier</label><input id="prodSupplier"></div><div class="field full"><label>Price Categories (max 3)</label><div id="prodCategories"></div></div></div><div class="actions"><button class="btn primary" onclick="saveProduct()">Save</button><button class="btn red" onclick="deleteProduct()">Delete</button></div></div></div></div><div id="productPickerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Add Ribbon / Paper Roll</b><button class="closex" onclick="closeModal('productPickerModal')">×</button></div><div id="productPickerList" class="modal-body"></div></div></div><div id="savedPricesModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Customer Saved Label Prices</b><button class="closex" onclick="closeModal('savedPricesModal')">×</button></div><div id="savedPricesBody" class="modal-body"></div></div></div>`);
  const it=document.querySelector('.item-tools');if(it){const b=document.createElement('button');b.className='btn ghost';b.textContent='Ribbon / Paper';b.onclick=openProductPicker;it.appendChild(b)}
-const cm=$('customerModal').querySelector('.modal-body');
-cm.insertAdjacentHTML(
-    'beforeend',
-    '<div class="section">PRICE CATEGORIES</div><div id="custCategoryChoices" class="grid"></div><div class="actions"><button class="btn ghost" type="button" onclick="viewCustomerSavedPrices()">View Saved Sizes & Prices</button></div>'
-);
+ const cm=$('customerModal').querySelector('.modal-body');cm.insertAdjacentHTML('beforeend','<div class="section">PRICE CATEGORIES (SELECT UP TO 3)</div><div id="custCategoryChoices" class="grid"></div><div class="actions"><button class="btn ghost" type="button" onclick="viewCustomerSavedPrices()">View Saved Sizes & Prices</button></div>');
  const dg=$('deviceModal').querySelector('.grid');dg.insertAdjacentHTML('beforeend','<div class="field"><label>Supplier</label><input id="devSupplier"></div><div class="field"><label>Warranty Period</label><input id="devWarranty" placeholder="12 months"></div><div class="field full"><label>Price Categories (max 3)</label><div id="devCategories"></div></div>');
  const pd=$('profitDelivery').closest('.field');pd.style.display='none';pd.insertAdjacentHTML('afterend','<div class="field"><label>Delivery Mode</label><select id="deliveryMode" onchange="renderProfitReport()"><option value="charge">Charge Customer</option><option value="free">Free / Company Absorbed</option><option value="pickup">Pickup / Not Applicable</option></select></div><div class="field"><label>Distance from Kurunegala (km)</label><input id="deliveryKm" type="number" step="0.1" oninput="renderProfitReport()"></div><div class="field"><label>Rate per km (LKR)</label><input id="deliveryRate" type="number" step="0.01" value="25" oninput="renderProfitReport()"></div><div class="field"><label>Amount Charged to Customer</label><input id="deliveryCharge" type="number" step="0.01" oninput="renderProfitReport()"></div><div class="field full"><div class="notice">Use the customer Google Maps link to check route distance from Kurunegala, then enter km here. Automatic distance requires a Google Maps API key when hosted.</div></div>');
 }
 enhanceV5UI();
-const openCustomerModalV5=openCustomerModal;
 
-openCustomerModal=function(id=''){
-
-    openCustomerModalV5(id);
-
-    const c=
-        state.customers.find(
-            x=>x.id===id
-        )||{};
-
-    $('custCategoryChoices').innerHTML=
-        categoryChecks(
-            c.priceCategoryIds||[],
-            'custCat'
-        );
-};
-const saveCustomerV5=saveCustomer;
-
-saveCustomer=async function(){
-
-    /*
-       CUSTOMER PRICE CATEGORIES
-       NO MAXIMUM LIMIT
-    */
-    const ids=[
-        ...document.querySelectorAll(
-            'input[name="custCat"]:checked'
-        )
-    ].map(x=>x.value);
-
-
-    const id=
-        $('custId').value||
-        '';
-
-
-    await saveCustomerV5();
-
-
-    const sid=
-        id||
-        $('customerSelect').value;
-
-
-    const c=
-        state.customers.find(
-            x=>x.id===sid
-        );
-
-
-    if(c){
-
-        c.priceCategoryIds=ids;
-
-        saveState();
-
-        calculateLabelPrice();
-    }
-};
+const openCustomerModalV5=openCustomerModal;openCustomerModal=function(id=''){openCustomerModalV5(id);const c=state.customers.find(x=>x.id===id)||{};$('custCategoryChoices').innerHTML=categoryChecks(c.priceCategoryIds||[],'custCat');enforceThree('custCat')};
+const saveCustomerV5=saveCustomer;saveCustomer=async function(){const ids=checkedCategories('custCat'),id=$('custId').value||'';await saveCustomerV5();const sid=id||$('customerSelect').value,c=state.customers.find(x=>x.id===sid);if(c){c.priceCategoryIds=ids;saveState();calculateLabelPrice()}};
 function viewCustomerSavedPrices(){const id=$('custId').value||$('customerSelect').value,c=state.customers.find(x=>x.id===id);if(!c)return toast('Save/select a customer first');$('savedPricesBody').innerHTML=`<div><b>${esc(c.name)}</b></div><div class="small">Categories: ${(c.priceCategoryIds||[]).map(id=>esc(state.priceCategories.find(x=>x.id===id)?.name||'')).join(', ')||'All active categories'}</div><table class="table"><thead><tr><th>Size / Material</th><th>Price</th><th>Mode</th><th>Category</th><th>Date</th></tr></thead><tbody>${(c.priceHistory||[]).map(x=>`<tr><td>${esc([x.size,x.material,x.layout,x.pcs].filter(Boolean).join(' / '))}</td><td>LKR ${money(x.price)}</td><td>${esc(x.mode||'')}</td><td>${esc(x.tier||'')}</td><td>${esc((x.date||'').slice(0,10))}</td></tr>`).join('')||'<tr><td colspan="5">No saved prices</td></tr>'}</tbody></table>`;$('savedPricesModal').classList.add('show')}
 
 const openDeviceModalV5=openDeviceModal;openDeviceModal=function(id=''){openDeviceModalV5(id);const d=state.devices.find(x=>x.id===id)||{};$('devSupplier').value=d.supplier||'';$('devWarranty').value=d.warranty||'';$('devCategories').innerHTML=categoryChecks(d.categoryIds||[],'devCat');enforceThree('devCat')};
@@ -2306,41 +2245,7 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
     return true
   }
   window.poAdminPasswordOK=poAdminPasswordOK;
-function poItemRowsChanged(oldLines=[],newLines=[]){
 
-    const clean=lines=>(lines||[]).map(l=>({
-        id:String(l.id||''),
-        description:String(l.description||'').trim(),
-        spec:String(l.spec||'').trim(),
-        unit:String(l.unit||'').trim(),
-        qty:Number(l.qty||0),
-        unitPrice:Number(l.unitPrice||0)
-    }));
-
-    const oldClean=clean(oldLines);
-    const newClean=clean(newLines);
-
-    if(oldClean.length!==newClean.length)return true;
-
-    for(let i=0;i<oldClean.length;i++){
-
-        const a=oldClean[i];
-        const b=newClean[i];
-
-        if(
-            a.id!==b.id ||
-            a.description!==b.description ||
-            a.spec!==b.spec ||
-            a.unit!==b.unit ||
-            a.qty!==b.qty ||
-            a.unitPrice!==b.unitPrice
-        ){
-            return true;
-        }
-    }
-
-    return false;
-}
   window.renderPurchaseOrders=function(){
     if(!$('poList'))return;state.purchaseOrders=state.purchaseOrders||[];if(currentUser?.role!=='admin'&&!hasPerm('purchase_orders_view')){$('poList').innerHTML='<div class="empty">Purchase Orders access is not enabled for this user.</div>';return}
     const a=state.purchaseOrders||[],q=($('poSearch')?.value||'').trim().toLowerCase(),sf=$('poStatusFilter')?.value||'',filtered=a.filter(po=>(!sf||po.status===sf)&&(!q||[po.poNo,po.supplier?.name,po.supplierRef,...(po.lines||[]).map(l=>l.description+' '+l.spec)].join(' ').toLowerCase().includes(q))).sort((x,y)=>String(y.updatedAt||y.createdAt||'').localeCompare(String(x.updatedAt||x.createdAt||'')));
@@ -2402,325 +2307,15 @@ function poItemRowsChanged(oldLines=[],newLines=[]){
     if(!requirePerm('purchase_orders_view','use purchase orders'))return;const po=state.purchaseOrders.find(x=>x.id===id)||{id:'',poNo:poNumberNext(),date:today(),expectedDate:'',status:'Draft',currency:'USD',vatMode:'none',supplier:{},lines:[],shippingCharge:0,otherCharge:0,discount:0,history:[]};
     $('poId').value=po.id||'';$('poNumber').value=po.poNo||poNumberNext();$('poStatus').value=po.status||'Draft';$('poDate').value=po.date||today();$('poExpectedDate').value=po.expectedDate||'';$('poSupplier').value=po.supplier?.name||'';$('poSupplierContact').value=po.supplier?.contact||'';$('poSupplierPhone').value=po.supplier?.phone||'';$('poSupplierEmail').value=po.supplier?.email||'';$('poSupplierCountry').value=po.supplier?.country||'';$('poSupplierAddress').value=po.supplier?.address||'';$('poCurrency').value=po.currency||'USD';$('poVatMode').value=po.vatMode||'none';$('poPaymentTerms').value=po.paymentTerms||'';$('poShippingMethod').value=po.shippingMethod||'';$('poSupplierRef').value=po.supplierRef||'';$('poShippingCharge').value=po.shippingCharge||'';$('poOtherCharge').value=po.otherCharge||'';$('poDiscount').value=po.discount||'';$('poNotes').value=po.notes||'';$('poLineRows').innerHTML='';(po.lines?.length?po.lines:[{}]).forEach(l=>{addPurchaseOrderLine(l);const tr=$('poLineRows').lastElementChild;if(tr)tr.dataset.lineId=l.id||uid('pol')});$('poHistory').innerHTML=poHistoryHtml(po);$('poModalTitle').textContent=po.id?`Purchase Order — ${po.poNo}`:'New Supplier Purchase Order';$('poMarkSentBtn').style.display=po.id&&!['Sent','Supplier Confirmed','Partially Received','Received','Cancelled'].includes(po.status)?'inline-block':'none';$('poReceiveBtn').style.display=po.id&&!['Draft','Cancelled','Received'].includes(po.status)?'inline-block':'none';refreshPOAutoCompleteLists();renderPOEditorTotals();$('purchaseOrderModal').classList.add('show')
   };
-window.savePurchaseOrder=function(keepOpen=false){
 
-    if(!requirePerm(
-        'purchase_orders_view',
-        'save purchase orders'
-    ))return null;
-
-
-    const existingId=$('poId').value;
-
-    const id=
-        existingId ||
-        uid('po');
-
-    const old=
-        state.purchaseOrders.find(x=>x.id===id) ||
-        {};
-
-    const lines=collectPOLines();
-
-
-    if(!$('poSupplier').value.trim()){
-        toast('Supplier name is required');
-        return null;
-    }
-
-
-    if(
-        !lines.length ||
-        lines.some(
-            l=>!l.description || !(l.qty>0)
-        )
-    ){
-        toast(
-            'Add at least one item with description and ordered quantity'
-        );
-        return null;
-    }
-
-
-    /*
-       ADMIN PASSWORD ONLY WHEN ITEM ROWS OF
-       AN EXISTING PO HAVE BEEN CHANGED.
-    */
-    if(
-        old.id &&
-        poItemRowsChanged(
-            old.lines||[],
-            lines
-        )
-    ){
-
-        if(
-            !poAdminPasswordOK(
-                `edit item details in ${old.poNo||$('poNumber').value||'this Purchase Order'}`
-            )
-        ){
-            return null;
-        }
-    }
-
-
-    const now=
-        new Date().toISOString();
-
-    const selected=
-        $('poStatus').value;
-
-
-    const po={
-        ...old,
-
-        id,
-
-        poNo:
-            $('poNumber').value ||
-            poNumberNext(),
-
-        date:
-            $('poDate').value ||
-            today(),
-
-        expectedDate:
-            $('poExpectedDate').value ||
-            '',
-
-
-        supplier:{
-
-            name:
-                $('poSupplier').value.trim(),
-
-            contact:
-                $('poSupplierContact').value.trim(),
-
-            phone:
-                $('poSupplierPhone').value.trim(),
-
-            email:
-                $('poSupplierEmail').value.trim(),
-
-            country:
-                $('poSupplierCountry').value.trim(),
-
-            address:
-                $('poSupplierAddress').value.trim()
-        },
-
-
-        currency:
-            $('poCurrency').value,
-
-        vatMode:
-            $('poVatMode').value ||
-            'none',
-
-        paymentTerms:
-            $('poPaymentTerms').value.trim(),
-
-        shippingMethod:
-            $('poShippingMethod').value.trim(),
-
-        supplierRef:
-            $('poSupplierRef').value.trim(),
-
-
-        lines,
-
-
-        shippingCharge:
-            Number(
-                $('poShippingCharge').value ||
-                0
-            ),
-
-        otherCharge:
-            Number(
-                $('poOtherCharge').value ||
-                0
-            ),
-
-        discount:
-            Number(
-                $('poDiscount').value ||
-                0
-            ),
-
-        notes:
-            $('poNotes').value.trim(),
-
-
-        createdAt:
-            old.createdAt ||
-            now,
-
-        createdBy:
-            old.createdBy ||
-            currentUser?.username ||
-            '',
-
-        createdByDisplay:
-            old.createdByDisplay ||
-            currentUser?.display ||
-            currentUser?.username ||
-            '',
-
-
-        updatedAt:
-            now,
-
-        updatedBy:
-            currentUser?.username ||
-            '',
-
-
-        history:
-            Array.isArray(old.history)
-                ? [...old.history]
-                : []
-    };
-
-
-    po.status=
-        poDerivedStatus(
-            po,
-            selected
-        );
-
-
-    if(!old.id){
-
-        po.history.push({
-
-            status:'Draft',
-
-            note:
-                'Purchase order created',
-
-            by:
-                currentUser?.display ||
-                currentUser?.username ||
-                '',
-
-            at:now
-        });
-
-    }
-    else{
-
-        /*
-           RECORD ITEM EDIT IN HISTORY
-        */
-        if(
-            poItemRowsChanged(
-                old.lines||[],
-                lines
-            )
-        ){
-
-            po.history.push({
-
-                status:
-                    po.status ||
-                    'Draft',
-
-                note:
-                    'Purchase Order item details edited with administrator approval',
-
-                by:
-                    currentUser?.display ||
-                    currentUser?.username ||
-                    '',
-
-                at:now
-            });
-        }
-
-
-        if(old.status!==po.status){
-
-            po.history.push({
-
-                status:
-                    po.status,
-
-                note:
-                    `Status changed from ${old.status||'Draft'} to ${po.status}`,
-
-                by:
-                    currentUser?.display ||
-                    currentUser?.username ||
-                    '',
-
-                at:now
-            });
-        }
-    }
-
-
-    const i=
-        state.purchaseOrders.findIndex(
-            x=>x.id===id
-        );
-
-
-    if(i>=0){
-
-        state.purchaseOrders[i]=po;
-
-    }
-    else{
-
-        state.purchaseOrders.unshift(po);
-    }
-
-
-    audit(
-        'SAVE_PURCHASE_ORDER',
-        `${po.poNo} ${po.supplier.name} ${po.status}`
-    );
-
-
-    saveState();
-
-    refreshPOAutoCompleteLists();
-
-    renderPurchaseOrders();
-
-
-    /*
-       Used internally by Mark Sent etc.
-    */
-    if(keepOpen){
-
-        $('poId').value=id;
-
-        $('poHistory').innerHTML=
-            poHistoryHtml(po);
-
-    }
-    else{
-
-        /*
-           NORMAL SAVE:
-           CLOSE PO CARD AUTOMATICALLY
-        */
-        closeModal(
-            'purchaseOrderModal'
-        );
-    }
-
-
-    toast(
-        `Purchase Order ${po.poNo} saved`
-    );
-
-
-    return po;
-};
+  window.savePurchaseOrder=function(keepOpen=false){
+    if(!requirePerm('purchase_orders_view','save purchase orders'))return null;
+    const existingId=$('poId').value,id=existingId||uid('po'),old=state.purchaseOrders.find(x=>x.id===id)||{},lines=collectPOLines();
+    if(!$('poSupplier').value.trim())return toast('Supplier name is required');
+    if(!lines.length||lines.some(l=>!l.description||!(l.qty>0)))return toast('Add at least one item with description and ordered quantity');
+    if(!poAdminPasswordOK(`save ${old.poNo||$('poNumber').value||'this Purchase Order'}`))return null;
+    const now=new Date().toISOString(),selected=$('poStatus').value,po={...old,id,poNo:$('poNumber').value||poNumberNext(),date:$('poDate').value||today(),expectedDate:$('poExpectedDate').value||'',supplier:{name:$('poSupplier').value.trim(),contact:$('poSupplierContact').value.trim(),phone:$('poSupplierPhone').value.trim(),email:$('poSupplierEmail').value.trim(),country:$('poSupplierCountry').value.trim(),address:$('poSupplierAddress').value.trim()},currency:$('poCurrency').value,vatMode:$('poVatMode').value||'none',paymentTerms:$('poPaymentTerms').value.trim(),shippingMethod:$('poShippingMethod').value.trim(),supplierRef:$('poSupplierRef').value.trim(),lines,shippingCharge:Number($('poShippingCharge').value||0),otherCharge:Number($('poOtherCharge').value||0),discount:Number($('poDiscount').value||0),notes:$('poNotes').value.trim(),createdAt:old.createdAt||now,createdBy:old.createdBy||currentUser?.username||'',createdByDisplay:old.createdByDisplay||currentUser?.display||currentUser?.username||'',updatedAt:now,updatedBy:currentUser?.username||'',history:Array.isArray(old.history)?[...old.history]:[]};po.status=poDerivedStatus(po,selected);if(!old.id)po.history.push({status:'Draft',note:'Purchase order created',by:currentUser?.display||currentUser?.username||'',at:now});else if(old.status!==po.status)po.history.push({status:po.status,note:`Status changed from ${old.status||'Draft'} to ${po.status}`,by:currentUser?.display||currentUser?.username||'',at:now});const i=state.purchaseOrders.findIndex(x=>x.id===id);if(i>=0)state.purchaseOrders[i]=po;else state.purchaseOrders.unshift(po);audit('SAVE_PURCHASE_ORDER',`${po.poNo} ${po.supplier.name} ${po.status}`);saveState();refreshPOAutoCompleteLists();renderPurchaseOrders();if(keepOpen){$('poId').value=id;$('poHistory').innerHTML=poHistoryHtml(po)}else closeModal('purchaseOrderModal');toast(`Purchase Order ${po.poNo} saved`);return po
+  };
   window.markCurrentPurchaseOrderSent=function(){const po=savePurchaseOrder(true);if(po)markPurchaseOrderSent(po.id)};
   window.markPurchaseOrderSent=function(id){const po=state.purchaseOrders.find(x=>x.id===id);if(!po)return;po.status='Sent';po.updatedAt=new Date().toISOString();po.updatedBy=currentUser?.username||'';po.history=po.history||[];po.history.push({status:'Sent',note:'Purchase order marked as sent to supplier',by:currentUser?.display||currentUser?.username||'',at:po.updatedAt});saveState();renderPurchaseOrders();openPurchaseOrder(id);toast('PO marked as Sent')};
   window.openCurrentPOReceipt=function(){const id=$('poId').value;if(id)openPurchaseOrderReceipt(id)};
@@ -2749,78 +2344,9 @@ window.savePurchaseOrder=function(keepOpen=false){
       const entered=Number(l.unitPrice||0),unitPrice=vatMode?entered/vatFactor:entered,amount=Number(l.qty||0)*unitPrice;
       return `<tr><td><b>${esc(l.description||'')}</b></td><td>${esc(l.spec||'-')}</td><td class="r">${money(l.qty)} ${esc(l.unit||'')}</td><td class="r">${esc(poCurrency(currency))} ${money(unitPrice)}</td><td class="r"><b>${esc(poCurrency(currency))} ${money(amount)}</b></td></tr>`
     }).join('');
-const commercial=vatMode
-
-?`<div class="commercial-summary po-commercial-summary">
-<div class="sumtitle">Commercial Summary</div>
-
-${t.shipping?`
-<div class="sumrow">
-  <span>Shipping / Freight</span>
-  <b>${esc(poMoney(t.shipping,currency))}</b>
-</div>`:''}
-
-${t.other?`
-<div class="sumrow">
-  <span>Other Charges</span>
-  <b>${esc(poMoney(t.other,currency))}</b>
-</div>`:''}
-
-${t.discount?`
-<div class="sumrow">
-  <span>Discount</span>
-  <b>- ${esc(poMoney(t.discount,currency))}</b>
-</div>`:''}
-
-<div class="sumrow">
-  <span>Subtotal / Net (Excl. VAT)</span>
-  <b>${esc(poMoney(t.net,currency))}</b>
-</div>
-
-<div class="sumrow">
-  <span>VAT ${money(vatRate)}%</span>
-  <b>${esc(poMoney(t.vat,currency))}</b>
-</div>
-
-<div class="sumrow grand">
-  <span>TOTAL (Incl. VAT)</span>
-  <b>${esc(poMoney(t.total,currency))}</b>
-</div>
-
-</div>`
-
-:`<div class="commercial-summary po-commercial-summary">
-<div class="sumtitle">Commercial Summary</div>
-
-<div class="sumrow">
-  <span>Items Subtotal</span>
-  <b>${esc(poMoney(t.subtotal,currency))}</b>
-</div>
-
-${t.shipping?`
-<div class="sumrow">
-  <span>Shipping / Freight</span>
-  <b>${esc(poMoney(t.shipping,currency))}</b>
-</div>`:''}
-
-${t.other?`
-<div class="sumrow">
-  <span>Other Charges</span>
-  <b>${esc(poMoney(t.other,currency))}</b>
-</div>`:''}
-
-${t.discount?`
-<div class="sumrow">
-  <span>Discount</span>
-  <b>- ${esc(poMoney(t.discount,currency))}</b>
-</div>`:''}
-
-<div class="sumrow grand">
-  <span>GRAND TOTAL</span>
-  <b>${esc(poMoney(t.total,currency))}</b>
-</div>
-
-</div>`;
+    const commercial=vatMode
+      ?`<div class="commercial-summary po-commercial-summary"><div class="sumtitle">Commercial Summary</div><div class="sumrow"><span>Items Subtotal (VAT Incl.)</span><b>${esc(poMoney(t.subtotal,currency))}</b></div>${t.shipping?`<div class="sumrow"><span>Shipping / Freight</span><b>${esc(poMoney(t.shipping,currency))}</b></div>`:''}${t.other?`<div class="sumrow"><span>Other Charges</span><b>${esc(poMoney(t.other,currency))}</b></div>`:''}${t.discount?`<div class="sumrow"><span>Discount</span><b>- ${esc(poMoney(t.discount,currency))}</b></div>`:''}<div class="sumrow"><span>Subtotal / Net (Excl. VAT)</span><b>${esc(poMoney(t.net,currency))}</b></div><div class="sumrow"><span>VAT ${money(vatRate)}%</span><b>${esc(poMoney(t.vat,currency))}</b></div><div class="sumrow grand"><span>TOTAL (Incl. VAT)</span><b>${esc(poMoney(t.total,currency))}</b></div></div>`
+      :`<div class="commercial-summary po-commercial-summary"><div class="sumtitle">Commercial Summary</div><div class="sumrow"><span>Subtotal</span><b>${esc(poMoney(t.subtotal,currency))}</b></div>${t.shipping?`<div class="sumrow"><span>Shipping / Freight</span><b>${esc(poMoney(t.shipping,currency))}</b></div>`:''}${t.other?`<div class="sumrow"><span>Other Charges</span><b>${esc(poMoney(t.other,currency))}</b></div>`:''}${t.discount?`<div class="sumrow"><span>Discount</span><b>- ${esc(poMoney(t.discount,currency))}</b></div>`:''}<div class="sumrow grand"><span>TOTAL PURCHASE ORDER VALUE</span><b>${esc(poMoney(t.total,currency))}</b></div></div>`;
     const terms=[
       ['Payment Terms',po.paymentTerms||'As mutually agreed with the supplier.'],
       ['Shipping Method',po.shippingMethod||'As mutually agreed with the supplier.'],
@@ -2869,7 +2395,9 @@ let spgsReady=false,
     spgsProductionClient=null,
     spgsProductionChannel=null,
     spgsPurchaseChannel=null,
-    spgsPurchaseCloudReady=false;
+    spgsPurchaseCloudReady=false,
+    spgsQuoteRequestChannel=null,
+    spgsQuoteRequestCloudReady=false;
 
   function spgsApiKey(){
     let key=localStorage.getItem(SPGS_KEY_STORE)||'';
@@ -3010,6 +2538,9 @@ window.spgsLoadProductionSeen=
     const copy=JSON.parse(JSON.stringify(state));
     delete copy.productionRequests;
     delete copy.purchaseOrders;
+    // Live-safe migration: only remove quoteRequests from the legacy shared
+    // payload after the dedicated realtime table has been confirmed available.
+    if(spgsQuoteRequestCloudReady)delete copy.quoteRequests;
     delete copy.users;
     copy.current=null;
     return copy;
@@ -3106,6 +2637,147 @@ async function spgsSyncProduction(force=false){
         spgsProductionHashes[row.id]=
             JSON.stringify(row.payload);
     });
+}
+
+let spgsQuoteRequestHashes={};
+
+function spgsCleanQuoteRequestPayload(r){
+    const x={...r};
+    delete x._spgsUpdatedAt;
+    return x;
+}
+
+function spgsQuoteRequestSignature(r){
+    return JSON.stringify(spgsCleanQuoteRequestPayload(r));
+}
+
+async function spgsLoadQuoteRequests(){
+    const rows=await spgsFetch(
+        `/spgs_quote_requests`+
+        `?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}`+
+        `&select=id,payload,updated_at`+
+        `&order=updated_at.desc`
+    );
+
+    const list=(rows||[])
+        .map(row=>({
+            ...(row.payload||{}),
+            _spgsUpdatedAt:row.updated_at
+        }))
+        .filter(x=>x.id);
+
+    spgsQuoteRequestHashes={};
+    list.forEach(r=>{
+        spgsQuoteRequestHashes[r.id]=spgsQuoteRequestSignature(r);
+    });
+
+    spgsQuoteRequestCloudReady=true;
+    return list;
+}
+
+async function spgsSyncQuoteRequests(force=false){
+    if(!spgsQuoteRequestCloudReady)return;
+
+    state.quoteRequests=state.quoteRequests||[];
+    const changed=[];
+
+    for(const r of state.quoteRequests){
+        if(!r?.id)continue;
+
+        const payload=spgsCleanQuoteRequestPayload(r);
+        const sig=JSON.stringify(payload);
+
+        if(!force && spgsQuoteRequestHashes[r.id]===sig)continue;
+
+        const updated_at=new Date().toISOString();
+
+        changed.push({
+            workspace:SPGS_WORKSPACE,
+            id:r.id,
+            request_no:r.requestNo||'',
+            status:r.status||'Pending',
+            requester:r.requester||'',
+            handler:r.handler||'',
+            payload,
+            updated_at
+        });
+    }
+
+    if(!changed.length)return;
+
+    await spgsFetch(
+        '/spgs_quote_requests?on_conflict=workspace,id',
+        {
+            method:'POST',
+            headers:{
+                'Content-Type':'application/json',
+                'Prefer':'resolution=merge-duplicates,return=minimal'
+            },
+            body:JSON.stringify(changed)
+        }
+    );
+
+    changed.forEach(row=>{
+        spgsQuoteRequestHashes[row.id]=JSON.stringify(row.payload);
+        const r=state.quoteRequests.find(x=>x.id===row.id);
+        if(r)r._spgsUpdatedAt=row.updated_at;
+    });
+}
+
+async function spgsStartQuoteRequestsRealtime(){
+    if(!spgsQuoteRequestCloudReady||!spgsProductionClient)return;
+
+    spgsQuoteRequestChannel=spgsProductionClient
+        .channel('spgs-quote-requests-'+SPGS_WORKSPACE)
+        .on(
+            'postgres_changes',
+            {
+                event:'*',
+                schema:'public',
+                table:'spgs_quote_requests',
+                filter:`workspace=eq.${SPGS_WORKSPACE}`
+            },
+            change=>{
+                state.quoteRequests=state.quoteRequests||[];
+
+                if(change.eventType==='DELETE'){
+                    const id=change.old?.id;
+                    if(id){
+                        state.quoteRequests=state.quoteRequests.filter(x=>x.id!==id);
+                        delete spgsQuoteRequestHashes[id];
+                    }
+                }else{
+                    const incoming={
+                        ...(change.new?.payload||{}),
+                        _spgsUpdatedAt:change.new?.updated_at||new Date().toISOString()
+                    };
+
+                    if(!incoming.id)return;
+
+                    const i=state.quoteRequests.findIndex(x=>x.id===incoming.id);
+                    if(i>=0)state.quoteRequests[i]=incoming;
+                    else state.quoteRequests.unshift(incoming);
+
+                    spgsQuoteRequestHashes[incoming.id]=spgsQuoteRequestSignature(incoming);
+                }
+
+                spgsWriteLocal();
+
+                try{
+                    if($('quoterequests')?.classList.contains('active'))renderBranchRequests();
+                    if($('branchportal')?.classList.contains('active'))renderMyBranchRequests();
+                }catch(e){
+                    console.warn('Quote Requests realtime render failed',e);
+                }
+
+                console.log(
+                    'Quote Requests realtime:',
+                    change.eventType,
+                    change.new?.request_no||change.old?.request_no||''
+                );
+            }
+        )
+        .subscribe(status=>console.log('Quote Requests realtime status:',status));
 }
 
 let spgsPurchaseHashes={};
@@ -3326,6 +2998,11 @@ async function spgsStartProductionRealtime(){
     if(spgsSaving){spgsSaveAgain=true;return}
     spgsSaving=true;
     try{
+    // Quote Requests are synced first. During the live migration this guarantees
+    // the dedicated record is safely stored before the legacy shared payload is
+    // written without quoteRequests. If the new table is unavailable, this is a
+    // no-op and spgsCloudPayload() continues preserving the legacy field.
+    await spgsSyncQuoteRequests();
     await spgsWriteCloudState();
     await spgsSyncUsers();
     await spgsSyncProduction();
@@ -3407,6 +3084,38 @@ try{
   console.warn('Purchase Orders cloud table is not ready yet. Run spgs_purchase_orders.sql.',e);
 }
 
+// ------------------------------------
+// Quote Requests dedicated realtime cloud bootstrap
+// ------------------------------------
+try{
+  // Keep any legacy requests already loaded from spgs_app_state/local backup.
+  const legacyQuoteRequests=Array.isArray(state.quoteRequests)
+      ? state.quoteRequests.filter(x=>x?.id)
+      : [];
+
+  const cloudQuoteRequests=await spgsLoadQuoteRequests();
+
+  // Merge by id. Dedicated-table rows win when both copies exist, while any
+  // legacy-only request is retained and then migrated into the new table.
+  const merged=new Map();
+  legacyQuoteRequests.forEach(r=>merged.set(r.id,r));
+  cloudQuoteRequests.forEach(r=>merged.set(r.id,r));
+  state.quoteRequests=[...merged.values()].sort((a,b)=>
+      (Date.parse(b.createdAt||b._spgsUpdatedAt||0)||0)-
+      (Date.parse(a.createdAt||a._spgsUpdatedAt||0)||0)
+  );
+
+  // Inserts only legacy/missing or changed rows. Existing dedicated rows are
+  // protected by signatures and are not blindly overwritten.
+  await spgsSyncQuoteRequests(false);
+}catch(e){
+  // Deployment-order safety: if SQL is not installed yet, keep quoteRequests
+  // in the legacy shared state so existing requests cannot disappear.
+  spgsQuoteRequestCloudReady=false;
+  state.quoteRequests=state.quoteRequests||[];
+  console.warn('Quote Requests cloud table is not ready yet. Run spgs_quote_requests.sql.',e);
+}
+
 spgsProductionJson=
     JSON.stringify(state.productionRequests||[]);
       if(!state.users.length)throw new Error('spgs_users is empty. Run the supplied SQL and refresh.');
@@ -3428,6 +3137,9 @@ spgsProductionJson=
 }
       if(spgsPurchaseCloudReady){
         try{await spgsStartPurchaseOrdersRealtime()}catch(e){console.error('Purchase Orders realtime could not start',e)}
+      }
+      if(spgsQuoteRequestCloudReady){
+        try{await spgsStartQuoteRequestsRealtime()}catch(e){console.error('Quote Requests realtime could not start',e)}
       }
       spgsWriteLocal();
 
@@ -3471,6 +3183,7 @@ spgsProductionJson=
   window.spgsResetSupabaseKey=function(){localStorage.removeItem(SPGS_KEY_STORE);location.reload()};
   window.spgsCloudSaveNow=async function(){if(!spgsReady)return false;await spgsFlush();toast('Cloud save completed');return true};
   window.spgsPurchaseOrdersCloudReady=()=>spgsPurchaseCloudReady;
+  window.spgsQuoteRequestsCloudReady=()=>spgsQuoteRequestCloudReady;
 
   const spgsReadyPromise=spgsBootstrap();
 })();
