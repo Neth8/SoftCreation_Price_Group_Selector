@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.6 - Supplier PO Receiving Detail + Protected Save + Branded PDF -->
+<!-- SoftCreation v1.0.9 - Hosted Live + Order Fulfilment + Repeat Sales Orders -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.6</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.9</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <div class="topbar">
     <div class="brand"><div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div><div class="brandtext"><b>Business Quotation System <span style="font-size:9px;color:#078f92">v4</span></b><span>Label Pricing • Cost Snapshots • Profit Reports • Device Quotations • User Audit</span></div></div>
@@ -2378,6 +2378,137 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
 </script>
 
 <script>
+/* V8.8 - Dealer Fulfilment / Drop Shipment Management */
+(function(){
+ const FLOW=['Awaiting Instructions','Stock Allocated','Production Pending','Ready for Dispatch','Handed to Courier','In Transit','Delivered','Delivery Failed','Returned','Cancelled'];
+ const LOCKED=['Delivered','Returned','Cancelled'];
+ const css=document.createElement('style');css.textContent=`
+ .df-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}.df-kpi{border:1px solid #d6e5e7;border-radius:13px;padding:12px;background:#f8fbfc}.df-kpi span{display:block;font-size:9px;font-weight:900;color:#647780;text-transform:uppercase}.df-kpi b{font-size:19px}.df-progress{height:8px;background:#e5edef;border-radius:99px;overflow:hidden;margin-top:6px}.df-progress i{display:block;height:100%;background:linear-gradient(90deg,#078f92,#18a66a)}.df-card{border:1px solid #d6e5e7;border-radius:13px;padding:12px;margin:9px 0;background:#fff}.df-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.df-number{font-size:15px;font-weight:1000;color:#087f83}.df-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px}.df-stat{background:#f2f7f8;border-radius:9px;padding:8px}.df-stat small{display:block;color:#6c7c82}.df-stat b{font-size:13px}.df-status{display:inline-block;border-radius:999px;padding:4px 8px;font-size:9px;font-weight:1000;background:#e8f2f2;color:#32616a}.df-status.delivered{background:#dff5e9;color:#087247}.df-status.transit{background:#e2edff;color:#244e91}.df-status.failed,.df-status.returned{background:#ffe7e7;color:#a62828}.df-status.ready{background:#fff1cd;color:#806000}.df-alloc{display:grid;grid-template-columns:1fr 120px 120px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #e3ecee}.df-proof{border:1px dashed #b9ced2;border-radius:9px;padding:9px;background:#f8fbfc}.df-warning{background:#fff4da;border:1px solid #e8c664;color:#785700;border-radius:9px;padding:9px}.df-ok{background:#e8f8ef;border:1px solid #99d8b6;color:#086944;border-radius:9px;padding:9px}@media(max-width:800px){.df-kpis{grid-template-columns:1fr 1fr}.df-grid{grid-template-columns:1fr 1fr}.df-alloc{grid-template-columns:1fr 90px}}
+ `;document.head.appendChild(css);
+ if(!USER_FEATURES.some(x=>x[0]==='dealer_fulfilment'))USER_FEATURES.push(['dealer_fulfilment','Dealer Fulfilment & Drop Shipments']);
+ VIEW_PERMS.dealerfulfilment='dealer_fulfilment';
+ state.dealerFulfilments=state.dealerFulfilments||[];
+ const save88=saveState;saveState=function(){state.dealerFulfilments=state.dealerFulfilments||[];return save88()};
+ const nav=document.querySelector('.nav'),settingsBtn=document.querySelector('[data-view="settings"]');
+ if(!document.querySelector('[data-view="dealerfulfilment"]')){const b=document.createElement('button');b.className='navbtn';b.dataset.view='dealerfulfilment';b.textContent='Dealer Fulfilment';b.onclick=()=>showView('dealerfulfilment');nav.insertBefore(b,settingsBtn)}
+ const firstModal=document.querySelector('.modal');firstModal.insertAdjacentHTML('beforebegin',`
+ <section id="dealerfulfilment" class="view"><div class="panel"><div class="panel-title">Dealer Fulfilment & Drop Shipments <button class="btn sm" style="background:#fff;color:#087f83" onclick="openDfCreate()">+ Create from PI</button></div><div class="panel-body"><div class="notice"><b>Bill To remains the dealer.</b> Split one confirmed PI/PO into multiple ship-to consignments, track every parcel and keep final-customer selling prices private.</div><div id="dfKpis" class="df-kpis"></div><div class="listbar"><input id="dfSearch" class="search" placeholder="Search dealer / PI / PO / recipient / tracking" oninput="renderDealerFulfilment()"><select id="dfFilter" onchange="renderDealerFulfilment()"><option value="">All consignments</option><option value="pending">Pending dispatch</option><option value="transit">In transit</option><option value="delivered">Delivered</option><option value="issue">Failed / Returned</option></select></div><div id="dfList"></div></div></div></section>`);
+ document.body.insertAdjacentHTML('beforeend',`
+ <div id="dfCreateModal" class="modal"><div class="modal-card"><div class="modal-head"><div><b>Create Dealer Fulfilment Plan</b><div class="small">Confirmed PI/PO becomes the bill-to order. Delivery recipients can be added separately.</div></div><button class="closex" onclick="closeModal('dfCreateModal')">×</button></div><div class="modal-body"><div class="field"><label>Select PI</label><select id="dfPiSelect" onchange="dfPreviewPI()"></select></div><div id="dfPiPreview" class="notice"></div><div class="grid"><div class="field"><label>Fulfilment Method</label><select id="dfMethod"><option>Direct delivery to dealer customers</option><option>Deliver all to dealer</option><option>Dealer pickup</option><option>Mixed delivery</option></select></div><div class="field"><label>Dealer PO / Reference</label><input id="dfPoRef"></div><div class="field full"><label>Internal Instructions</label><textarea id="dfInstructions" placeholder="Blind delivery, packing or contact instructions"></textarea></div></div><div class="actions"><button class="btn primary" onclick="createDfPlan()">Create Delivery Plan</button></div></div></div></div>
+ <div id="dfPlanModal" class="modal"><div class="modal-card" style="max-width:1180px"><div class="modal-head"><div><b id="dfPlanTitle">Fulfilment Plan</b><div id="dfPlanMeta" class="small"></div></div><button class="closex" onclick="closeModal('dfPlanModal')">×</button></div><div id="dfPlanBody" class="modal-body"></div></div></div>
+ <div id="dfConsignmentModal" class="modal"><div class="modal-card" style="max-width:1000px"><div class="modal-head"><div><b id="dfConTitle">Consignment</b><div id="dfConMeta" class="small"></div></div><button class="closex" onclick="closeModal('dfConsignmentModal')">×</button></div><div class="modal-body"><input id="dfPlanId" type="hidden"><input id="dfConId" type="hidden"><div class="section">Ship-To Customer</div><div class="grid"><div class="field"><label>Recipient / Company</label><input id="dfRecipient"></div><div class="field"><label>Contact Number</label><input id="dfPhone"></div><div class="field full"><label>Delivery Address</label><textarea id="dfAddress"></textarea></div><div class="field full"><label>Google Maps Link</label><input id="dfMap"></div><div class="field"><label>Delivery Cost Payer</label><select id="dfPayer"><option>Dealer</option><option>Recipient</option><option>Softcreation</option><option>Free / Waived</option></select></div><div class="field"><label>Delivery Charge</label><input id="dfCharge" type="number" min="0" step="0.01"></div><div class="field full"><label class="checkline"><input id="dfBlind" type="checkbox" checked> Blind delivery — hide Softcreation selling price and dealer purchase documents</label></div></div><div class="section">Item Allocation</div><div id="dfAllocation"></div><div class="section">Dispatch & Tracking</div><div class="grid"><div class="field"><label>Status</label><select id="dfStatus">${FLOW.map(x=>`<option>${x}</option>`).join('')}</select></div><div class="field"><label>Courier / Driver / Vehicle</label><input id="dfCourier"></div><div class="field"><label>Tracking Number</label><input id="dfTracking"></div><div class="field"><label>Dispatch Date</label><input id="dfDispatchDate" type="date"></div><div class="field"><label>Expected Delivery</label><input id="dfExpectedDate" type="date"></div><div class="field"><label>Delivered Date</label><input id="dfDeliveredDate" type="date"></div><div class="field"><label>Receiver Name</label><input id="dfReceiver"></div><div class="field"><label>Delivered Quantity</label><input id="dfDeliveredQty" type="number" min="0" step="0.01"></div><div class="field full"><label>Delivery / Failure / Return Note</label><textarea id="dfConNote"></textarea></div><div class="field full"><label>Packing / Courier / POD Proof (image or PDF, maximum 750 KB)</label><input id="dfProof" type="file" accept="image/*,.pdf"><div id="dfProofCurrent" class="df-proof small"></div></div></div><div id="dfConWarning"></div><div class="actions"><button class="btn primary" onclick="saveDfConsignment()">Save Consignment</button><button class="btn green" onclick="copyDfWhatsApp()">Copy WhatsApp Update</button><button class="btn ghost" onclick="downloadDfNote()">Delivery Note PDF</button><button id="dfDeleteBtn" class="btn red" onclick="deleteDfConsignment()">Delete Draft</button></div></div></div></div>`);
+
+ function dfVisible(p){return currentUser?.role==='admin'||p.ownerUser===currentUser?.username||hasPerm('dealer_fulfilment')}
+ function piVisible(d){return d.type==='PI'&&(currentUser?.role==='admin'||d.ownerUser===currentUser?.username||d.createdBy===currentUser?.display)}
+ function statusClass(s){return s==='Delivered'?'delivered':s==='In Transit'||s==='Handed to Courier'?'transit':s==='Delivery Failed'?'failed':s==='Returned'?'returned':s==='Ready for Dispatch'?'ready':''}
+ function dfNo(){const n=(state.dealerFulfilments||[]).length+1;return `SC/DF/${today().slice(0,4)}/${String(n).padStart(4,'0')}`}
+ function conNo(p){return `${p.planNo}/S${String((p.consignments?.length||0)+1).padStart(2,'0')}`}
+ function lineLabel(l){return [l.desc,l.size,l.material,l.layout,l.pcs?`${l.pcs} pcs/roll`:``].filter(Boolean).join(' • ')}
+ function planTotals(p){const ordered=p.lines.reduce((s,l)=>s+Number(l.qty||0),0),allocated=p.consignments.reduce((s,c)=>s+c.allocations.reduce((a,x)=>a+Number(x.qty||0),0),0),dispatched=p.consignments.filter(c=>['Handed to Courier','In Transit','Delivered','Delivery Failed','Returned'].includes(c.status)).reduce((s,c)=>s+c.allocations.reduce((a,x)=>a+Number(x.qty||0),0),0),delivered=p.consignments.filter(c=>c.status==='Delivered').reduce((s,c)=>s+c.allocations.reduce((a,x)=>a+Number(x.qty||0),0),0);return {ordered,allocated,dispatched,delivered,balance:Math.max(0,ordered-allocated)}}
+ function lineAllocated(p,i,except=''){return p.consignments.filter(c=>c.id!==except).reduce((s,c)=>s+Number(c.allocations.find(x=>x.lineIndex===i)?.qty||0),0)}
+ window.openDfCreate=function(){const pis=state.docs.filter(piVisible).filter(d=>!state.dealerFulfilments.some(p=>p.piId===d.id));$('dfPiSelect').innerHTML=pis.length?pis.map(d=>`<option value="${d.id}">${esc(d.serial)} • ${esc(d.customer?.name||'')} • LKR ${money(docTotals(d).gross)}</option>`).join(''):'<option value="">No unlinked PI available</option>';$('dfMethod').value='Direct delivery to dealer customers';$('dfInstructions').value='';dfPreviewPI();$('dfCreateModal').classList.add('show')};
+ window.dfPreviewPI=function(){const d=state.docs.find(x=>x.id===$('dfPiSelect').value);$('dfPoRef').value=d?.poRef||'';$('dfPiPreview').innerHTML=d?`<b>Bill To: ${esc(d.customer?.name||'')}</b><br>${esc(d.serial)} • ${activeDocLines(d).length} item(s) • LKR ${money(docTotals(d).gross)}<br><span class="small">${activeDocLines(d).map(l=>`${esc(lineLabel(l))} — ${money(l.qty)} ${esc(l.unit||'')}`).join('<br>')}</span>`:'Select or create a PI first.'};
+ window.createDfPlan=function(){const d=state.docs.find(x=>x.id===$('dfPiSelect').value);if(!d)return toast('Select a PI');if(state.dealerFulfilments.some(p=>p.piId===d.id))return toast('A fulfilment plan already exists for this PI');const p={id:uid('df'),planNo:dfNo(),piId:d.id,piSerial:d.serial,dealerId:d.customerId,dealerName:d.customer?.name||'',dealerPhone:d.customer?.phone||'',poRef:$('dfPoRef').value.trim()||d.poRef||'',method:$('dfMethod').value,instructions:$('dfInstructions').value.trim(),ownerUser:d.ownerUser||currentUser.username,ownerDisplay:d.createdBy||currentUser.display,lines:activeDocLines(d).map(l=>({desc:l.desc,size:l.size,material:l.material,layout:l.layout,pcs:l.pcs,qty:Number(l.qty||0),unit:l.unit||'Rolls'})),consignments:[],createdAt:new Date().toISOString(),createdBy:currentUser.display};state.dealerFulfilments.unshift(p);audit('CREATE_DEALER_FULFILMENT',`${p.planNo} • ${p.piSerial}`);saveState();closeModal('dfCreateModal');renderDealerFulfilment();openDfPlan(p.id);toast('Dealer fulfilment plan created')};
+ window.renderDealerFulfilment=function(){if(!$('dfList'))return;const q=($('dfSearch')?.value||'').toLowerCase(),f=$('dfFilter')?.value||'',all=state.dealerFulfilments.filter(dfVisible),cons=all.flatMap(p=>p.consignments),matchStatus=c=>!f||(f==='pending'&&!['Handed to Courier','In Transit','Delivered','Returned','Cancelled'].includes(c.status))||(f==='transit'&&['Handed to Courier','In Transit'].includes(c.status))||(f==='delivered'&&c.status==='Delivered')||(f==='issue'&&['Delivery Failed','Returned'].includes(c.status)),a=all.filter(p=>[p.planNo,p.piSerial,p.poRef,p.dealerName,...p.consignments.flatMap(c=>[c.recipient,c.phone,c.tracking])].join(' ').toLowerCase().includes(q)&&(!f||p.consignments.some(matchStatus)));$('dfKpis').innerHTML=[['Dealer Orders',all.length],['Consignments',cons.length],['Ready',cons.filter(c=>c.status==='Ready for Dispatch').length],['In Transit',cons.filter(c=>['Handed to Courier','In Transit'].includes(c.status)).length],['Delivered',cons.filter(c=>c.status==='Delivered').length]].map(x=>`<div class="df-kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');$('dfList').innerHTML=a.length?a.map(p=>{const t=planTotals(p),pct=t.ordered?Math.min(100,t.delivered/t.ordered*100):0;return `<div class="df-card"><div class="df-head"><div><div class="df-number">${esc(p.planNo)}</div><b>${esc(p.dealerName)}</b><div class="small">PI ${esc(p.piSerial)} • PO ${esc(p.poRef||'-')} • ${esc(p.method)}</div></div><div><button class="btn primary sm" onclick="openDfPlan('${p.id}')">Open Plan</button></div></div><div class="df-grid"><div class="df-stat"><small>Ordered</small><b>${money(t.ordered)}</b></div><div class="df-stat"><small>Allocated</small><b>${money(t.allocated)}</b></div><div class="df-stat"><small>Dispatched</small><b>${money(t.dispatched)}</b></div><div class="df-stat"><small>Delivered / Balance</small><b>${money(t.delivered)} / ${money(t.balance)}</b></div></div><div class="df-progress"><i style="width:${pct}%"></i></div><div class="small" style="margin-top:6px">${p.consignments.length?p.consignments.map(c=>`<span class="df-status ${statusClass(c.status)}">${esc(c.consignmentNo)} • ${esc(c.recipient)} • ${esc(c.status)}</span>`).join(' '):'No delivery consignments created yet.'}</div></div>`}).join(''):'<div class="empty">No dealer fulfilment plans found.</div>'};
+ window.openDfPlan=function(id){const p=state.dealerFulfilments.find(x=>x.id===id);if(!p||!dfVisible(p))return;const t=planTotals(p);$('dfPlanTitle').textContent=`${p.planNo} — ${p.dealerName}`;$('dfPlanMeta').textContent=`PI ${p.piSerial} • PO ${p.poRef||'-'} • Owner ${p.ownerDisplay}`;$('dfPlanBody').innerHTML=`<div class="df-grid"><div class="df-stat"><small>Ordered</small><b>${money(t.ordered)}</b></div><div class="df-stat"><small>Allocated</small><b>${money(t.allocated)}</b></div><div class="df-stat"><small>Dispatched</small><b>${money(t.dispatched)}</b></div><div class="df-stat"><small>Remaining Unallocated</small><b>${money(t.balance)}</b></div></div><div class="actions"><button class="btn primary" onclick="openDfConsignment('${p.id}')">+ Add Ship-To Consignment</button><button class="btn ghost" onclick="copyDfPlanSummary('${p.id}')">Copy Dealer Summary</button></div><h4>Order Items</h4><table class="table"><thead><tr><th>Item</th><th>Ordered</th><th>Allocated</th><th>Remaining</th></tr></thead><tbody>${p.lines.map((l,i)=>{const a=lineAllocated(p,i);return `<tr><td><b>${esc(lineLabel(l))}</b></td><td>${money(l.qty)} ${esc(l.unit)}</td><td>${money(a)}</td><td><b>${money(Math.max(0,l.qty-a))}</b></td></tr>`}).join('')}</tbody></table><h4>Consignments</h4>${p.consignments.length?`<table class="table"><thead><tr><th>Consignment</th><th>Ship To</th><th>Quantity</th><th>Courier / Tracking</th><th>Status</th><th></th></tr></thead><tbody>${p.consignments.map(c=>`<tr><td><b>${esc(c.consignmentNo)}</b><div class="small">${esc(c.dispatchDate||'Not dispatched')}</div></td><td><b>${esc(c.recipient)}</b><div class="small">${esc(c.phone||'')}<br>${esc(c.address||'')}</div></td><td>${money(c.allocations.reduce((s,x)=>s+Number(x.qty||0),0))}</td><td>${esc(c.courier||'-')}<div class="small">${esc(c.tracking||'No tracking')}</div></td><td><span class="df-status ${statusClass(c.status)}">${esc(c.status)}</span></td><td><button class="btn ghost sm" onclick="openDfConsignment('${p.id}','${c.id}')">Open / Update</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">No consignments yet. Split the order by each delivery recipient.</div>'}`;$('dfPlanModal').classList.add('show')};
+ window.openDfConsignment=function(planId,conId=''){const p=state.dealerFulfilments.find(x=>x.id===planId),c=p?.consignments.find(x=>x.id===conId);if(!p)return;$('dfPlanId').value=p.id;$('dfConId').value=c?.id||'';$('dfConTitle').textContent=c?c.consignmentNo:'New Ship-To Consignment';$('dfConMeta').textContent=`Bill To: ${p.dealerName} • PI ${p.piSerial}`;$('dfRecipient').value=c?.recipient||'';$('dfPhone').value=c?.phone||'';$('dfAddress').value=c?.address||'';$('dfMap').value=c?.map||'';$('dfPayer').value=c?.payer||'Dealer';$('dfCharge').value=c?.charge??0;$('dfBlind').checked=c?.blind!==false;$('dfStatus').value=c?.status||'Awaiting Instructions';$('dfCourier').value=c?.courier||'';$('dfTracking').value=c?.tracking||'';$('dfDispatchDate').value=c?.dispatchDate||'';$('dfExpectedDate').value=c?.expectedDate||'';$('dfDeliveredDate').value=c?.deliveredDate||'';$('dfReceiver').value=c?.receiver||'';$('dfDeliveredQty').value=c?.deliveredQty??'';$('dfConNote').value=c?.note||'';$('dfProof').value='';$('dfAllocation').innerHTML=p.lines.map((l,i)=>{const used=lineAllocated(p,i,c?.id),max=Math.max(0,Number(l.qty)-used),qty=Number(c?.allocations.find(x=>x.lineIndex===i)?.qty||0);return `<div class="df-alloc"><div><b>${esc(lineLabel(l))}</b><div class="small">Ordered ${money(l.qty)} • Used elsewhere ${money(used)} • Available ${money(max)}</div></div><div class="field"><label>Qty</label><input class="dfQty" data-i="${i}" data-max="${max}" type="number" min="0" max="${max}" step="0.01" value="${qty}"></div><div>${esc(l.unit)}</div></div>`}).join('');$('dfProofCurrent').innerHTML=c?.proof?`Saved: <b>${esc(c.proof.name)}</b> <button class="btn ghost sm" onclick="viewDfProof()">View / Download</button>`:'No proof saved.';const locked=c&&LOCKED.includes(c.status),oldIndex=c?FLOW.indexOf(c.status):-1;$('dfDeleteBtn').style.display=c&&!locked?'inline-block':'none';$('dfStatus').disabled=locked;[...$('dfStatus').options].forEach(o=>o.disabled=!!c&&oldIndex>=FLOW.indexOf('Handed to Courier')&&FLOW.indexOf(o.value)<oldIndex&&!['Delivery Failed','Returned','Cancelled'].includes(o.value));document.querySelectorAll('#dfConsignmentModal input,#dfConsignmentModal textarea,#dfConsignmentModal select').forEach(e=>{if(!['dfPlanId','dfConId'].includes(e.id))e.disabled=locked});$('dfConWarning').innerHTML=locked?'<div class="df-ok">This consignment is completed and locked. Proof and history remain view-only.</div>':'<div class="df-warning">Changing a consignment to Delivered requires delivered quantity, receiver and proof. Allocation cannot exceed the original PI quantity. Once handed to the courier, earlier workflow stages are locked.</div>';$('dfPlanModal').classList.remove('show');$('dfConsignmentModal').classList.add('show')};
+ async function proofValue(old){const f=$('dfProof').files?.[0];if(!f)return old||null;if(f.size>750*1024){toast('Proof file must be 750 KB or smaller');throw new Error('proof-too-large')}return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve({name:f.name,type:f.type,data:r.result});r.onerror=reject;r.readAsDataURL(f)})}
+ window.saveDfConsignment=async function(){const p=state.dealerFulfilments.find(x=>x.id===$('dfPlanId').value),old=p?.consignments.find(x=>x.id===$('dfConId').value);if(!p)return;const recipient=$('dfRecipient').value.trim(),phone=$('dfPhone').value.trim(),address=$('dfAddress').value.trim(),status=$('dfStatus').value,allocations=[...document.querySelectorAll('.dfQty')].map(e=>({lineIndex:Number(e.dataset.i),qty:Number(e.value||0),max:Number(e.dataset.max)})).filter(x=>x.qty>0);if(old&&FLOW.indexOf(old.status)>=FLOW.indexOf('Handed to Courier')&&FLOW.indexOf(status)<FLOW.indexOf(old.status)&&!['Delivery Failed','Returned','Cancelled'].includes(status))return toast('A dispatched consignment cannot move back to an earlier stage');if(!recipient||!phone||!address)return toast('Recipient, contact number and address are required');if(!allocations.length)return toast('Allocate at least one item');if(allocations.some(x=>x.qty>x.max+.0001))return toast('Allocated quantity exceeds the remaining PI quantity');const total=allocations.reduce((s,x)=>s+x.qty,0),deliveredQty=Number($('dfDeliveredQty').value||0);let proof;try{proof=await proofValue(old?.proof)}catch(e){return}if(status==='Delivered'&&(!deliveredQty||!$('dfReceiver').value.trim()||!proof))return toast('Delivered quantity, receiver name and POD proof are required');if(status==='Delivered'&&deliveredQty>total+.0001)return toast('Delivered quantity cannot exceed consignment quantity');const next={...(old||{}),id:old?.id||uid('con'),consignmentNo:old?.consignmentNo||conNo(p),recipient,phone,address,map:$('dfMap').value.trim(),payer:$('dfPayer').value,charge:Number($('dfCharge').value||0),blind:$('dfBlind').checked,allocations:allocations.map(({lineIndex,qty})=>({lineIndex,qty})),status,courier:$('dfCourier').value.trim(),tracking:$('dfTracking').value.trim(),dispatchDate:$('dfDispatchDate').value,expectedDate:$('dfExpectedDate').value,deliveredDate:$('dfDeliveredDate').value,receiver:$('dfReceiver').value.trim(),deliveredQty,note:$('dfConNote').value.trim(),proof,updatedAt:new Date().toISOString(),updatedBy:currentUser.display,history:[...(old?.history||[]),{status,by:currentUser.display,at:new Date().toISOString(),note:$('dfConNote').value.trim()}]};if(['Handed to Courier','In Transit','Delivered'].includes(status)&&(!next.courier||!next.tracking||!next.dispatchDate))return toast('Courier/driver, tracking/reference and dispatch date are required');if(old)Object.assign(old,next);else p.consignments.push(next);audit(old?'UPDATE_CONSIGNMENT':'ADD_CONSIGNMENT',`${next.consignmentNo} • ${next.status}`);saveState();closeModal('dfConsignmentModal');renderDealerFulfilment();openDfPlan(p.id);toast('Consignment saved')};
+ window.deleteDfConsignment=function(){const p=state.dealerFulfilments.find(x=>x.id===$('dfPlanId').value),c=p?.consignments.find(x=>x.id===$('dfConId').value);if(!p||!c||LOCKED.includes(c.status))return toast('Completed consignments cannot be deleted');if(!confirm(`Delete draft ${c.consignmentNo}?`))return;p.consignments=p.consignments.filter(x=>x.id!==c.id);audit('DELETE_CONSIGNMENT',c.consignmentNo);saveState();closeModal('dfConsignmentModal');renderDealerFulfilment();openDfPlan(p.id)};
+ function currentPC(){const p=state.dealerFulfilments.find(x=>x.id===$('dfPlanId').value),c=p?.consignments.find(x=>x.id===$('dfConId').value);return {p,c}}
+ window.copyDfWhatsApp=function(){const {p,c}=currentPC();if(!p||!c)return toast('Save the consignment first');const items=c.allocations.map(a=>`${lineLabel(p.lines[a.lineIndex])} — ${money(a.qty)} ${p.lines[a.lineIndex].unit}`).join('\n'),msg=`Dear ${p.dealerName},\n\nShipment Update: ${c.consignmentNo}\nShip To: ${c.recipient}\n${items}\nStatus: ${c.status}\nCourier/Driver: ${c.courier||'-'}\nTracking/Reference: ${c.tracking||'-'}\nExpected Delivery: ${c.expectedDate||'-'}\n\nThank you.`;navigator.clipboard.writeText(msg).then(()=>toast('WhatsApp update copied')).catch(()=>prompt('Copy message:',msg))};
+ window.copyDfPlanSummary=function(id){const p=state.dealerFulfilments.find(x=>x.id===id);if(!p)return;const t=planTotals(p),msg=`Dealer Order: ${p.planNo}\nPI: ${p.piSerial}\nPO: ${p.poRef||'-'}\nDealer: ${p.dealerName}\nOrdered: ${money(t.ordered)}\nAllocated: ${money(t.allocated)}\nDispatched: ${money(t.dispatched)}\nDelivered: ${money(t.delivered)}\nUnallocated: ${money(t.balance)}\n\n${p.consignments.map(c=>`${c.consignmentNo} | ${c.recipient} | ${c.status} | ${c.tracking||'No tracking'}`).join('\n')}`;navigator.clipboard.writeText(msg).then(()=>toast('Dealer summary copied')).catch(()=>prompt('Copy summary:',msg))};
+ window.viewDfProof=function(){const {c}=currentPC();if(!c?.proof)return;const a=document.createElement('a');a.href=c.proof.data;a.download=c.proof.name;a.target='_blank';a.click()};
+ window.downloadDfNote=async function(){const {p,c}=currentPC();if(!p||!c)return toast('Save the consignment first');const rows=c.allocations.map(a=>{const l=p.lines[a.lineIndex];return `<tr><td>${esc(lineLabel(l))}</td><td>${money(a.qty)} ${esc(l.unit)}</td></tr>`}).join(''),html=`<div style="border-left:7px solid #078f92;padding-left:14px"><h1 style="margin:0;color:#078f92">DELIVERY NOTE</h1><b>${esc(c.consignmentNo)}</b></div><table class="table" style="margin-top:20px"><tr><th>Bill To</th><td>${esc(p.dealerName)}</td><th>PI / PO</th><td>${esc(p.piSerial)} / ${esc(p.poRef||'-')}</td></tr><tr><th>Ship To</th><td colspan="3"><b>${esc(c.recipient)}</b><br>${esc(c.address)}<br>${esc(c.phone)}</td></tr><tr><th>Courier / Driver</th><td>${esc(c.courier||'-')}</td><th>Tracking</th><td>${esc(c.tracking||'-')}</td></tr></table><h3 style="color:#078f92">ITEMS</h3><table class="table"><thead><tr><th>Description</th><th>Quantity</th></tr></thead><tbody>${rows}</tbody></table><div class="notice"><b>Status:</b> ${esc(c.status)}<br>${esc(c.note||'')}</div><div style="margin-top:55px;display:flex;justify-content:space-between"><span>Prepared By: ${esc(currentUser.display)}</span><span>Receiver: __________________</span><span>Date: __________________</span></div>`;if(typeof pdfFromLetterheadV81==='function')await pdfFromLetterheadV81(html,`Delivery_${c.consignmentNo.replaceAll('/','-')}.pdf`);else toast('PDF function is unavailable')};
+ const show88=showView;showView=function(id){const r=show88(id);if(id==='dealerfulfilment')renderDealerFulfilment();return r};
+ const refresh88=refreshAll;refreshAll=function(){refresh88();renderDealerFulfilment()};
+ const access88=applyUserAccess;applyUserAccess=function(){access88();const b=document.querySelector('[data-view="dealerfulfilment"]');if(b)b.style.display=hasPerm('dealer_fulfilment')?'inline-block':'none'};
+ saveState();applyUserAccess();renderDealerFulfilment();
+})();
+</script>
+
+<script>
+/* V9.0 - Dealer delivery/pickup auto-fill and full-quantity lock */
+(function(){
+ const ALL='Deliver all to dealer',PICKUP='Dealer pickup';
+ function isDealerOnly(p){return !!p&&[ALL,PICKUP].includes(p.method)}
+ function dealerSnapshot(p){const d=state.docs.find(x=>x.id===p.piId),c=state.customers.find(x=>x.id===p.dealerId),snap=d?.customer||{};return {name:p.dealerName||c?.name||snap.name||'',phone:p.dealerPhone||c?.phone||snap.phone||'',address:c?.delivery||snap.delivery||c?.address||snap.address||'',map:c?.map||snap.map||''}}
+ function ensureDealerConsignment(p){
+   if(!isDealerOnly(p))return null;
+   const info=dealerSnapshot(p);let c=p.consignments.find(x=>x.autoDealerConsignment)||p.consignments[0];
+   if(!c){c={id:uid('con'),consignmentNo:`${p.planNo}/S01`,recipient:info.name,phone:info.phone,address:info.address,map:info.map,payer:p.method===PICKUP?'Dealer':'Softcreation',charge:0,blind:false,status:'Ready for Dispatch',courier:'',tracking:'',dispatchDate:'',expectedDate:'',deliveredDate:'',receiver:'',deliveredQty:0,note:p.method===PICKUP?'Dealer pickup — collector details pending':'Full order delivery to registered dealer',service:p.method===PICKUP?'Dealer Representative':'Company Vehicle',pickupBy:'',pickupNic:'',pickupRef:'',proof:null,packageImages:[],history:[{status:'Ready for Dispatch',by:currentUser?.display||'System',at:new Date().toISOString(),note:'Auto-created from PI dealer details'}],updatedAt:new Date().toISOString(),updatedBy:currentUser?.display||'System'};p.consignments.push(c)}
+   c.autoDealerConsignment=true;c.recipient=info.name;c.phone=info.phone;c.address=info.address;c.map=info.map;c.allocations=p.lines.map((l,i)=>({lineIndex:i,qty:Number(l.qty||0)}));
+   return c
+ }
+ const openPlan90=window.openDfPlan;window.openDfPlan=function(id){const p=state.dealerFulfilments.find(x=>x.id===id);if(isDealerOnly(p)){ensureDealerConsignment(p);saveState()}openPlan90(id);if(!isDealerOnly(p))return;const add=[...$('dfPlanBody').querySelectorAll('button')].find(b=>b.textContent.includes('Add Ship-To Consignment'));if(add){const c=ensureDealerConsignment(p);add.textContent=p.method===PICKUP?'Update Dealer Pickup':'Update Dealer Delivery';add.setAttribute('onclick',`openDfConsignment('${p.id}','${c.id}')`)}const empty=[...$('dfPlanBody').querySelectorAll('.empty')].find(x=>x.textContent.includes('No consignments'));if(empty)empty.remove()};
+ const openCon90=window.openDfConsignment;window.openDfConsignment=function(planId,conId=''){const p=state.dealerFulfilments.find(x=>x.id===planId);if(isDealerOnly(p)){const c=ensureDealerConsignment(p);conId=c.id;saveState()}openCon90(planId,conId);if(!isDealerOnly(p)){$('dfAllocation').style.display='';if($('dfAllocation').previousElementSibling)$('dfAllocation').previousElementSibling.style.display='';return}const c=ensureDealerConsignment(p),info=dealerSnapshot(p);$('dfConTitle').textContent=p.method===PICKUP?'Update Dealer Pickup':'Update Dealer Delivery';$('dfRecipient').value=info.name;$('dfPhone').value=info.phone;$('dfAddress').value=info.address;$('dfMap').value=info.map;$('dfRecipient').readOnly=true;$('dfPhone').readOnly=true;$('dfAddress').readOnly=true;$('dfMap').readOnly=true;$('dfAllocation').style.display='none';if($('dfAllocation').previousElementSibling)$('dfAllocation').previousElementSibling.style.display='none';document.querySelectorAll('#dfAllocation .dfQty').forEach((e,i)=>{e.value=Number(p.lines[i]?.qty||0);e.readOnly=true;e.disabled=false});$('dfConWarning').innerHTML=`<div class="df-ok"><b>${p.method===PICKUP?'Dealer Pickup':'Full Dealer Delivery'}:</b> Dealer details and the complete PI quantity are selected automatically. Item quantities cannot be changed in this mode.</div>`;c.recipient=info.name;c.phone=info.phone;c.address=info.address;c.map=info.map;c.allocations=p.lines.map((l,i)=>({lineIndex:i,qty:Number(l.qty||0)}));saveState()};
+ const saveCon90=window.saveDfConsignment;window.saveDfConsignment=async function(){const p=state.dealerFulfilments.find(x=>x.id===$('dfPlanId').value);if(isDealerOnly(p)){const c=ensureDealerConsignment(p),info=dealerSnapshot(p);$('dfConId').value=c.id;$('dfRecipient').value=info.name;$('dfPhone').value=info.phone;$('dfAddress').value=info.address;$('dfMap').value=info.map;document.querySelectorAll('#dfAllocation .dfQty').forEach((e,i)=>{e.disabled=false;e.value=Number(p.lines[i]?.qty||0)})}await saveCon90();if(isDealerOnly(p)){ensureDealerConsignment(p);saveState();renderDealerFulfilment()}};
+ (state.dealerFulfilments||[]).filter(isDealerOnly).forEach(ensureDealerConsignment);saveState();
+})();
+</script>
+
+<script>
+/* V9.1 - Repeat Sales Orders, ERP API queue and generic Order Fulfilment */
+(function(){
+ const ALL='Deliver all to dealer',PICKUP='Dealer pickup',DIRECT='Direct delivery to dealer customers',MIXED='Mixed delivery';
+ state.salesOrders=state.salesOrders||[];state.settings=state.settings||{};
+ if(!USER_FEATURES.some(x=>x[0]==='sales_orders'))USER_FEATURES.push(['sales_orders','Repeat Sales Orders']);
+ VIEW_PERMS.salesorders='sales_orders';
+ const save91=saveState;saveState=function(){state.salesOrders=state.salesOrders||[];return save91()};
+ const style=document.createElement('style');style.textContent='.so-status{display:inline-block;padding:4px 8px;border-radius:999px;font-size:9px;font-weight:1000;background:#e9f1f3;color:#38545d}.so-status.synced{background:#ddf6e8;color:#087247}.so-status.error{background:#ffe6e6;color:#a22525}.so-price-lock{background:#eefafa;border:1px solid #b4dede;border-radius:9px;padding:8px}.so-line{display:grid;grid-template-columns:42px 1fr 120px 140px 150px;gap:8px;align-items:center;padding:8px;border-bottom:1px solid #deeaec}.so-line input[type=number]{width:100%}@media(max-width:800px){.so-line{grid-template-columns:34px 1fr 90px}.so-line .so-price,.so-line .so-amount{grid-column:2/4}}';document.head.appendChild(style);
+ const nav=document.querySelector('.nav'),fulfilBtn=document.querySelector('[data-view="dealerfulfilment"]'),settingsBtn=document.querySelector('[data-view="settings"]');
+ if(fulfilBtn)fulfilBtn.textContent='Order Fulfilment';
+ if(!document.querySelector('[data-view="salesorders"]')){const b=document.createElement('button');b.className='navbtn';b.dataset.view='salesorders';b.textContent='Sales Orders';b.onclick=()=>showView('salesorders');nav.insertBefore(b,fulfilBtn||settingsBtn)}
+ const firstModal=document.querySelector('.modal');firstModal.insertAdjacentHTML('beforebegin',`<section id="salesorders" class="view"><div class="panel"><div class="panel-title">Repeat Sales Orders <button class="btn sm" style="background:#fff;color:#087f83" onclick="openSalesOrder91()">+ Create SO</button></div><div class="panel-body"><div class="notice"><b>Repeat-order control:</b> Only customers with at least one saved PI are eligible. Customer identity and unit prices come from the selected PI; prices remain locked.</div><div class="listbar"><input id="soSearch91" class="search" placeholder="Search SO / customer / PI / ERP number" oninput="renderSalesOrders91()"><select id="soStatus91" onchange="renderSalesOrders91()"><option value="">All ERP statuses</option><option>Pending ERP Sync</option><option>Synced</option><option>Sync Error</option></select></div><div id="soList91"></div></div></div></section>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="soModal91" class="modal"><div class="modal-card" style="max-width:1150px"><div class="modal-head"><div><b id="soTitle91">Create Repeat Sales Order</b><div class="small">Existing PI customer and approved price snapshot only.</div></div><button class="closex" onclick="closeModal('soModal91')">×</button></div><div class="modal-body"><input id="soId91" type="hidden"><div class="grid"><div class="field"><label>Existing Customer</label><select id="soCustomer91" onchange="loadSoCustomer91()"></select></div><div class="field"><label>Approved Price Source PI</label><select id="soSource91" onchange="loadSoSource91()"></select></div><div class="field"><label>SO Date</label><input id="soDate91" type="date"></div><div class="field"><label>Required Date</label><input id="soNeed91" type="date"></div><div class="field"><label>Customer PO / Reference</label><input id="soRef91"></div><div class="field"><label>Fulfilment Method</label><select id="soMethod91" onchange="toggleSoDestination91()"><option value="${ALL}">Deliver all to customer</option><option value="${PICKUP}">Customer pickup</option><option value="${DIRECT}">Deliver to nominated address</option><option value="${MIXED}">Mixed delivery</option></select></div><div id="soDestination91" class="field full"><div class="grid"><div class="field"><label>Ship-To Name</label><input id="soShipName91"></div><div class="field"><label>Contact</label><input id="soShipPhone91"></div><div class="field full"><label>Ship-To Address</label><textarea id="soShipAddress91"></textarea></div><div class="field full"><label>Google Maps Link</label><input id="soShipMap91"></div></div></div><div class="field full"><label>Special Notes for Stores / Production</label><textarea id="soNote91"></textarea></div></div><div class="section">Locked Price Items</div><div class="so-price-lock">Select the required repeat-order items and change quantity only. Description and approved unit price cannot be edited.</div><div id="soLines91"></div><div class="sumline"><span>Sales Order Value</span><strong id="soTotal91">LKR 0.00</strong></div><div class="actions"><button class="btn primary" onclick="saveSalesOrder91()">Save SO & Create Fulfilment Plan</button><button class="btn green" onclick="saveAndSyncSO91()">Save & Send to ERP</button></div></div></div></div>`);
+ const settingsBody=document.querySelector('#settings .panel-body');if(settingsBody)settingsBody.insertAdjacentHTML('beforeend',`<div class="section">ERP Sales Order API Integration</div><div class="grid"><div class="field full"><label>ERP Sales Order API Endpoint</label><input id="erpEndpoint91" placeholder="https://erp.example.lk/api/sales-orders"></div><div class="field full"><label>API Bearer Token</label><input id="erpToken91" type="password" placeholder="Use a restricted integration token"></div><div class="field full"><div class="notice">For the hosted production system, keep the API token on the server—not in browser storage. This HTML connector is suitable for testing and handover to your IT developer.</div></div></div><div class="actions"><button class="btn green" onclick="saveErpSettings91()">Save ERP API Settings</button></div>`);
+
+ function ownedPI91(d){return d.type==='PI'&&(currentUser?.role==='admin'||d.ownerUser===currentUser?.username||d.createdBy===currentUser?.display)}
+ function eligibleCustomers91(){const ids=new Set(state.docs.filter(ownedPI91).map(d=>d.customerId));return state.customers.filter(c=>ids.has(c.id)&&(currentUser?.role==='admin'||c.ownerUser===currentUser?.username||state.docs.some(d=>ownedPI91(d)&&d.customerId===c.id)))}
+ function customerPIs91(id){return state.docs.filter(d=>ownedPI91(d)&&d.customerId===id).sort((a,b)=>Number(b.created||0)-Number(a.created||0))}
+ function soVisible91(x){return currentUser?.role==='admin'||x.ownerUser===currentUser?.username}
+ function soNo91(){return `SC/SO/${today().replaceAll('-','')}/${String(state.salesOrders.length+1).padStart(3,'0')}`}
+ function soTotalCalc91(lines){return (lines||[]).filter(x=>x.use!==false).reduce((s,x)=>s+Number(x.qty||0)*Number(x.price||0),0)}
+ function soClass91(s){return s==='Synced'?'synced':s==='Sync Error'?'error':''}
+ window.openSalesOrder91=function(id=''){const x=state.salesOrders.find(y=>y.id===id),cs=eligibleCustomers91();if(!cs.length)return toast('No eligible customer. A saved PI is required before creating a repeat SO.');$('soId91').value=x?.id||'';$('soTitle91').textContent=x?`Edit ${x.soNo}`:'Create Repeat Sales Order';$('soCustomer91').innerHTML=cs.map(c=>`<option value="${c.id}">${esc(c.name)} • ${esc(c.phone||'')}</option>`).join('');$('soCustomer91').value=x?.customerId||cs[0].id;$('soDate91').value=x?.date||today();$('soNeed91').value=x?.needDate||'';$('soRef91').value=x?.customerRef||'';$('soMethod91').value=x?.method||ALL;$('soNote91').value=x?.note||'';loadSoCustomer91(x?.sourcePIId||'',x);$('soModal91').classList.add('show')};
+ window.loadSoCustomer91=function(preferred='',existing=null){const id=$('soCustomer91').value,ps=customerPIs91(id);$('soSource91').innerHTML=ps.map(d=>`<option value="${d.id}">${esc(d.serial)} • ${esc(d.date)} • LKR ${money(docTotals(d).gross)}</option>`).join('');$('soSource91').value=preferred&&ps.some(d=>d.id===preferred)?preferred:ps[0]?.id||'';const c=state.customers.find(x=>x.id===id);$('soShipName91').value=existing?.shipTo?.name||c?.name||'';$('soShipPhone91').value=existing?.shipTo?.phone||c?.phone||'';$('soShipAddress91').value=existing?.shipTo?.address||c?.delivery||c?.address||'';$('soShipMap91').value=existing?.shipTo?.map||c?.map||'';loadSoSource91(existing?.lines);toggleSoDestination91()};
+ window.loadSoSource91=function(existingLines=null){const d=state.docs.find(x=>x.id===$('soSource91').value),lines=existingLines||activeDocLines(d||{}).map(l=>({kind:l.kind||'label',itemId:l.itemId||'',desc:l.desc||'ELP',size:l.size||'',material:l.material||'',layout:l.layout||'',pcs:l.pcs||'',unit:l.unit||'Rolls',qty:Number(l.qty||0),price:Number(l.price||0),priceTier:l.priceTier||'',use:true}));$('soLines91').innerHTML=lines.length?lines.map((l,i)=>`<div class="so-line"><input class="soUse91" data-i="${i}" type="checkbox" ${l.use!==false?'checked':''} onchange="calcSo91()"><div><b>${esc([l.desc,l.size,l.material,l.layout,l.pcs?l.pcs+' pcs':''].filter(Boolean).join(' • '))}</b><div class="small">Locked from ${esc(d?.serial||'saved SO')} • ${esc(l.priceTier||'approved price')}</div></div><div><label>Qty</label><input class="soQty91" data-i="${i}" type="number" min="0.01" step="0.01" value="${Number(l.qty||1)}" oninput="calcSo91()"></div><div class="so-price">Unit: <b>LKR ${money(l.price)}</b></div><div class="so-amount" id="soAmount91_${i}">LKR ${money(Number(l.qty||0)*Number(l.price||0))}</div><input class="soData91" type="hidden" value="${encodeURIComponent(JSON.stringify(l))}"></div>`).join(''):'<div class="empty">Selected PI has no active items.</div>';calcSo91()};
+ window.calcSo91=function(){let t=0;document.querySelectorAll('#soLines91 .so-line').forEach((r,i)=>{const l=JSON.parse(decodeURIComponent(r.querySelector('.soData91').value)),use=r.querySelector('.soUse91').checked,qty=Number(r.querySelector('.soQty91').value||0),a=use?qty*Number(l.price||0):0;t+=a;const e=$(`soAmount91_${i}`);if(e)e.textContent=`LKR ${money(a)}`});$('soTotal91').textContent=`LKR ${money(t)}`};
+ window.toggleSoDestination91=function(){const m=$('soMethod91').value,show=m===DIRECT||m===MIXED;$('soDestination91').style.display=show?'block':'none'};
+ function collectSoLines91(){return [...document.querySelectorAll('#soLines91 .so-line')].map(r=>{const l=JSON.parse(decodeURIComponent(r.querySelector('.soData91').value));return {...l,use:r.querySelector('.soUse91').checked,qty:Number(r.querySelector('.soQty91').value||0)}}).filter(x=>x.use&&x.qty>0)}
+ function createSoFulfilment91(so){let p=state.dealerFulfilments.find(x=>x.sourceSOId===so.id);if(p)return p;p={id:uid('df'),planNo:`SC/OF/${today().slice(0,4)}/${String(state.dealerFulfilments.length+1).padStart(4,'0')}`,piId:'',piSerial:so.soNo,sourceType:'SO',sourceSOId:so.id,sourceSerial:so.soNo,dealerId:so.customerId,dealerName:so.customerName,dealerPhone:so.customerPhone,poRef:so.customerRef||'',method:so.method,instructions:so.note||'',ownerUser:so.ownerUser,ownerDisplay:so.ownerDisplay,lines:so.lines.map(l=>({desc:l.desc,size:l.size,material:l.material,layout:l.layout,pcs:l.pcs,qty:l.qty,unit:l.unit})),consignments:[],createdAt:new Date().toISOString(),createdBy:currentUser.display,erpSONo:so.erpSONo||''};state.dealerFulfilments.unshift(p);if(so.method===DIRECT){p.consignments.push({id:uid('con'),consignmentNo:`${p.planNo}/S01`,recipient:so.shipTo.name,phone:so.shipTo.phone,address:so.shipTo.address,map:so.shipTo.map,payer:'Customer',charge:0,blind:false,allocations:p.lines.map((l,i)=>({lineIndex:i,qty:l.qty})),status:'Awaiting Instructions',courier:'',tracking:'',dispatchDate:'',expectedDate:'',deliveredDate:'',receiver:'',deliveredQty:0,note:so.note||'',proof:null,packageImages:[],history:[],updatedAt:new Date().toISOString(),updatedBy:currentUser.display})}return p}
+ window.saveSalesOrder91=function(sync=false){const id=$('soId91').value,old=state.salesOrders.find(x=>x.id===id),c=state.customers.find(x=>x.id===$('soCustomer91').value),pi=state.docs.find(x=>x.id===$('soSource91').value),lines=collectSoLines91();if(!c||!pi)return toast('Select an eligible customer and source PI');if(!customerPIs91(c.id).some(x=>x.id===pi.id))return toast('The selected PI does not belong to this customer');if(!lines.length)return toast('Select at least one repeat-order item with a valid quantity');const method=$('soMethod91').value,shipTo={name:method===DIRECT||method===MIXED?$('soShipName91').value.trim():c.name,phone:method===DIRECT||method===MIXED?$('soShipPhone91').value.trim():c.phone||'',address:method===DIRECT||method===MIXED?$('soShipAddress91').value.trim():c.delivery||c.address||'',map:method===DIRECT||method===MIXED?$('soShipMap91').value.trim():c.map||''};if((method===DIRECT||method===MIXED)&&(!shipTo.name||!shipTo.phone||!shipTo.address))return toast('Complete the nominated delivery details');const so={...(old||{}),id:old?.id||uid('so'),soNo:old?.soNo||soNo91(),date:$('soDate91').value||today(),needDate:$('soNeed91').value,customerRef:$('soRef91').value.trim(),customerId:c.id,customerName:c.name,customerPhone:c.phone||'',sourcePIId:pi.id,sourcePISerial:pi.serial,method,shipTo,note:$('soNote91').value.trim(),lines,total:soTotalCalc91(lines),ownerUser:old?.ownerUser||currentUser.username,ownerDisplay:old?.ownerDisplay||currentUser.display,erpStatus:old?.erpStatus||'Pending ERP Sync',erpSONo:old?.erpSONo||'',erpMessage:old?.erpMessage||'',createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(),history:[...(old?.history||[]),{action:old?'Updated':'Created',by:currentUser.display,at:new Date().toISOString()}]};if(old)Object.assign(old,so);else state.salesOrders.unshift(so);const p=createSoFulfilment91(so);so.fulfilmentPlanId=p.id;audit(old?'UPDATE_SALES_ORDER':'CREATE_SALES_ORDER',`${so.soNo} • ${c.name}`);saveState();closeModal('soModal91');renderSalesOrders91();renderDealerFulfilment();toast(`${so.soNo} saved and linked to Order Fulfilment`);if(sync)syncSalesOrder91(so.id);return so};
+ window.saveAndSyncSO91=function(){return saveSalesOrder91(true)};
+ window.renderSalesOrders91=function(){if(!$('soList91'))return;const q=($('soSearch91')?.value||'').toLowerCase(),f=$('soStatus91')?.value||'',a=state.salesOrders.filter(soVisible91).filter(x=>(!f||x.erpStatus===f)&&[x.soNo,x.customerName,x.sourcePISerial,x.erpSONo,x.customerRef].join(' ').toLowerCase().includes(q));$('soList91').innerHTML=a.length?`<table class="table"><thead><tr><th>Sales Order</th><th>Customer / Source</th><th>Items</th><th>Value</th><th>ERP Status</th><th>Fulfilment</th><th></th></tr></thead><tbody>${a.map(x=>`<tr><td><b>${esc(x.soNo)}</b><div class="small">${esc(x.date)} • Need ${esc(x.needDate||'-')}</div></td><td><b>${esc(x.customerName)}</b><div class="small">Price source: ${esc(x.sourcePISerial)}<br>PO/Ref: ${esc(x.customerRef||'-')}</div></td><td>${x.lines.length}<div class="small">${x.lines.slice(0,2).map(l=>esc(l.desc+' '+l.size+' × '+money(l.qty))).join('<br>')}</div></td><td><b>LKR ${money(x.total)}</b></td><td><span class="so-status ${soClass91(x.erpStatus)}">${esc(x.erpStatus)}</span>${x.erpSONo?`<div class="small">ERP: ${esc(x.erpSONo)}</div>`:''}${x.erpMessage?`<div class="small">${esc(x.erpMessage)}</div>`:''}</td><td><button class="btn ghost sm" onclick="showView('dealerfulfilment');openDfPlan('${x.fulfilmentPlanId}')">Open Plan</button></td><td><button class="btn ghost sm" onclick="openSalesOrder91('${x.id}')">Open</button> <button class="btn green sm" onclick="syncSalesOrder91('${x.id}')">${x.erpStatus==='Synced'?'Re-Sync':'Send ERP'}</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">No repeat Sales Orders found.</div>'};
+ function erpPayload91(x){return {externalOrderNo:x.soNo,orderDate:x.date,requiredDate:x.needDate,customer:{id:x.customerId,name:x.customerName,phone:x.customerPhone},sourcePI:x.sourcePISerial,customerReference:x.customerRef,delivery:{method:x.method,shipTo:x.shipTo},notes:x.note,items:x.lines.map(l=>({itemId:l.itemId,description:l.desc,size:l.size,material:l.material,layout:l.layout,pcs:l.pcs,unit:l.unit,quantity:l.qty,unitPrice:l.price,amount:l.qty*l.price})),total:x.total}}
+ window.syncSalesOrder91=async function(id){const x=state.salesOrders.find(y=>y.id===id);if(!x)return;const url=(state.settings.erpSalesOrderApi||'').trim();if(!url){x.erpStatus='Pending ERP Sync';x.erpMessage='ERP endpoint is not configured';saveState();renderSalesOrders91();return toast('Configure the ERP Sales Order API endpoint in Settings')}x.erpStatus='Sending';x.erpMessage='';saveState();renderSalesOrders91();try{const headers={'Content-Type':'application/json','X-Idempotency-Key':x.soNo};if(state.settings.erpApiToken)headers.Authorization=`Bearer ${state.settings.erpApiToken}`;const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(erpPayload91(x))});const raw=await r.text();let data={};try{data=raw?JSON.parse(raw):{}}catch(e){data={message:raw}}if(!r.ok)throw new Error(data.message||`ERP HTTP ${r.status}`);x.erpStatus='Synced';x.erpSONo=data.soNo||data.orderNo||data.documentNo||x.erpSONo||'';x.erpMessage=data.message||'Accepted by ERP';x.erpSyncedAt=new Date().toISOString();x.history.push({action:'ERP Sync',by:currentUser.display,at:x.erpSyncedAt,erpSONo:x.erpSONo});const p=state.dealerFulfilments.find(p=>p.sourceSOId===x.id);if(p)p.erpSONo=x.erpSONo;audit('SYNC_ERP_SALES_ORDER',`${x.soNo} → ${x.erpSONo||'accepted'}`);toast(`ERP accepted ${x.soNo}${x.erpSONo?' as '+x.erpSONo:''}`)}catch(e){x.erpStatus='Sync Error';x.erpMessage=e.message;audit('ERP_SYNC_ERROR',`${x.soNo}: ${e.message}`);toast(`ERP sync failed: ${e.message}`)}saveState();renderSalesOrders91()};
+ window.saveErpSettings91=function(){if(currentUser?.role!=='admin')return toast('Administrator access is required');state.settings.erpSalesOrderApi=$('erpEndpoint91').value.trim();state.settings.erpApiToken=$('erpToken91').value.trim();audit('ERP_API_SETTINGS','Sales Order endpoint updated');saveState();toast('ERP API settings saved')};
+ function refreshGenericLabels91(){const b=document.querySelector('[data-view="dealerfulfilment"]');if(b)b.textContent='Order Fulfilment';const title=document.querySelector('#dealerfulfilment .panel-title');if(title)title.childNodes[0].nodeValue='Order Fulfilment & Delivery Monitoring ';const notice=document.querySelector('#dealerfulfilment .notice');if(notice)notice.innerHTML='<b>Bill To remains the customer.</b> Monitor PI and repeat Sales Order deliveries, split shipments, tracking, package proof and delivery completion.';const createTitle=$('dfCreateModal')?.querySelector('.modal-head b');if(createTitle)createTitle.textContent='Create Order Fulfilment Plan';const createSub=$('dfCreateModal')?.querySelector('.modal-head .small');if(createSub)createSub.textContent='Confirmed PI becomes the bill-to order. Sales Orders are linked automatically.';const label=$('dfDeliveredQty')?.closest('.field')?.querySelector('label');if(label)label.textContent='Delivered Box Quantity';if($('dfDeliveredQty'))$('dfDeliveredQty').placeholder='Number of boxes / packages';const opts=$('dfMethod')?.options||[];[...opts].forEach(o=>{if(o.value===DIRECT)o.textContent='Direct delivery to nominated recipient';if(o.value===ALL)o.textContent='Deliver all to customer';if(o.value===PICKUP)o.textContent='Customer pickup';if(o.value===MIXED)o.textContent='Mixed delivery'});const createBtn=document.querySelector('#dealerfulfilment .panel-title button');if(createBtn)createBtn.textContent='+ Create from PI'}
+ const renderDf91=window.renderDealerFulfilment;window.renderDealerFulfilment=function(){renderDf91();refreshGenericLabels91();const first=$('dfKpis')?.querySelector('.df-kpi span');if(first)first.textContent='Orders'};
+ const openCon91=window.openDfConsignment;window.openDfConsignment=function(a,b=''){openCon91(a,b);refreshGenericLabels91();const w=$('dfConWarning');if(w&&w.textContent.includes('Delivered quantity'))w.innerHTML=w.innerHTML.replaceAll('Delivered quantity','Delivered box quantity')};
+ const show91=showView;showView=function(id){const r=show91(id);if(id==='salesorders')renderSalesOrders91();if(id==='settings'){$('erpEndpoint91').value=state.settings.erpSalesOrderApi||'';$('erpToken91').value=state.settings.erpApiToken||''}if(id==='dealerfulfilment')refreshGenericLabels91();return r};
+ const refresh91=refreshAll;refreshAll=function(){refresh91();renderSalesOrders91();refreshGenericLabels91()};
+ const access91=applyUserAccess;applyUserAccess=function(){access91();const b=document.querySelector('[data-view="salesorders"]');if(b)b.style.display=hasPerm('sales_orders')?'inline-block':'none'};
+ const saveBoxes91=window.saveDfConsignment;window.saveDfConsignment=async function(){const p=state.dealerFulfilments.find(x=>x.id===$('dfPlanId')?.value),id=$('dfConId')?.value,before=p?.consignments.find(x=>x.id===id)?.updatedAt||'',boxes=Number($('dfDeliveredQty')?.value||0),status=$('dfStatus')?.value;if(status==='Delivered'&&p){const c=p.consignments.find(x=>x.id===id),itemQty=(c?.allocations||[]).reduce((s,x)=>s+Number(x.qty||0),0);if(boxes>itemQty&&$('dfDeliveredQty'))$('dfDeliveredQty').value=Math.min(itemQty||1,1)}await saveBoxes91();const c=id?p?.consignments.find(x=>x.id===id):null;if(c&&c.updatedAt!==before&&status==='Delivered'){c.deliveredBoxQty=boxes;c.deliveredQty=boxes;saveState();renderDealerFulfilment()}};
+ const saveSOBase91=window.saveSalesOrder91;window.saveSalesOrder91=function(sync=false){const existing=state.salesOrders.find(x=>x.id===$('soId91')?.value),oldPlan=existing&&state.dealerFulfilments.find(p=>p.sourceSOId===existing.id);if(oldPlan?.consignments.some(c=>['Handed to Courier','In Transit','Delivered','Returned'].includes(c.status))){toast('This SO already has a dispatched shipment. Create a new SO revision instead of changing quantities.');return}const so=saveSOBase91(sync);if(!so)return so;const p=state.dealerFulfilments.find(x=>x.sourceSOId===so.id);if(p){p.method=so.method;p.instructions=so.note||'';p.poRef=so.customerRef||'';p.lines=so.lines.map(l=>({desc:l.desc,size:l.size,material:l.material,layout:l.layout,pcs:l.pcs,qty:l.qty,unit:l.unit}));if(p.consignments.length===1){const c=p.consignments[0];c.allocations=p.lines.map((l,i)=>({lineIndex:i,qty:l.qty}));if(so.method===DIRECT){Object.assign(c,{recipient:so.shipTo.name,phone:so.shipTo.phone,address:so.shipTo.address,map:so.shipTo.map})}}saveState();renderDealerFulfilment()}return so};
+ refreshGenericLabels91();renderSalesOrders91();applyUserAccess();saveState();
+})();
+</script>
+
+<script>
+/* V9.2 - Lock SO item quantities for Deliver All to Customer */
+(function(){
+ const ALL='Deliver all to dealer';
+ const note=document.querySelector('#soModal91 .so-price-lock');if(note)note.id='soQtyLock91';
+ function applySoQtyLock92(){const locked=$('soMethod91')?.value===ALL;document.querySelectorAll('#soLines91 .so-line').forEach(r=>{const q=r.querySelector('.soQty91');if(!q)return;q.readOnly=locked;q.classList.toggle('readonly',locked);q.style.background=locked?'#eef3f4':'#fff';q.style.cursor=locked?'not-allowed':''});if($('soQtyLock91'))$('soQtyLock91').innerHTML=locked?'<b>Full delivery quantity locked:</b> Quantities are taken from the selected approved PI/SO snapshot and cannot be changed for “Deliver all to customer”.':'Select the required repeat-order items and change quantity only. Description and approved unit price remain locked.'}
+ const toggle92=window.toggleSoDestination91;window.toggleSoDestination91=function(){toggle92();applySoQtyLock92()};
+ const loadSource92=window.loadSoSource91;window.loadSoSource91=function(lines=null){loadSource92(lines);applySoQtyLock92()};
+ const saveSO92=window.saveSalesOrder91;window.saveSalesOrder91=function(sync=false){if($('soMethod91')?.value===ALL){document.querySelectorAll('#soLines91 .so-line').forEach(r=>{const q=r.querySelector('.soQty91'),raw=r.querySelector('.soData91')?.value;if(!q||!raw)return;try{q.value=Number(JSON.parse(decodeURIComponent(raw)).qty||0)}catch(e){}});calcSo91()}return saveSO92(sync)};
+ applySoQtyLock92();
+})();
+</script>
+
+<script>
 /* SPGS Supabase bridge - cloud persistence + application-user table.
    Business/pricing/document logic above is intentionally left unchanged. */
 (function(){
@@ -2397,7 +2528,11 @@ let spgsReady=false,
     spgsPurchaseChannel=null,
     spgsPurchaseCloudReady=false,
     spgsQuoteRequestChannel=null,
-    spgsQuoteRequestCloudReady=false;
+    spgsQuoteRequestCloudReady=false,
+    spgsSalesOrderChannel=null,
+    spgsSalesOrderCloudReady=false,
+    spgsFulfilmentChannel=null,
+    spgsFulfilmentCloudReady=false;
 
   function spgsApiKey(){
     let key=localStorage.getItem(SPGS_KEY_STORE)||'';
@@ -2541,6 +2676,10 @@ window.spgsLoadProductionSeen=
     // Live-safe migration: only remove quoteRequests from the legacy shared
     // payload after the dedicated realtime table has been confirmed available.
     if(spgsQuoteRequestCloudReady)delete copy.quoteRequests;
+    // v1.0.9 live-safe isolation: keep these in legacy shared state until
+    // their dedicated tables have been confirmed available.
+    if(spgsSalesOrderCloudReady)delete copy.salesOrders;
+    if(spgsFulfilmentCloudReady)delete copy.dealerFulfilments;
     delete copy.users;
     copy.current=null;
     return copy;
@@ -2780,6 +2919,145 @@ async function spgsStartQuoteRequestsRealtime(){
         .subscribe(status=>console.log('Quote Requests realtime status:',status));
 }
 
+
+// -----------------------------------------------------------------------------
+// v1.0.9 - Repeat Sales Orders + Order Fulfilment dedicated realtime persistence
+// -----------------------------------------------------------------------------
+let spgsSalesOrderHashes={};
+let spgsFulfilmentHashes={};
+
+function spgsCleanV109Payload(r){
+  const x={...r};
+  delete x._spgsUpdatedAt;
+  return x;
+}
+function spgsV109Signature(r){return JSON.stringify(spgsCleanV109Payload(r))}
+
+async function spgsLoadSalesOrders(){
+  const rows=await spgsFetch(`/spgs_sales_orders?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&select=id,payload,updated_at&order=updated_at.desc`);
+  const list=(rows||[]).map(row=>({...(row.payload||{}),_spgsUpdatedAt:row.updated_at})).filter(x=>x.id);
+  spgsSalesOrderHashes={};
+  list.forEach(r=>spgsSalesOrderHashes[r.id]=spgsV109Signature(r));
+  spgsSalesOrderCloudReady=true;
+  return list;
+}
+
+async function spgsSyncSalesOrders(force=false){
+  if(!spgsSalesOrderCloudReady)return;
+  state.salesOrders=state.salesOrders||[];
+  const changed=[];
+  for(const r of state.salesOrders){
+    if(!r?.id)continue;
+    const payload=spgsCleanV109Payload(r),sig=JSON.stringify(payload);
+    if(!force&&spgsSalesOrderHashes[r.id]===sig)continue;
+    const updated_at=new Date().toISOString();
+    changed.push({
+      workspace:SPGS_WORKSPACE,
+      id:r.id,
+      so_no:r.soNo||'',
+      customer_name:r.customerName||'',
+      erp_status:r.erpStatus||'Pending ERP Sync',
+      owner_user:r.ownerUser||'',
+      payload,
+      updated_at
+    });
+  }
+  if(!changed.length)return;
+  await spgsFetch('/spgs_sales_orders?on_conflict=workspace,id',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify(changed)
+  });
+  changed.forEach(row=>{
+    spgsSalesOrderHashes[row.id]=JSON.stringify(row.payload);
+    const x=state.salesOrders.find(y=>y.id===row.id);if(x)x._spgsUpdatedAt=row.updated_at;
+  });
+}
+
+async function spgsLoadOrderFulfilments(){
+  const rows=await spgsFetch(`/spgs_order_fulfilments?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&select=id,payload,updated_at&order=updated_at.desc`);
+  const list=(rows||[]).map(row=>({...(row.payload||{}),_spgsUpdatedAt:row.updated_at})).filter(x=>x.id);
+  spgsFulfilmentHashes={};
+  list.forEach(r=>spgsFulfilmentHashes[r.id]=spgsV109Signature(r));
+  spgsFulfilmentCloudReady=true;
+  return list;
+}
+
+async function spgsSyncOrderFulfilments(force=false){
+  if(!spgsFulfilmentCloudReady)return;
+  state.dealerFulfilments=state.dealerFulfilments||[];
+  const changed=[];
+  for(const r of state.dealerFulfilments){
+    if(!r?.id)continue;
+    const payload=spgsCleanV109Payload(r),sig=JSON.stringify(payload);
+    if(!force&&spgsFulfilmentHashes[r.id]===sig)continue;
+    const updated_at=new Date().toISOString();
+    const statuses=(r.consignments||[]).map(c=>c.status||'').filter(Boolean);
+    const status=statuses.length&&statuses.every(x=>x==='Delivered')?'Delivered':
+      statuses.some(x=>['Handed to Courier','In Transit'].includes(x))?'In Transit':
+      statuses.some(x=>x==='Ready for Dispatch')?'Ready for Dispatch':'Active';
+    changed.push({
+      workspace:SPGS_WORKSPACE,
+      id:r.id,
+      plan_no:r.planNo||'',
+      source_type:r.sourceType||'PI',
+      source_serial:r.sourceSerial||r.piSerial||'',
+      status,
+      owner_user:r.ownerUser||'',
+      payload,
+      updated_at
+    });
+  }
+  if(!changed.length)return;
+  await spgsFetch('/spgs_order_fulfilments?on_conflict=workspace,id',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify(changed)
+  });
+  changed.forEach(row=>{
+    spgsFulfilmentHashes[row.id]=JSON.stringify(row.payload);
+    const x=state.dealerFulfilments.find(y=>y.id===row.id);if(x)x._spgsUpdatedAt=row.updated_at;
+  });
+}
+
+async function spgsStartSalesOrdersRealtime(){
+  if(!spgsSalesOrderCloudReady||!spgsProductionClient)return;
+  spgsSalesOrderChannel=spgsProductionClient.channel('spgs-sales-orders-'+SPGS_WORKSPACE)
+    .on('postgres_changes',{event:'*',schema:'public',table:'spgs_sales_orders',filter:`workspace=eq.${SPGS_WORKSPACE}`},change=>{
+      state.salesOrders=state.salesOrders||[];
+      if(change.eventType==='DELETE'){
+        const id=change.old?.id;if(id){state.salesOrders=state.salesOrders.filter(x=>x.id!==id);delete spgsSalesOrderHashes[id]}
+      }else{
+        const incoming={...(change.new?.payload||{}),_spgsUpdatedAt:change.new?.updated_at||new Date().toISOString()};
+        if(!incoming.id)return;
+        const i=state.salesOrders.findIndex(x=>x.id===incoming.id);
+        if(i>=0)state.salesOrders[i]=incoming;else state.salesOrders.unshift(incoming);
+        spgsSalesOrderHashes[incoming.id]=spgsV109Signature(incoming);
+      }
+      spgsWriteLocal();
+      try{if($('salesorders')?.classList.contains('active')&&window.renderSalesOrders91)window.renderSalesOrders91()}catch(e){console.warn('Sales Orders realtime render failed',e)}
+    }).subscribe(status=>console.log('Sales Orders realtime status:',status));
+}
+
+async function spgsStartFulfilmentRealtime(){
+  if(!spgsFulfilmentCloudReady||!spgsProductionClient)return;
+  spgsFulfilmentChannel=spgsProductionClient.channel('spgs-order-fulfilments-'+SPGS_WORKSPACE)
+    .on('postgres_changes',{event:'*',schema:'public',table:'spgs_order_fulfilments',filter:`workspace=eq.${SPGS_WORKSPACE}`},change=>{
+      state.dealerFulfilments=state.dealerFulfilments||[];
+      if(change.eventType==='DELETE'){
+        const id=change.old?.id;if(id){state.dealerFulfilments=state.dealerFulfilments.filter(x=>x.id!==id);delete spgsFulfilmentHashes[id]}
+      }else{
+        const incoming={...(change.new?.payload||{}),_spgsUpdatedAt:change.new?.updated_at||new Date().toISOString()};
+        if(!incoming.id)return;
+        const i=state.dealerFulfilments.findIndex(x=>x.id===incoming.id);
+        if(i>=0)state.dealerFulfilments[i]=incoming;else state.dealerFulfilments.unshift(incoming);
+        spgsFulfilmentHashes[incoming.id]=spgsV109Signature(incoming);
+      }
+      spgsWriteLocal();
+      try{if($('dealerfulfilment')?.classList.contains('active')&&window.renderDealerFulfilment)window.renderDealerFulfilment()}catch(e){console.warn('Order Fulfilment realtime render failed',e)}
+    }).subscribe(status=>console.log('Order Fulfilment realtime status:',status));
+}
+
 let spgsPurchaseHashes={};
 function spgsCleanPurchasePayload(r){const x={...r};delete x._spgsUpdatedAt;return x}
 function spgsPurchaseSignature(r){return JSON.stringify(spgsCleanPurchasePayload(r))}
@@ -3003,6 +3281,8 @@ async function spgsStartProductionRealtime(){
     // written without quoteRequests. If the new table is unavailable, this is a
     // no-op and spgsCloudPayload() continues preserving the legacy field.
     await spgsSyncQuoteRequests();
+    await spgsSyncSalesOrders();
+    await spgsSyncOrderFulfilments();
     await spgsWriteCloudState();
     await spgsSyncUsers();
     await spgsSyncProduction();
@@ -3019,10 +3299,14 @@ async function spgsStartProductionRealtime(){
     state.notifications=state.notifications||[];
     state.grns=state.grns||[];
     state.quoteRequests=state.quoteRequests||[];
+    state.salesOrders=state.salesOrders||[];
+    state.dealerFulfilments=state.dealerFulfilments||[];
     spgsWriteLocal();
     try{updateStats()}catch(e){}
     try{if($('productionproducts')?.classList.contains('active'))renderProductionProducts()}catch(e){}
     try{if($('purchaseorders')?.classList.contains('active'))renderPurchaseOrders()}catch(e){}
+    try{if($('salesorders')?.classList.contains('active')&&window.renderSalesOrders91)window.renderSalesOrders91()}catch(e){}
+    try{if($('dealerfulfilment')?.classList.contains('active')&&window.renderDealerFulfilment)window.renderDealerFulfilment()}catch(e){}
     if(spgsReady)spgsSchedule();
   };
 
@@ -3116,6 +3400,47 @@ try{
   console.warn('Quote Requests cloud table is not ready yet. Run spgs_quote_requests.sql.',e);
 }
 
+
+// ------------------------------------
+// v1.0.9 Repeat Sales Orders dedicated realtime bootstrap
+// ------------------------------------
+try{
+  const legacySales=[
+    ...(Array.isArray(local?.salesOrders)?local.salesOrders:[]),
+    ...(Array.isArray(state.salesOrders)?state.salesOrders:[])
+  ].filter(x=>x?.id);
+  const cloudSales=await spgsLoadSalesOrders();
+  const mergedSales=new Map();
+  legacySales.forEach(x=>mergedSales.set(x.id,x));
+  cloudSales.forEach(x=>mergedSales.set(x.id,x));
+  state.salesOrders=[...mergedSales.values()].sort((a,b)=>(Date.parse(b.updatedAt||b.createdAt||b._spgsUpdatedAt||0)||0)-(Date.parse(a.updatedAt||a.createdAt||a._spgsUpdatedAt||0)||0));
+  await spgsSyncSalesOrders(false);
+}catch(e){
+  spgsSalesOrderCloudReady=false;
+  state.salesOrders=state.salesOrders||[];
+  console.warn('Sales Orders cloud table is not ready yet. Run spgs_sales_orders_fulfilments.sql.',e);
+}
+
+// ------------------------------------
+// v1.0.9 Order Fulfilment dedicated realtime bootstrap
+// ------------------------------------
+try{
+  const legacyFulfilments=[
+    ...(Array.isArray(local?.dealerFulfilments)?local.dealerFulfilments:[]),
+    ...(Array.isArray(state.dealerFulfilments)?state.dealerFulfilments:[])
+  ].filter(x=>x?.id);
+  const cloudFulfilments=await spgsLoadOrderFulfilments();
+  const mergedFulfilments=new Map();
+  legacyFulfilments.forEach(x=>mergedFulfilments.set(x.id,x));
+  cloudFulfilments.forEach(x=>mergedFulfilments.set(x.id,x));
+  state.dealerFulfilments=[...mergedFulfilments.values()].sort((a,b)=>(Date.parse(b.updatedAt||b.createdAt||b._spgsUpdatedAt||0)||0)-(Date.parse(a.updatedAt||a.createdAt||a._spgsUpdatedAt||0)||0));
+  await spgsSyncOrderFulfilments(false);
+}catch(e){
+  spgsFulfilmentCloudReady=false;
+  state.dealerFulfilments=state.dealerFulfilments||[];
+  console.warn('Order Fulfilment cloud table is not ready yet. Run spgs_sales_orders_fulfilments.sql.',e);
+}
+
 spgsProductionJson=
     JSON.stringify(state.productionRequests||[]);
       if(!state.users.length)throw new Error('spgs_users is empty. Run the supplied SQL and refresh.');
@@ -3140,6 +3465,12 @@ spgsProductionJson=
       }
       if(spgsQuoteRequestCloudReady){
         try{await spgsStartQuoteRequestsRealtime()}catch(e){console.error('Quote Requests realtime could not start',e)}
+      }
+      if(spgsSalesOrderCloudReady){
+        try{await spgsStartSalesOrdersRealtime()}catch(e){console.error('Sales Orders realtime could not start',e)}
+      }
+      if(spgsFulfilmentCloudReady){
+        try{await spgsStartFulfilmentRealtime()}catch(e){console.error('Order Fulfilment realtime could not start',e)}
       }
       spgsWriteLocal();
 
@@ -3184,6 +3515,8 @@ spgsProductionJson=
   window.spgsCloudSaveNow=async function(){if(!spgsReady)return false;await spgsFlush();toast('Cloud save completed');return true};
   window.spgsPurchaseOrdersCloudReady=()=>spgsPurchaseCloudReady;
   window.spgsQuoteRequestsCloudReady=()=>spgsQuoteRequestCloudReady;
+  window.spgsSalesOrdersCloudReady=()=>spgsSalesOrderCloudReady;
+  window.spgsOrderFulfilmentCloudReady=()=>spgsFulfilmentCloudReady;
 
   const spgsReadyPromise=spgsBootstrap();
 })();
