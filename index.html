@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.11 - ERP Stock Lookup in PI Conversion -->
+<!-- SoftCreation v1.0.12 - Professional ERP Stock Autocomplete + Modal Layer Fix -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.11</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.12</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -18,7 +18,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.11</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.12</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
       <div class="topbar-actions">
@@ -238,11 +238,66 @@
 </div><div class="actions"><button class="btn primary" onclick="saveItem()">Save Item</button><button class="btn red" id="deleteItemBtn" onclick="deleteItem()">Delete</button></div></div></div></div>
 
 <div id="convertModal" class="modal"><div class="modal-card convert-pi-modal" style="width:min(900px,96vw)"><div class="modal-head"><b>Select items for Pro Forma Invoice</b><button class="closex" onclick="closeModal('convertModal')">×</button></div><div class="modal-body">
-  <div class="erp-stock-panel">
-    <div class="erp-stock-head"><div><b>ERP Live Stock Search</b><div class="hint">Search bPOS by product name or product code before selecting the PI supply method.</div></div><span class="erp-branch-badge">Branch 2</span></div>
-    <div class="erp-stock-search-row"><input id="erpStockSearch" type="search" placeholder="Search product name or code..." autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();searchERPStockV111()}"><button class="btn primary" id="erpStockSearchBtn" type="button" onclick="searchERPStockV111()">Search Stock</button></div>
-    <div id="erpStockStatus" class="erp-stock-status">Enter at least 2 characters to check live ERP stock.</div>
-    <div id="erpStockResults" class="erp-stock-results"></div>
+  <div class="erp-lookup-panel">
+
+    <div class="erp-lookup-header">
+      <div class="erp-lookup-title-wrap">
+        <div class="erp-lookup-icon">⌕</div>
+
+        <div>
+          <div class="erp-lookup-title">
+            Check ERP Stock
+            <span class="erp-live-dot"></span>
+            <span class="erp-live-text">LIVE</span>
+          </div>
+
+          <div class="erp-lookup-subtitle">
+            Search a product by name or code to check current availability before creating the PI.
+          </div>
+        </div>
+      </div>
+
+      <div class="erp-branch-chip">
+        <span>WAREHOUSE</span>
+        <b>Branch 2</b>
+      </div>
+    </div>
+
+    <div class="erp-autocomplete-wrap">
+      <div class="erp-search-box">
+        <span class="erp-search-icon">⌕</span>
+
+        <input
+          id="erpStockSearch"
+          type="text"
+          placeholder="Start typing product name or code..."
+          autocomplete="off"
+          spellcheck="false"
+          oninput="erpStockTypeV112(this.value)"
+          onkeydown="erpStockKeyV112(event)"
+          onfocus="erpStockFocusV112()"
+        >
+
+        <button
+          id="erpStockClear"
+          class="erp-search-clear"
+          type="button"
+          onclick="clearERPStockV112()"
+          aria-label="Clear search"
+          title="Clear search"
+        >×</button>
+      </div>
+
+      <div id="erpStockSuggestions" class="erp-suggestions"></div>
+    </div>
+
+    <div id="erpStockStatus" class="erp-lookup-status">
+      <span class="erp-status-dot"></span>
+      Type at least 2 characters to search ERP products.
+    </div>
+
+    <div id="erpStockSelected" class="erp-selected-wrap"></div>
+
   </div>
   <div id="convertItems"></div><div class="actions"><button class="btn green" onclick="createPIFromSelection()">Create PI with Selected Items</button></div></div></div></div>
 <div id="deviceModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Device Master</b><button class="closex" onclick="closeModal('deviceModal')">×</button></div><div class="modal-body"><div class="grid"><input id="devId" type="hidden"><div class="field"><label>Device Name</label><input id="devName" placeholder="Desktop Barcode Label Printer"></div><div class="field"><label>Model</label><input id="devModel"></div><div class="field"><label>Serial Number (Optional)</label><input id="devSerial"></div><div class="field"><label>Brand / Make</label><input id="devBrand"></div><div class="field"><label>Base Unit Price</label><input id="devPrice" type="number" step="0.01"></div><div class="field"><label>Available Qty</label><input id="devStock" type="number" step="1"></div><div class="field"><label>Device Image</label><input id="devImage" type="file" accept="image/*"></div><div class="field full"><label>Features (one per line)</label><textarea id="devFeatures" placeholder="Resolution: 203 DPI&#10;Interface: USB + Ethernet&#10;Printing Method: Direct Thermal"></textarea></div><div class="section">Automatic Quantity Prices</div><div class="field"><label>1-5 Qty Discount %</label><input id="devD1" type="number" value="0"></div><div class="field"><label>6-10 Qty Discount %</label><input id="devD2" type="number" value="5"></div><div class="field"><label>11-20 Qty Discount %</label><input id="devD3" type="number" value="10"></div><div class="field"><label>21+ Qty Discount %</label><input id="devD4" type="number" value="15"></div></div><div class="actions"><button class="btn primary" onclick="saveDevice()">Save Device</button><button id="deleteDeviceBtn" class="btn red" onclick="deleteDevice()">Delete</button></div></div></div></div>
@@ -3937,89 +3992,642 @@ spgsProductionJson=
 </script>
 
 <script>
-/* v1.0.11 - Secure ERP live stock lookup for PI conversion.
-   ERP secret stays in Supabase Edge Function; this browser only calls the proxy. */
+/* v1.0.12 - Professional ERP autocomplete + live Branch 2 stock */
 (function(){
-  const ERP_FUNCTION_URL='https://qyxgamverzdmhtvezbft.supabase.co/functions/v1/erp-stock-search';
-  const ERP_BRANCH_ID=2;
-  let erpSearchSeq=0;
 
-  function erpEsc(v){return typeof esc==='function'?esc(String(v??'')):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  function erpMoney(v,currency='LKR'){const n=Number(v);return Number.isFinite(n)?`${currency} ${n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`:'-'}
-  function erpStockClass(q){q=Number(q||0);return q<=0?'out':q<=5?'low':'ok'}
-  function erpStockLabel(q){q=Number(q||0);return q<=0?'OUT OF STOCK':q<=5?'LOW STOCK':'IN STOCK'}
+  const ERP_FUNCTION_URL =
+    'https://qyxgamverzdmhtvezbft.supabase.co/functions/v1/erp-stock-search';
+
+  const ERP_BRANCH_ID = 2;
+
+  let erpSearchSeq = 0;
+  let erpSearchTimer = null;
+  let erpRows = [];
+  let erpActiveIndex = -1;
+  let erpSelectedProduct = null;
+
+  const erpCache = new Map();
+
+  function erpEsc(v){
+    return typeof esc === 'function'
+      ? esc(String(v ?? ''))
+      : String(v ?? '').replace(/[&<>"']/g,c=>({
+          '&':'&amp;',
+          '<':'&lt;',
+          '>':'&gt;',
+          '"':'&quot;',
+          "'":'&#39;'
+        }[c]));
+  }
+
+  function erpMoney(v,currency='LKR'){
+    const n = Number(v);
+
+    return Number.isFinite(n)
+      ? `${currency} ${n.toLocaleString(undefined,{
+          minimumFractionDigits:2,
+          maximumFractionDigits:2
+        })}`
+      : '-';
+  }
+
+  function erpStockClass(q){
+    q = Number(q || 0);
+
+    if(q <= 0) return 'out';
+    if(q <= 5) return 'low';
+
+    return 'ok';
+  }
+
+  function erpStockLabel(q){
+    q = Number(q || 0);
+
+    if(q <= 0) return 'OUT OF STOCK';
+    if(q <= 5) return 'LOW STOCK';
+
+    return 'IN STOCK';
+  }
+
+  function erpInitial(name){
+    const txt = String(name || '').trim();
+
+    if(!txt) return 'P';
+
+    return txt
+      .split(/\s+/)
+      .slice(0,2)
+      .map(x => x.charAt(0))
+      .join('')
+      .toUpperCase();
+  }
 
   function erpSupabaseKey(){
-    const key=(localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
-    if(!key)throw new Error('Supabase browser key is not configured on this device. Reload the app and complete cloud setup first.');
+    const key =
+      (localStorage.getItem('spgs_supabase_browser_key_v1') || '')
+      .trim();
+
+    if(!key){
+      throw new Error(
+        'Supabase browser key is not configured on this device.'
+      );
+    }
+
     return key;
   }
 
   async function erpProxySearch(q){
-    const key=erpSupabaseKey();
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),12000);
+    const cacheKey = q.toLowerCase();
+
+    if(erpCache.has(cacheKey)){
+      return erpCache.get(cacheKey);
+    }
+
+    const key = erpSupabaseKey();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(),12000);
+
     try{
-      const res=await fetch(ERP_FUNCTION_URL,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','apikey':key,'Authorization':'Bearer '+key},
-        body:JSON.stringify({q,branch_id:ERP_BRANCH_ID}),
-        signal:controller.signal
-      });
-      let body={};
-      try{body=await res.json()}catch(e){}
-      if(!res.ok)throw new Error(body?.error||body?.message||`ERP stock service returned ${res.status}`);
-      if(body?.success===false)throw new Error(body?.message||'ERP stock search failed');
-      return Array.isArray(body?.data)?body.data:[];
-    }finally{clearTimeout(timer)}
+      const res = await fetch(
+        ERP_FUNCTION_URL,
+        {
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'apikey':key,
+            'Authorization':'Bearer ' + key
+          },
+          body:JSON.stringify({
+            q,
+            branch_id:ERP_BRANCH_ID
+          }),
+          signal:controller.signal
+        }
+      );
+
+      let body = {};
+
+      try{
+        body = await res.json();
+      }catch(e){}
+
+      if(!res.ok){
+        throw new Error(
+          body?.error ||
+          body?.message ||
+          `ERP service returned ${res.status}`
+        );
+      }
+
+      if(body?.success === false){
+        throw new Error(
+          body?.error ||
+          body?.message ||
+          'ERP product search failed.'
+        );
+      }
+
+      const rows = Array.isArray(body?.data) ? body.data : [];
+
+      erpCache.set(cacheKey,rows);
+
+      if(erpCache.size > 30){
+        const first = erpCache.keys().next().value;
+        erpCache.delete(first);
+      }
+
+      return rows;
+
+    }finally{
+      clearTimeout(timer);
+    }
   }
 
-  function renderERPStockResultsV111(rows){
-    const box=document.getElementById('erpStockResults');
-    if(!box)return;
-    if(!rows.length){box.innerHTML='<div class="erp-stock-empty">No ERP products matched this search.</div>';return}
-    box.innerHTML=`<div class="erp-stock-table-wrap"><table class="erp-stock-table"><thead><tr><th>Code</th><th>Product</th><th>Category / Brand</th><th>ERP Price</th><th>Branch 2 Stock</th></tr></thead><tbody>${rows.map(p=>{
-      const qty=Number(p.stock_quantity||0),cls=erpStockClass(qty);
-      return `<tr><td><b>${erpEsc(p.code||'-')}</b></td><td><div class="erp-product-name">${erpEsc(p.name||'-')}</div>${p.sinhala_name?`<div class="erp-product-sub">${erpEsc(p.sinhala_name)}</div>`:''}</td><td>${erpEsc([p.category,p.brand].filter(Boolean).join(' • ')||'-')}</td><td>${erpEsc(erpMoney(p.price,p.currency||'LKR'))}</td><td><div class="erp-stock-cell"><b>${qty.toLocaleString()}</b><span class="erp-stock-pill ${cls}">${erpStockLabel(qty)}</span></div></td></tr>`
-    }).join('')}</tbody></table></div>`;
+  function erpSetStatus(type,text){
+    const status = document.getElementById('erpStockStatus');
+    if(!status) return;
+
+    status.className =
+      'erp-lookup-status' +
+      (type ? ' ' + type : '');
+
+    status.innerHTML =
+      `<span class="erp-status-dot"></span>${erpEsc(text)}`;
   }
 
-  window.searchERPStockV111=async function(){
-    const input=document.getElementById('erpStockSearch'),status=document.getElementById('erpStockStatus'),box=document.getElementById('erpStockResults'),btn=document.getElementById('erpStockSearchBtn');
-    if(!input||!status||!box)return;
-    const q=input.value.trim();
-    if(q.length<2){status.className='erp-stock-status warn';status.textContent='Enter at least 2 characters.';box.innerHTML='';input.focus();return}
-    const seq=++erpSearchSeq;
-    status.className='erp-stock-status loading';status.textContent=`Checking Branch ${ERP_BRANCH_ID} stock...`;
-    box.innerHTML='<div class="erp-stock-loading"><span class="erp-spinner"></span> Contacting ERP…</div>';
-    if(btn){btn.disabled=true;btn.textContent='Searching…'}
+  function erpShowClear(show){
+    const btn = document.getElementById('erpStockClear');
+    if(!btn) return;
+
+    btn.classList.toggle('show',!!show);
+  }
+
+  function erpHideSuggestions(){
+    const box = document.getElementById('erpStockSuggestions');
+    if(!box) return;
+
+    box.classList.remove('show');
+    erpActiveIndex = -1;
+  }
+
+  function erpRenderSuggestions(rows){
+    const box = document.getElementById('erpStockSuggestions');
+    if(!box) return;
+
+    erpRows = rows || [];
+    erpActiveIndex = -1;
+
+    if(!erpRows.length){
+      box.innerHTML = `
+        <div class="erp-suggest-message">
+          No ERP products found for this search.
+        </div>
+      `;
+
+      box.classList.add('show');
+      return;
+    }
+
+    const visible = erpRows.slice(0,10);
+
+    box.innerHTML =
+      visible.map((p,i)=>{
+        const qty = Number(p.stock_quantity || 0);
+        const cls = erpStockClass(qty);
+        const meta =
+          [p.category,p.brand]
+          .filter(Boolean)
+          .join(' • ') || 'ERP Product';
+
+        return `
+          <button
+            type="button"
+            class="erp-suggestion-item"
+            data-erp-index="${i}"
+            onclick="selectERPStockProductV112(${i})"
+          >
+            <div class="erp-suggestion-avatar">
+              ${erpEsc(erpInitial(p.name))}
+            </div>
+
+            <div class="erp-suggestion-main">
+              <div class="erp-suggestion-code">
+                ${erpEsc(p.code || 'NO CODE')}
+              </div>
+
+              <div class="erp-suggestion-name">
+                ${erpEsc(p.name || '-')}
+              </div>
+
+              <div class="erp-suggestion-meta">
+                ${erpEsc(meta)}
+              </div>
+            </div>
+
+            <div class="erp-suggestion-right">
+              <div class="erp-suggestion-price">
+                ${erpEsc(
+                  erpMoney(
+                    p.price,
+                    p.currency || 'LKR'
+                  )
+                )}
+              </div>
+
+              <div class="erp-suggestion-stock">
+                <strong>
+                  ${qty.toLocaleString()}
+                </strong>
+
+                <span class="erp-mini-stock ${cls}">
+                  ${erpStockLabel(qty)}
+                </span>
+              </div>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+    box.classList.add('show');
+  }
+
+  function erpRenderSelected(p){
+    const box = document.getElementById('erpStockSelected');
+    if(!box) return;
+
+    if(!p){
+      box.innerHTML = '';
+      return;
+    }
+
+    const qty = Number(p.stock_quantity || 0);
+    const cls = erpStockClass(qty);
+    const category = p.category || '-';
+    const brand = p.brand || '-';
+    const price = erpMoney(p.price,p.currency || 'LKR');
+    const checked = new Date().toLocaleTimeString([],{
+      hour:'2-digit',
+      minute:'2-digit'
+    });
+
+    box.innerHTML = `
+      <div class="erp-selected-card">
+        <div class="erp-selected-top">
+          <div class="erp-selected-product">
+            <div class="erp-selected-label">
+              ERP PRODUCT SELECTED
+            </div>
+
+            <div class="erp-selected-name">
+              ${erpEsc(p.name || '-')}
+            </div>
+
+            <div class="erp-selected-code">
+              Product Code:
+              <strong>${erpEsc(p.code || '-')}</strong>
+            </div>
+          </div>
+
+          <div class="erp-selected-stock ${cls}">
+            <div class="erp-selected-stock-number">
+              ${qty.toLocaleString()}
+            </div>
+
+            <div class="erp-selected-stock-caption">
+              ${erpStockLabel(qty)}
+            </div>
+          </div>
+        </div>
+
+        <div class="erp-selected-grid">
+          <div class="erp-selected-info">
+            <span>ERP PRICE</span>
+            <b>${erpEsc(price)}</b>
+          </div>
+
+          <div class="erp-selected-info">
+            <span>CATEGORY</span>
+            <b>${erpEsc(category)}</b>
+          </div>
+
+          <div class="erp-selected-info">
+            <span>BRAND</span>
+            <b>${erpEsc(brand)}</b>
+          </div>
+        </div>
+
+        <div class="erp-selected-footer">
+          <div>
+            Live availability from
+            <strong>ERP Branch ${ERP_BRANCH_ID}</strong>
+          </div>
+
+          <div>
+            Checked ${erpEsc(checked)}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function erpLoadSuggestions(q){
+    const seq = ++erpSearchSeq;
+
+    erpSetStatus(
+      'loading',
+      `Searching ERP Branch ${ERP_BRANCH_ID}...`
+    );
+
+    const suggestionBox = document.getElementById('erpStockSuggestions');
+
+    if(suggestionBox){
+      suggestionBox.innerHTML = `
+        <div class="erp-suggest-message">
+          Searching ERP products...
+        </div>
+      `;
+
+      suggestionBox.classList.add('show');
+    }
+
     try{
-      const rows=await erpProxySearch(q);
-      if(seq!==erpSearchSeq)return;
-      status.className='erp-stock-status ok';
-      status.textContent=`${rows.length} product${rows.length===1?'':'s'} found • live Branch ${ERP_BRANCH_ID} stock`;
-      renderERPStockResultsV111(rows);
+      const rows = await erpProxySearch(q);
+
+      if(seq !== erpSearchSeq){
+        return;
+      }
+
+      erpRenderSuggestions(rows);
+
+      if(rows.length){
+        erpSetStatus(
+          'ok',
+          `${rows.length} matching ERP product${rows.length === 1 ? '' : 's'} found. Select one to view stock.`
+        );
+      }else{
+        erpSetStatus(
+          '',
+          'No ERP product matched your search.'
+        );
+      }
+
     }catch(e){
-      if(seq!==erpSearchSeq)return;
-      status.className='erp-stock-status error';
-      status.textContent=e?.name==='AbortError'?'ERP stock lookup timed out. Try again.':(e?.message||'ERP stock lookup failed.');
-      box.innerHTML='<div class="erp-stock-empty error">Could not load ERP stock. Your PI data has not been changed.</div>';
+      if(seq !== erpSearchSeq){
+        return;
+      }
+
       console.error('ERP stock lookup failed',e);
-    }finally{if(btn){btn.disabled=false;btn.textContent='Search Stock'}}
-  };
 
-  window.resetERPStockSearchV111=function(){
-    erpSearchSeq++;
-    const input=document.getElementById('erpStockSearch'),status=document.getElementById('erpStockStatus'),box=document.getElementById('erpStockResults');
-    if(input)input.value='';
-    if(status){status.className='erp-stock-status';status.textContent='Enter at least 2 characters to check live ERP stock.'}
-    if(box)box.innerHTML='';
-  };
+      if(suggestionBox){
+        suggestionBox.innerHTML = `
+          <div class="erp-suggest-message">
+            ERP search could not be loaded.
+          </div>
+        `;
 
-  const openConvertBase=window.convertCurrentToPI;
-  if(typeof openConvertBase==='function'){
-    window.convertCurrentToPI=function(){window.resetERPStockSearchV111();return openConvertBase.apply(this,arguments)};
+        suggestionBox.classList.add('show');
+      }
+
+      erpSetStatus(
+        'error',
+        e?.name === 'AbortError'
+          ? 'ERP request timed out. Please try again.'
+          : (e?.message || 'Could not contact ERP.')
+      );
+    }
   }
+
+  window.erpStockTypeV112 = function(value){
+    const q = String(value || '').trim();
+
+    erpShowClear(q.length > 0);
+    clearTimeout(erpSearchTimer);
+
+    erpSelectedProduct = null;
+    erpRenderSelected(null);
+
+    if(q.length < 2){
+      erpSearchSeq++;
+      erpRows = [];
+      erpHideSuggestions();
+
+      erpSetStatus(
+        '',
+        'Type at least 2 characters to search ERP products.'
+      );
+
+      return;
+    }
+
+    erpSetStatus(
+      'loading',
+      'Waiting for product search...'
+    );
+
+    erpSearchTimer =
+      setTimeout(
+        ()=>{
+          erpLoadSuggestions(q);
+        },
+        300
+      );
+  };
+
+  window.erpStockFocusV112 = function(){
+    const input = document.getElementById('erpStockSearch');
+
+    if(
+      input &&
+      input.value.trim().length >= 2 &&
+      erpRows.length
+    ){
+      const box = document.getElementById('erpStockSuggestions');
+      if(box){
+        box.classList.add('show');
+      }
+    }
+  };
+
+  window.selectERPStockProductV112 = function(index){
+    const p = erpRows[index];
+    if(!p) return;
+
+    erpSelectedProduct = p;
+
+    const input = document.getElementById('erpStockSearch');
+
+    if(input){
+      input.value = `${p.code || ''} — ${p.name || ''}`;
+    }
+
+    erpShowClear(true);
+    erpHideSuggestions();
+    erpRenderSelected(p);
+
+    erpSetStatus(
+      'ok',
+      `Live stock loaded from ERP Branch ${ERP_BRANCH_ID}.`
+    );
+  };
+
+  function erpRefreshActiveSuggestion(){
+    const items = document.querySelectorAll(
+      '#erpStockSuggestions .erp-suggestion-item'
+    );
+
+    items.forEach(
+      (el,i)=>{
+        el.classList.toggle(
+          'active',
+          i === erpActiveIndex
+        );
+      }
+    );
+
+    if(
+      erpActiveIndex >= 0 &&
+      items[erpActiveIndex]
+    ){
+      items[erpActiveIndex].scrollIntoView({
+        block:'nearest'
+      });
+    }
+  }
+
+  window.erpStockKeyV112 = function(event){
+    const box = document.getElementById('erpStockSuggestions');
+
+    if(
+      !box ||
+      !box.classList.contains('show')
+    ){
+      return;
+    }
+
+    const count = Math.min(erpRows.length,10);
+    if(!count) return;
+
+    if(event.key === 'ArrowDown'){
+      event.preventDefault();
+
+      erpActiveIndex =
+        erpActiveIndex < count - 1
+          ? erpActiveIndex + 1
+          : 0;
+
+      erpRefreshActiveSuggestion();
+      return;
+    }
+
+    if(event.key === 'ArrowUp'){
+      event.preventDefault();
+
+      erpActiveIndex =
+        erpActiveIndex > 0
+          ? erpActiveIndex - 1
+          : count - 1;
+
+      erpRefreshActiveSuggestion();
+      return;
+    }
+
+    if(event.key === 'Enter'){
+      if(erpActiveIndex >= 0){
+        event.preventDefault();
+        window.selectERPStockProductV112(erpActiveIndex);
+      }else if(erpRows.length){
+        event.preventDefault();
+        window.selectERPStockProductV112(0);
+      }
+
+      return;
+    }
+
+    if(event.key === 'Escape'){
+      erpHideSuggestions();
+    }
+  };
+
+  window.clearERPStockV112 = function(){
+    clearTimeout(erpSearchTimer);
+
+    erpSearchSeq++;
+    erpRows = [];
+    erpActiveIndex = -1;
+    erpSelectedProduct = null;
+
+    const input = document.getElementById('erpStockSearch');
+    const selected = document.getElementById('erpStockSelected');
+
+    if(input){
+      input.value = '';
+      input.focus();
+    }
+
+    if(selected){
+      selected.innerHTML = '';
+    }
+
+    erpShowClear(false);
+    erpHideSuggestions();
+
+    erpSetStatus(
+      '',
+      'Type at least 2 characters to search ERP products.'
+    );
+  };
+
+  window.resetERPStockSearchV112 = function(){
+    clearTimeout(erpSearchTimer);
+
+    erpSearchSeq++;
+    erpRows = [];
+    erpActiveIndex = -1;
+    erpSelectedProduct = null;
+
+    const input = document.getElementById('erpStockSearch');
+    const selected = document.getElementById('erpStockSelected');
+
+    if(input){
+      input.value = '';
+    }
+
+    if(selected){
+      selected.innerHTML = '';
+    }
+
+    erpShowClear(false);
+    erpHideSuggestions();
+
+    erpSetStatus(
+      '',
+      'Type at least 2 characters to search ERP products.'
+    );
+  };
+
+  document.addEventListener(
+    'click',
+    function(e){
+      const wrap = document.querySelector('.erp-autocomplete-wrap');
+
+      if(
+        wrap &&
+        !wrap.contains(e.target)
+      ){
+        erpHideSuggestions();
+      }
+    }
+  );
+
+  const openConvertBase = window.convertCurrentToPI;
+
+  if(typeof openConvertBase === 'function'){
+    window.convertCurrentToPI = function(){
+      window.resetERPStockSearchV112();
+      return openConvertBase.apply(this,arguments);
+    };
+  }
+
 })();
 </script>
 </body></html>
