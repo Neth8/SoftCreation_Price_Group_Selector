@@ -12,16 +12,16 @@
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
+      <button class="shell-icon-btn mobile-nav-toggle" id="mobileNavToggle" type="button" aria-label="Open navigation" aria-controls="navShell" aria-expanded="false" onclick="toggleMobileNav()">
+          <span></span><span></span><span></span>
+        </button>
+
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
         <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.10</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
       <div class="topbar-actions">
-        <button class="shell-icon-btn mobile-nav-toggle" id="mobileNavToggle" type="button" aria-label="Open navigation" aria-controls="navShell" aria-expanded="false" onclick="toggleMobileNav()">
-          <span></span><span></span><span></span>
-        </button>
-
         <div class="user-profile-wrap">
           <button class="user-profile-btn" id="userProfileBtn" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleProfileMenu(event)">
             <span class="user-avatar" id="userAvatar">U</span>
@@ -49,6 +49,8 @@
       </div>
     </div>
 
+  </header>
+
     <div class="nav-backdrop" id="navBackdrop" onclick="closeMobileNav()"></div>
     <div class="nav-shell" id="navShell">
       <div class="mobile-nav-head">
@@ -67,7 +69,7 @@
         <button class="navbtn" data-view="settings">Settings</button>
       </nav>
     </div>
-  </header>
+
 
   <section id="dashboard" class="view active">
     <div class="cards">
@@ -3910,7 +3912,9 @@ spgsProductionJson=
   });
 
   window.addEventListener('resize',function(){
-    if(window.innerWidth>900)closeMobileNav();
+    // Navigation is intentionally a drawer at every viewport size.
+    // Only close the floating profile menu when the viewport changes.
+    closeProfileMenu();
   });
 
   // Dynamic feature modules add nav buttons after initial markup. Make them mobile-friendly automatically.
