@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.9 - Hosted Live + Order Fulfilment + Repeat Sales Orders -->
+<!-- SoftCreation v1.0.10 - Per-record Realtime Data Integrity -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.9</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.10</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -2575,7 +2575,11 @@ let spgsReady=false,
     spgsSalesOrderChannel=null,
     spgsSalesOrderCloudReady=false,
     spgsFulfilmentChannel=null,
-    spgsFulfilmentCloudReady=false;
+    spgsFulfilmentCloudReady=false,
+    spgsEntityChannel=null,
+    spgsEntityStoreReady=false,
+    spgsEntityHashes={},
+    spgsEntityUiTimer=null;
 
   function spgsApiKey(){
     let key=localStorage.getItem(SPGS_KEY_STORE)||'';
@@ -2712,6 +2716,199 @@ window.spgsLoadProductionSeen=
     const extra={};Object.keys(u||{}).forEach(k=>{if(!known.has(k))extra[k]=u[k]});
     return {id:u.id,username:u.username,password:String(u.password??''),display:u.display||u.username||'',role:u.role||'user',active:u.active!==false,permissions:Array.isArray(u.permissions)?u.permissions:[],price_category_ids:Array.isArray(u.priceCategoryIds)?u.priceCategoryIds:[],quote_handler:u.quoteHandler||null,company_link_type:u.companyLinkType||null,company_link_id:u.companyLinkId||null,last_portal_customer_key:u.lastPortalCustomerKey||null,extra,updated_at:new Date().toISOString()};
   }
+  // ------------------------------------------------------------------
+  // v1.0.10 Per-record realtime entity store
+  // Prevents a stale browser from replacing the entire shared application
+  // payload. Each mutable business record is stored independently.
+  // ------------------------------------------------------------------
+  const SPGS_ENTITY_ARRAYS=[
+    'customers','items','devices','productItems','priceCategories','docs',
+    'approvals','audit','introducers','commissionPayments','notifications','grns'
+  ];
+  const SPGS_ENTITY_SINGLETONS=['settings','counters'];
+
+  function spgsEntityKey(type,id){return `${type}::${id}`}
+  function spgsEntityCleanPayload(value){
+    const x=JSON.parse(JSON.stringify(value??{}));
+    if(x&&typeof x==='object')delete x._spgsUpdatedAt;
+    return x;
+  }
+  function spgsEntitySignature(value,sortOrder=0){return JSON.stringify({payload:spgsEntityCleanPayload(value),sort_order:Number(sortOrder)||0})}
+  function spgsEnsureEntityIds(){
+    SPGS_ENTITY_ARRAYS.forEach(type=>{
+      const arr=Array.isArray(state[type])?state[type]:(state[type]=[]);
+      arr.forEach((row,i)=>{
+        if(row&&typeof row==='object'&&!row.id){
+          row.id=uid(`ent_${type.slice(0,4)}`);
+        }
+      });
+    });
+    state.settings=state.settings||{};
+    state.counters=state.counters||{};
+  }
+  function spgsEntityRowsFromState(){
+    spgsEnsureEntityIds();
+    const rows=[];
+    SPGS_ENTITY_ARRAYS.forEach(type=>{
+      (state[type]||[]).forEach((row,index)=>{
+        if(!row?.id)return;
+        rows.push({entity_type:type,id:String(row.id),payload:spgsEntityCleanPayload(row),sort_order:index});
+      });
+    });
+    SPGS_ENTITY_SINGLETONS.forEach(type=>{
+      rows.push({entity_type:type,id:'singleton',payload:spgsEntityCleanPayload(state[type]||{}),sort_order:0});
+    });
+    return rows;
+  }
+  async function spgsLoadEntityMeta(){
+    const rows=await spgsFetch(`/spgs_entity_store_meta?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&select=workspace,initialized_at&limit=1`);
+    return rows?.[0]||null;
+  }
+  async function spgsSetEntityMeta(){
+    await spgsFetch('/spgs_entity_store_meta?on_conflict=workspace',{
+      method:'POST',headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([{workspace:SPGS_WORKSPACE,initialized_at:new Date().toISOString()}])
+    });
+  }
+  async function spgsLoadEntities(){
+    const rows=await spgsFetch(`/spgs_entities?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&select=entity_type,id,payload,sort_order,updated_at&order=entity_type.asc,sort_order.asc,updated_at.asc`);
+    return rows||[];
+  }
+  function spgsApplyEntityRows(rows,{replace=true}={}){
+    if(replace){
+      spgsEntityHashes={};
+      SPGS_ENTITY_ARRAYS.forEach(type=>{state[type]=[]});
+    }
+    const grouped={};
+    (rows||[]).forEach(row=>{
+      const type=row.entity_type,id=String(row.id||'');
+      if(!type||!id)return;
+      const payload=spgsEntityCleanPayload(row.payload||{});
+      if(type==='settings'){
+        state.settings=(typeof DEFAULT_SETTINGS==='object')?{...DEFAULT_SETTINGS,...payload}:payload;
+      }else if(type==='counters'){
+        state.counters=payload||{};
+      }else if(SPGS_ENTITY_ARRAYS.includes(type)){
+        if(payload&&typeof payload==='object'&&!payload.id)payload.id=id;
+        grouped[type]=grouped[type]||[];
+        grouped[type].push({payload,sort_order:Number(row.sort_order)||0});
+      }
+      spgsEntityHashes[spgsEntityKey(type,id)]=spgsEntitySignature(payload,row.sort_order);
+    });
+    Object.keys(grouped).forEach(type=>{state[type]=grouped[type].sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.payload)});
+    SPGS_ENTITY_ARRAYS.forEach(type=>{state[type]=state[type]||[]});
+    state.settings=state.settings||{};
+    state.counters=state.counters||{};
+  }
+  async function spgsSeedEntityStoreFromState(){
+    const rows=spgsEntityRowsFromState();
+    if(rows.length){
+      const now=new Date().toISOString(),by=currentUser?.username||'migration';
+      const dbRows=rows.map(r=>({workspace:SPGS_WORKSPACE,entity_type:r.entity_type,id:r.id,payload:r.payload,sort_order:r.sort_order||0,updated_at:now,updated_by:by}));
+      await spgsFetch('/spgs_entities?on_conflict=workspace,entity_type,id',{
+        method:'POST',headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(dbRows)
+      });
+    }
+    await spgsSetEntityMeta();
+  }
+  async function spgsBootstrapEntityStore(){
+    try{
+      let meta=await spgsLoadEntityMeta();
+      let rows=await spgsLoadEntities();
+      if(!meta){
+        // Deployment-order fallback. The supplied SQL normally performs this
+        // migration before the HTML is deployed. If it did not, seed once from
+        // the currently loaded legacy state instead of dropping any records.
+        if(!rows.length){
+          await spgsSeedEntityStoreFromState();
+          rows=await spgsLoadEntities();
+        }else{
+          await spgsSetEntityMeta();
+        }
+      }
+      if(rows.length)spgsApplyEntityRows(rows,{replace:true});
+      else{
+        // Empty is valid for array collections; keep settings/counters and
+        // initialise hashes from the current state.
+        spgsEntityHashes={};
+        spgsEntityRowsFromState().forEach(r=>{spgsEntityHashes[spgsEntityKey(r.entity_type,r.id)]=spgsEntitySignature(r.payload,r.sort_order)});
+      }
+      spgsEntityStoreReady=true;
+      return true;
+    }catch(e){
+      spgsEntityStoreReady=false;
+      console.warn('Per-record entity store is not ready. Run spgs_data_integrity_v110.sql.',e);
+      return false;
+    }
+  }
+  async function spgsSyncEntities(force=false){
+    if(!spgsEntityStoreReady)return;
+    const rows=spgsEntityRowsFromState();
+    const currentKeys=new Set(rows.map(r=>spgsEntityKey(r.entity_type,r.id)));
+    const changed=[];
+    const now=new Date().toISOString(),by=currentUser?.username||'system';
+    for(const r of rows){
+      const key=spgsEntityKey(r.entity_type,r.id),sig=spgsEntitySignature(r.payload,r.sort_order);
+      if(!force&&spgsEntityHashes[key]===sig)continue;
+      changed.push({workspace:SPGS_WORKSPACE,entity_type:r.entity_type,id:r.id,payload:r.payload,sort_order:r.sort_order||0,updated_at:now,updated_by:by});
+    }
+    if(changed.length){
+      await spgsFetch('/spgs_entities?on_conflict=workspace,entity_type,id',{
+        method:'POST',headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(changed)
+      });
+      changed.forEach(r=>{spgsEntityHashes[spgsEntityKey(r.entity_type,r.id)]=spgsEntitySignature(r.payload,r.sort_order)});
+    }
+    // Delete only records that THIS browser previously knew about and has now
+    // intentionally removed. A stale browser cannot delete rows it never saw.
+    const deleted=Object.keys(spgsEntityHashes).filter(key=>{
+      const type=key.split('::')[0];
+      return (SPGS_ENTITY_ARRAYS.includes(type)||SPGS_ENTITY_SINGLETONS.includes(type))&&!currentKeys.has(key);
+    });
+    for(const key of deleted){
+      const cut=key.indexOf('::'),type=key.slice(0,cut),id=key.slice(cut+2);
+      await spgsFetch(`/spgs_entities?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&entity_type=eq.${encodeURIComponent(type)}&id=eq.${encodeURIComponent(id)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
+      delete spgsEntityHashes[key];
+    }
+  }
+  function spgsApplyEntityRealtime(change){
+    const oldRow=change.old||{},newRow=change.new||{};
+    const row=change.eventType==='DELETE'?oldRow:newRow;
+    const type=row.entity_type,id=String(row.id||'');
+    if(!type||!id)return;
+    const key=spgsEntityKey(type,id);
+    if(change.eventType==='DELETE'){
+      if(SPGS_ENTITY_ARRAYS.includes(type))state[type]=(state[type]||[]).filter(x=>String(x?.id)!==id);
+      delete spgsEntityHashes[key];
+    }else{
+      const payload=spgsEntityCleanPayload(newRow.payload||{});
+      if(type==='settings')state.settings=(typeof DEFAULT_SETTINGS==='object')?{...DEFAULT_SETTINGS,...payload}:payload;
+      else if(type==='counters')state.counters=payload||{};
+      else if(SPGS_ENTITY_ARRAYS.includes(type)){
+        if(payload&&typeof payload==='object'&&!payload.id)payload.id=id;
+        const arr=state[type]=state[type]||[],i=arr.findIndex(x=>String(x?.id)===id);
+        if(i>=0)arr.splice(i,1);
+        const at=Math.max(0,Math.min(Number(newRow.sort_order)||0,arr.length));
+        arr.splice(at,0,payload);
+      }
+      spgsEntityHashes[key]=spgsEntitySignature(payload,newRow.sort_order);
+    }
+    spgsWriteLocal();
+    clearTimeout(spgsEntityUiTimer);
+    spgsEntityUiTimer=setTimeout(()=>{
+      try{refreshAll()}catch(e){}
+      try{renderCategories()}catch(e){}
+      try{renderProducts()}catch(e){}
+      try{if($('productionproducts')?.classList.contains('active'))renderProductionProducts()}catch(e){}
+    },80);
+  }
+  async function spgsStartEntityRealtime(){
+    if(!spgsEntityStoreReady||!spgsProductionClient)return;
+    if(spgsEntityChannel){try{await spgsProductionClient.removeChannel(spgsEntityChannel)}catch(e){}}
+    spgsEntityChannel=spgsProductionClient.channel('spgs-entities-'+SPGS_WORKSPACE)
+      .on('postgres_changes',{event:'*',schema:'public',table:'spgs_entities',filter:`workspace=eq.${SPGS_WORKSPACE}`},spgsApplyEntityRealtime)
+      .subscribe(status=>console.log('Entity realtime status:',status));
+  }
+
   function spgsCloudPayload(){
     const copy=JSON.parse(JSON.stringify(state));
     delete copy.productionRequests;
@@ -2723,6 +2920,12 @@ window.spgsLoadProductionSeen=
     // their dedicated tables have been confirmed available.
     if(spgsSalesOrderCloudReady)delete copy.salesOrders;
     if(spgsFulfilmentCloudReady)delete copy.dealerFulfilments;
+    // v1.0.10: once the per-record store is available, never place mutable
+    // masters/documents back into the giant shared JSON row.
+    if(spgsEntityStoreReady){
+      SPGS_ENTITY_ARRAYS.forEach(k=>delete copy[k]);
+      SPGS_ENTITY_SINGLETONS.forEach(k=>delete copy[k]);
+    }
     delete copy.users;
     copy.current=null;
     return copy;
@@ -3326,6 +3529,9 @@ async function spgsStartProductionRealtime(){
     await spgsSyncQuoteRequests();
     await spgsSyncSalesOrders();
     await spgsSyncOrderFulfilments();
+    // Save per-record entities first. Only after this succeeds is the compact
+    // legacy app_state row written without those mutable collections.
+    await spgsSyncEntities();
     await spgsWriteCloudState();
     await spgsSyncUsers();
     await spgsSyncProduction();
@@ -3373,6 +3579,16 @@ async function spgsStartProductionRealtime(){
         state={...state,...payload,current:localCurrent||null,users:cloudUsers};
         migrateV7();migrateUserPrivileges();
       }
+
+// ------------------------------------
+// v1.0.10 per-record business data bootstrap
+// ------------------------------------
+await spgsBootstrapEntityStore();
+// Re-run non-destructive migrations against the authoritative entity rows and
+// persist any schema-normalisation changes per record.
+migrateV7();migrateUserPrivileges();
+if(spgsEntityStoreReady)await spgsSyncEntities(false);
+
 // ------------------------------------
 // Production dedicated cloud bootstrap
 // ------------------------------------
@@ -3503,6 +3719,9 @@ spgsProductionJson=
         'Production realtime offline - normal cloud save still works'
     );
 }
+      if(spgsEntityStoreReady){
+        try{await spgsStartEntityRealtime()}catch(e){console.error('Per-record entity realtime could not start',e)}
+      }
       if(spgsPurchaseCloudReady){
         try{await spgsStartPurchaseOrdersRealtime()}catch(e){console.error('Purchase Orders realtime could not start',e)}
       }
@@ -3560,6 +3779,7 @@ spgsProductionJson=
   window.spgsQuoteRequestsCloudReady=()=>spgsQuoteRequestCloudReady;
   window.spgsSalesOrdersCloudReady=()=>spgsSalesOrderCloudReady;
   window.spgsOrderFulfilmentCloudReady=()=>spgsFulfilmentCloudReady;
+  window.spgsEntityStoreCloudReady=()=>spgsEntityStoreReady;
 
   const spgsReadyPromise=spgsBootstrap();
 })();
