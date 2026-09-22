@@ -362,11 +362,68 @@
   <div class="field"><label>Contact Person</label><input id="custContactPerson" placeholder="Optional"/></div>
   <div class="field"><label>Contact Number <span class="required-dot">*</span></label><input id="custPhone" placeholder="At least phone or email"/></div>
   <div class="field"><label>Email <span class="required-dot">*</span></label><input id="custEmail" placeholder="At least phone or email"/></div>
-  <div class="field"><label>VAT No. / Ref</label><input id="custVat"/></div>
+<div class="field full">
+
+  <div class="vat-customer-card" id="custVatCard">
+
+    <div class="vat-customer-info">
+
+      <div class="vat-customer-title">
+        VAT Customer
+      </div>
+
+      <div class="vat-customer-sub" id="custVatStatusText">
+        Disabled — quotations and PI will use non-VAT pricing display.
+      </div>
+
+    </div>
+
+
+    <label class="vat-switch">
+
+      <input
+        id="custVatEnabled"
+        type="checkbox"
+        onchange="updateCustomerVatUI()"
+      >
+
+      <span class="vat-slider"></span>
+
+    </label>
+
+  </div>
+
+</div>
+
+
+<div class="field" id="custVatNumberField">
+
+  <label>VAT No. / Ref</label>
+
+  <input
+    id="custVat"
+    placeholder="Enter VAT registration number"
+  >
+
+</div>
   <div class="field"><label>Google Location</label><input id="custMap" placeholder="Google Maps link if available"/></div>
   <div class="field full"><label>Billing Address</label><textarea id="custAddress" placeholder="Auto-fill from customer source where possible"></textarea></div>
   <div class="field full"><label>Delivery Address (if different)</label><textarea id="custDelivery"></textarea></div>
-  <div class="field"><label>VAT Certificate</label><input id="custVatFile" type="file" accept="application/pdf,image/*"/></div>
+<div class="field" id="custVatFileField">
+
+  <label>VAT Certificate</label>
+
+  <input
+    id="custVatFile"
+    type="file"
+    accept="application/pdf,image/*"
+  >
+
+  <div class="hint">
+    Optional supporting VAT registration document.
+  </div>
+
+</div>
   <div class="field"><label>Saved Source Document</label><div class="hint" id="custSavedSourceLabel">The auto-fill source will be stored with this customer when saved.</div></div>
 
   <div class="section">Customer-Specific Prices</div><div class="field full"><div id="specialPriceRows"></div><button class="btn ghost sm" onclick="addSpecialPriceRow()">+ Add Special Price Rule</button></div>
@@ -595,7 +652,44 @@ function currentPricingForItem(item,customerId,payMode){const c=state.customers.
 
 function refreshCustomerPick(){const sel=$('customerSelect'),v=sel.value;sel.innerHTML='<option value="">-- Select customer --</option>'+state.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');if(state.customers.some(c=>c.id===v))sel.value=v;const mp=$('masterItemPick'),mv=mp.value;mp.innerHTML='<option value="">-- Item Master --</option>'+state.items.map(i=>`<option value="${i.id}">${esc([i.size,i.material,i.layout,i.pcs?i.pcs+'pcs':''].filter(Boolean).join(' / '))}</option>`).join('');if(state.items.some(i=>i.id===mv))mp.value=mv}
 function fillCustomer(id){const c=state.customers.find(x=>x.id===id);if(!c)return;$('customerPhone').value=c.phone||'';$('customerEmail').value=c.email||'';$('customerAddress').value=c.address||'';$('deliveryAddress').value=c.delivery||'';$('googleLocation').value=c.map||'';$('customerVat').value=c.vat||'';syncPricesToCustomer();showCustomerPriceSuggestion();renderCurrent()}
-$('customerSelect').addEventListener('change',()=>fillCustomer($('customerSelect').value));$('payMode').addEventListener('change',()=>{if($('payMode').value==='cash'){$('validity').value='7'}else $('validity').value='14';syncPricesToCustomer();renderCurrent()});$('vatMode').addEventListener('change',renderCurrent);$('docType').addEventListener('change',()=>{if(!state.current)return;state.current.type=$('docType').value;updateEditorVisibility();renderCurrent()});$('quoteCategory').addEventListener('change',()=>{updateEditorVisibility();renderCurrent()});['docDate','validity','poRef','customerPhone','customerEmail','customerAddress','deliveryAddress','googleLocation','customerVat','extraNote','delivery3','whatsappTracking'].forEach(id=>$(id).addEventListener('input',renderCurrent));
+$('customerSelect').addEventListener(
+  'change',
+  ()=>{
+
+    const id =
+      $('customerSelect').value;
+
+
+    fillCustomer(id);
+
+
+    const c =
+      state.customers.find(
+        x=>x.id===id
+      );
+
+
+    if(!c){
+      return;
+    }
+
+
+    const vatEnabled =
+      c.vatEnabled !== undefined
+        ? !!c.vatEnabled
+        : !!c.vat;
+
+
+    $('vatMode').value =
+      vatEnabled
+        ? 'vat18'
+        : 'none';
+
+
+    renderCurrent();
+
+  }
+);$('payMode').addEventListener('change',()=>{if($('payMode').value==='cash'){$('validity').value='7'}else $('validity').value='14';syncPricesToCustomer();renderCurrent()});$('vatMode').addEventListener('change',renderCurrent);$('docType').addEventListener('change',()=>{if(!state.current)return;state.current.type=$('docType').value;updateEditorVisibility();renderCurrent()});$('quoteCategory').addEventListener('change',()=>{updateEditorVisibility();renderCurrent()});['docDate','validity','poRef','customerPhone','customerEmail','customerAddress','deliveryAddress','googleLocation','customerVat','extraNote','delivery3','whatsappTracking'].forEach(id=>$(id).addEventListener('input',renderCurrent));
 function syncPricesToCustomer(){document.querySelectorAll('#lineBody tr').forEach(tr=>{const iid=tr.dataset.itemId;if(!iid)return;const item=state.items.find(x=>x.id===iid);if(item){tr.querySelector('.lprice').value=currentPricingForItem(item,$('customerSelect').value,$('payMode').value).toFixed(2)}});recalcLines()}
 function newDocument(type='Q',category='label'){showView('editor');resetEditor(false);const date=today(),core=nextCore(date);state.current={id:uid('doc'),type,category,core,rev:0,date,serial:serialFor(type,core,0),lines:[],attachments:{},sourceQuoteId:null,createdBy:currentUser?.display||'',createdByUser:currentUser?.username||''};$('docType').value=type;$('quoteCategory').value=category;$('docDate').value=date;$('payMode').value='credit';$('vatMode').value='none';$('validity').value='14';$('poRef').value='';$('customerSelect').value='';['customerPhone','customerEmail','customerAddress','deliveryAddress','googleLocation','customerVat','extraNote','sourceText'].forEach(id=>$(id).value='');$('delivery3').checked=true;$('whatsappTracking').checked=true;clearAttachments();updateEditorVisibility();renderLineRows([]);renderCurrent();saveState()}
 function resetEditor(showDash=true){
@@ -1388,7 +1482,86 @@ function docTable(arr,isQ){
     </tr>`;
   }).join('')}</tbody></table>`
 }
-function renderCustomers(){const q=($('customerSearch')?.value||'').toLowerCase(),arr=state.customers.filter(c=>[c.name,c.address,c.phone,c.email].join(' ').toLowerCase().includes(q));$('customerList').innerHTML=!arr.length?'<div class="empty">No customers found.</div>':`<table class="table"><thead><tr><th>Customer</th><th>Contact</th><th>Billing / Delivery</th><th>VAT</th><th>Price History</th><th></th></tr></thead><tbody>${arr.map(c=>`<tr><td><b>${esc(c.name)}</b><div class="small">${esc(c.contactPerson||'')}${c.contactPerson&&c.email?' • ':''}${esc(c.email||'')}</div></td><td>${esc(c.phone||'-')}<div class="small">${c.map?'<span class="tag">Google Location</span>':''}</div></td><td>${esc(c.address||'-')}<div class="small">Delivery: ${esc(c.delivery||'Same as billing')}</div></td><td>${esc(c.vat||'-')}</td><td>${(c.priceHistory||[]).length} saved prices<div class="small">${Object.keys(c.specialPrices||{}).length} special rules</div></td><td><button class="btn ghost sm" onclick="openCustomerModal('${c.id}')">Edit</button></td></tr>`).join('')}</tbody></table>`}
+function renderCustomers(){const q=($('customerSearch')?.value||'').toLowerCase(),arr=state.customers.filter(c=>[c.name,c.address,c.phone,c.email].join(' ').toLowerCase().includes(q));$('customerList').innerHTML=!arr.length?'<div class="empty">No customers found.</div>':`<table class="table"><thead><tr><th>Customer</th><th>Contact</th><th>Billing / Delivery</th><th>VAT</th><th>Price History</th><th></th></tr></thead><tbody>${arr.map(c=>`<tr><td><b>${esc(c.name)}</b><div class="small">${esc(c.contactPerson||'')}${c.contactPerson&&c.email?' • ':''}${esc(c.email||'')}</div></td><td>${esc(c.phone||'-')}<div class="small">${c.map?'<span class="tag">Google Location</span>':''}</div></td><td>${esc(c.address||'-')}<div class="small">Delivery: ${esc(c.delivery||'Same as billing')}</div></td><td>
+
+  ${
+    (
+      c.vatEnabled !== undefined
+        ? c.vatEnabled
+        : !!c.vat
+    )
+
+    ? `
+      <span class="tag vat-enabled-tag">
+        VAT ENABLED
+      </span>
+
+      <div class="small">
+        ${esc(c.vat || 'VAT No. not entered')}
+      </div>
+    `
+
+    : `
+      <span class="tag vat-disabled-tag">
+        NON-VAT
+      </span>
+    `
+  }
+
+</td><td>${(c.priceHistory||[]).length} saved prices<div class="small">${Object.keys(c.specialPrices||{}).length} special rules</div></td><td><button class="btn ghost sm" onclick="openCustomerModal('${c.id}')">Edit</button></td></tr>`).join('')}</tbody></table>`}
+function updateCustomerVatUI(){
+
+  const enabled =
+    !!$('custVatEnabled')?.checked;
+
+  const vatInput =
+    $('custVat');
+
+  const vatFile =
+    $('custVatFile');
+
+  const card =
+    $('custVatCard');
+
+  const status =
+    $('custVatStatusText');
+
+
+  if(vatInput){
+
+    vatInput.disabled =
+      !enabled;
+
+  }
+
+
+  if(vatFile){
+
+    vatFile.disabled =
+      !enabled;
+
+  }
+
+
+  if(card){
+
+    card.classList.toggle(
+      'enabled',
+      enabled
+    );
+
+  }
+
+
+  if(status){
+
+    status.textContent =
+      enabled
+        ? 'Enabled — this customer uses VAT 18% documents.'
+        : 'Disabled — quotations and PI will use non-VAT pricing display.';
+
+  }
+}
 function openCustomerModal(id=''){
   pastedCustomerFile=null;
   const c=state.customers.find(x=>x.id===id);
@@ -1397,7 +1570,19 @@ function openCustomerModal(id=''){
   $('custContactPerson').value=c?.contactPerson||'';
   $('custPhone').value=c?.phone||'';
   $('custEmail').value=c?.email||'';
-  $('custVat').value=c?.vat||'';
+$('custVatEnabled').checked =
+  c
+    ? (
+        c.vatEnabled !== undefined
+          ? !!c.vatEnabled
+          : !!c.vat
+      )
+    : false;
+
+$('custVat').value =
+  c?.vat || '';
+
+updateCustomerVatUI();
   $('custAddress').value=c?.address||'';
   $('custDelivery').value=c?.delivery||'';
   $('custMap').value=c?.map||'';
@@ -1428,12 +1613,22 @@ async function saveCustomer(){
   if($('custVatFile').files[0])vatFile=await putFile($('custVatFile').files[0],'VAT Certificate');
   if($('custSourceFile').files[0]||pastedCustomerFile)sourceFile=await putFile($('custSourceFile').files[0]||pastedCustomerFile,'Customer Source');
   const c={...old,id,
-    name:$('custName').value.trim(),
-    contactPerson:$('custContactPerson').value.trim(),
-    phone:$('custPhone').value.trim(),
-    email:$('custEmail').value.trim(),
-    vat:$('custVat').value.trim(),
-    address:$('custAddress').value.trim(),
+name:$('custName').value.trim(),
+
+contactPerson:$('custContactPerson').value.trim(),
+
+phone:$('custPhone').value.trim(),
+
+email:$('custEmail').value.trim(),
+
+vatEnabled:
+  !!$('custVatEnabled').checked,
+
+vat:
+  $('custVat').value.trim(),
+
+address:
+  $('custAddress').value.trim(),
     delivery:$('custDelivery').value.trim(),
     map:$('custMap').value.trim(),
     notes:$('custNotes').value.trim(),
