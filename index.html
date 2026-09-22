@@ -10,21 +10,64 @@
 <body>
 <div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.9</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
-  <div class="topbar">
-    <div class="brand"><div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div><div class="brandtext"><b>Business Quotation System <span style="font-size:9px;color:#078f92">v4</span></b><span>Label Pricing • Cost Snapshots • Profit Reports • Device Quotations • User Audit</span></div></div>
-    <div class="nav">
-      <button class="navbtn active" data-view="dashboard">Dashboard</button>
-      <button class="navbtn" data-view="editor">New Document</button>
-      <button class="navbtn" data-view="quotations">Quotations</button>
-      <button class="navbtn" data-view="pis">Pro Forma</button>
-      <button class="navbtn" data-view="customers">Customers</button>
-      <button class="navbtn" data-view="items">Label Master</button>
-      <button class="navbtn" data-view="devices">Device Master</button>
-      <button class="navbtn" data-view="admin">Admin Panel</button>
-      <button class="navbtn" data-view="settings">Settings</button>
-      <span id="currentUserChip" class="user-chip">Not signed in</span><button class="btn ghost sm" onclick="logoutUser()">Logout</button>
+  <header class="topbar app-shell-header">
+    <div class="topbar-main">
+      <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
+        <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.9</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+      </div>
+
+      <div class="topbar-actions">
+        <button class="shell-icon-btn mobile-nav-toggle" id="mobileNavToggle" type="button" aria-label="Open navigation" aria-controls="navShell" aria-expanded="false" onclick="toggleMobileNav()">
+          <span></span><span></span><span></span>
+        </button>
+
+        <div class="user-profile-wrap">
+          <button class="user-profile-btn" id="userProfileBtn" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleProfileMenu(event)">
+            <span class="user-avatar" id="userAvatar">U</span>
+            <span class="user-profile-copy">
+              <strong id="currentUserChip">Not signed in</strong>
+              <small id="currentUserRole">User</small>
+            </span>
+            <span class="profile-chevron" aria-hidden="true">⌄</span>
+          </button>
+
+          <div class="user-profile-menu" id="userProfileMenu" role="menu" aria-hidden="true">
+            <div class="profile-menu-head">
+              <span class="user-avatar large" id="userAvatarMenu">U</span>
+              <div><b id="profileDisplayName">Not signed in</b><span id="profileUsername">—</span></div>
+            </div>
+            <div class="profile-role-row"><span>Role</span><b id="profileRoleLabel">User</b></div>
+            <div class="profile-menu-sep"></div>
+            <button type="button" class="profile-menu-item" onclick="showView('dashboard');closeProfileMenu()"><span>⌂</span> Dashboard</button>
+            <button type="button" class="profile-menu-item" id="profileAdminBtn" onclick="showView('admin');closeProfileMenu()"><span>⚙</span> Admin Panel</button>
+            <button type="button" class="profile-menu-item" id="profileSettingsBtn" onclick="showView('settings');closeProfileMenu()"><span>◫</span> Settings</button>
+            <div class="profile-menu-sep"></div>
+            <button type="button" class="profile-menu-item danger" onclick="closeProfileMenu();logoutUser()"><span>↪</span> Sign out</button>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
+
+    <div class="nav-backdrop" id="navBackdrop" onclick="closeMobileNav()"></div>
+    <div class="nav-shell" id="navShell">
+      <div class="mobile-nav-head">
+        <div><b>Navigation</b><span>SoftCreation workspace</span></div>
+        <button class="shell-icon-btn" type="button" aria-label="Close navigation" onclick="closeMobileNav()">×</button>
+      </div>
+      <nav class="nav" aria-label="Main navigation">
+        <button class="navbtn active" data-view="dashboard">Dashboard</button>
+        <button class="navbtn" data-view="editor">New Document</button>
+        <button class="navbtn" data-view="quotations">Quotations</button>
+        <button class="navbtn" data-view="pis">Pro Forma</button>
+        <button class="navbtn" data-view="customers">Customers</button>
+        <button class="navbtn" data-view="items">Label Master</button>
+        <button class="navbtn" data-view="devices">Device Master</button>
+        <button class="navbtn" data-view="admin">Admin Panel</button>
+        <button class="navbtn" data-view="settings">Settings</button>
+      </nav>
+    </div>
+  </header>
 
   <section id="dashboard" class="view active">
     <div class="cards">
@@ -3519,6 +3562,146 @@ spgsProductionJson=
   window.spgsOrderFulfilmentCloudReady=()=>spgsFulfilmentCloudReady;
 
   const spgsReadyPromise=spgsBootstrap();
+})();
+</script>
+
+<script id="softcreation-responsive-shell-v109">
+(function(){
+  function initials(value=''){
+    const parts=String(value||'User').trim().split(/\s+/).filter(Boolean);
+    return (parts.slice(0,2).map(x=>x.charAt(0)).join('')||'U').toUpperCase();
+  }
+
+  window.closeProfileMenu=function(){
+    const menu=document.getElementById('userProfileMenu');
+    const btn=document.getElementById('userProfileBtn');
+    if(menu){menu.classList.remove('show');menu.setAttribute('aria-hidden','true')}
+    if(btn)btn.setAttribute('aria-expanded','false');
+  };
+
+  window.toggleProfileMenu=function(ev){
+    if(ev)ev.stopPropagation();
+    const menu=document.getElementById('userProfileMenu');
+    const btn=document.getElementById('userProfileBtn');
+    if(!menu||!btn)return;
+    const open=!menu.classList.contains('show');
+    closeMobileNav();
+    menu.classList.toggle('show',open);
+    menu.setAttribute('aria-hidden',String(!open));
+    btn.setAttribute('aria-expanded',String(open));
+  };
+
+  window.closeMobileNav=function(){
+    document.body.classList.remove('mobile-nav-open');
+    const btn=document.getElementById('mobileNavToggle');
+    if(btn)btn.setAttribute('aria-expanded','false');
+  };
+
+  window.toggleMobileNav=function(){
+    closeProfileMenu();
+    const open=!document.body.classList.contains('mobile-nav-open');
+    document.body.classList.toggle('mobile-nav-open',open);
+    const btn=document.getElementById('mobileNavToggle');
+    if(btn)btn.setAttribute('aria-expanded',String(open));
+  };
+
+  window.refreshShellProfile=function(){
+    const u=(typeof currentUser!=='undefined'&&currentUser)?currentUser:null;
+    const display=u?.display||u?.username||'Not signed in';
+    const username=u?.username||'—';
+    const role=String(u?.role||'User');
+    const avatar=initials(display);
+    const chip=document.getElementById('currentUserChip');
+    const roleEl=document.getElementById('currentUserRole');
+    const displayEl=document.getElementById('profileDisplayName');
+    const usernameEl=document.getElementById('profileUsername');
+    const roleLabel=document.getElementById('profileRoleLabel');
+    const av=document.getElementById('userAvatar');
+    const av2=document.getElementById('userAvatarMenu');
+    if(chip)chip.textContent=display;
+    if(roleEl)roleEl.textContent=role.charAt(0).toUpperCase()+role.slice(1);
+    if(displayEl)displayEl.textContent=display;
+    if(usernameEl)usernameEl.textContent=username?`@${username}`:'—';
+    if(roleLabel)roleLabel.textContent=role.charAt(0).toUpperCase()+role.slice(1);
+    if(av)av.textContent=avatar;
+    if(av2)av2.textContent=avatar;
+
+    const adminBtn=document.getElementById('profileAdminBtn');
+    const settingsBtn=document.getElementById('profileSettingsBtn');
+    try{
+      if(adminBtn)adminBtn.style.display=(typeof hasPerm==='function'&&hasPerm('admin_profit'))?'flex':'none';
+      if(settingsBtn)settingsBtn.style.display=(typeof hasPerm==='function'&&hasPerm('settings'))?'flex':'none';
+    }catch(e){
+      if(adminBtn)adminBtn.style.display=role==='admin'?'flex':'none';
+      if(settingsBtn)settingsBtn.style.display=role==='admin'?'flex':'none';
+    }
+  };
+
+  // Wrap the final runtime functions only after every feature module has loaded.
+  if(typeof window.showView==='function'){
+    const baseShowView=window.showView;
+    window.showView=function(){
+      const result=baseShowView.apply(this,arguments);
+      closeMobileNav();
+      closeProfileMenu();
+      return result;
+    };
+  }
+
+  if(typeof window.loginUser==='function'){
+    const baseLogin=window.loginUser;
+    window.loginUser=function(){
+      const result=baseLogin.apply(this,arguments);
+      setTimeout(refreshShellProfile,0);
+      return result;
+    };
+  }
+
+  if(typeof window.restoreSession==='function'){
+    const baseRestore=window.restoreSession;
+    window.restoreSession=function(){
+      const result=baseRestore.apply(this,arguments);
+      setTimeout(refreshShellProfile,0);
+      return result;
+    };
+  }
+
+  if(typeof window.logoutUser==='function'){
+    const baseLogout=window.logoutUser;
+    window.logoutUser=function(){
+      closeProfileMenu();
+      closeMobileNav();
+      const result=baseLogout.apply(this,arguments);
+      setTimeout(refreshShellProfile,0);
+      return result;
+    };
+  }
+
+  document.addEventListener('click',function(e){
+    const wrap=e.target.closest?.('.user-profile-wrap');
+    if(!wrap)closeProfileMenu();
+  });
+
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){
+      closeProfileMenu();
+      closeMobileNav();
+    }
+  });
+
+  window.addEventListener('resize',function(){
+    if(window.innerWidth>900)closeMobileNav();
+  });
+
+  // Dynamic feature modules add nav buttons after initial markup. Make them mobile-friendly automatically.
+  const nav=document.querySelector('.nav');
+  if(nav){
+    nav.addEventListener('click',function(e){
+      if(e.target.closest('.navbtn'))closeMobileNav();
+    });
+  }
+
+  refreshShellProfile();
 })();
 </script>
 </body></html>
