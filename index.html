@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.13 - Customer Price Categories Unlimited -->
+<!-- SoftCreation v1.0.14 - Device Master Save Fix + Customer Price Categories Unlimited -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.13</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.14</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -18,7 +18,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.13</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.14</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
       <div class="topbar-actions">
@@ -1708,7 +1708,68 @@ function copyPriceMessage(id){const t=lastLabelCalc?.prices.find(x=>x.id===id);i
 const calculateLabelPriceV7=calculateLabelPrice;calculateLabelPrice=function(){calculateLabelPriceV7();if(!lastLabelCalc)return;document.querySelectorAll('#calcResults .price-option').forEach((b,i)=>{const t=lastLabelCalc.prices[i];if(!t)return;b.style.borderTop=`5px solid ${t.color||'#079c9f'}`;if(!b.querySelector('.copy-price')){const c=document.createElement('span');c.className='copy-price';c.textContent='Copy';c.onclick=e=>{e.stopPropagation();copyPriceMessage(t.id)};b.appendChild(c)}})};
 
 function removeConnectedBackground(dataUrl){return new Promise(resolve=>{const im=new Image();im.onload=()=>{const cv=document.createElement('canvas'),w=im.naturalWidth,h=im.naturalHeight;cv.width=w;cv.height=h;const x=cv.getContext('2d');x.drawImage(im,0,0);const d=x.getImageData(0,0,w,h),p=d.data,corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]],avg=[0,0,0];corners.forEach(([cx,cy])=>{const i=(cy*w+cx)*4;avg[0]+=p[i];avg[1]+=p[i+1];avg[2]+=p[i+2]});avg=avg.map(v=>v/4);const seen=new Uint8Array(w*h),q=[];for(let xx=0;xx<w;xx++){q.push(xx,(h-1)*w+xx)}for(let yy=0;yy<h;yy++){q.push(yy*w,yy*w+w-1)}const near=i=>Math.abs(p[i]-avg[0])+Math.abs(p[i+1]-avg[1])+Math.abs(p[i+2]-avg[2])<105;while(q.length){const n=q.pop();if(n<0||n>=w*h||seen[n])continue;seen[n]=1;const i=n*4;if(!near(i))continue;p[i+3]=0;const xx=n%w;if(xx)q.push(n-1);if(xx<w-1)q.push(n+1);q.push(n-w,n+w)}x.putImageData(d,0,0);resolve(cv.toDataURL('image/png'))};im.onerror=()=>resolve(dataUrl);im.src=dataUrl})}
-const saveDeviceV7=saveDevice;saveDevice=async function(){const f=$('devImage')?.files?.[0];if(f){const original=await fileDataUrl(f),clean=await removeConnectedBackground(original),dt=new DataTransfer(),blob=await (await fetch(clean)).blob();dt.items.add(new File([blob],f.name.replace(/\.[^.]+$/,'.png'),{type:'image/png'}));$('devImage').files=dt.files}return saveDeviceV7()};
+/* v1.0.14 - Robust Device Master save.
+   Save directly from the modal instead of passing the image through DataTransfer.
+   DataTransfer is not consistently constructible in Android/WebView and could stop
+   the entire Save Device action when an image was selected. */
+saveDevice=async function(){
+  try{
+    const id=$('devId')?.value||'';
+    if(id&&!protectedEdit('save device changes'))return;
+
+    const old=state.devices.find(x=>x.id===id)||{};
+    const name=$('devName')?.value.trim()||'';
+    const model=$('devModel')?.value.trim()||'';
+    if(!name||!model)return toast('Device name and model are required');
+
+    let image=old.image||'';
+    const file=$('devImage')?.files?.[0];
+    if(file){
+      try{
+        const original=await fileDataUrl(file);
+        image=await removeConnectedBackground(original);
+      }catch(imageErr){
+        console.warn('Device image processing failed; saving original image instead.',imageErr);
+        try{image=await fileDataUrl(file)}catch(_){image=old.image||''}
+      }
+    }
+
+    const categoryIds=checkedCategories('devCat');
+    const d={
+      ...old,
+      id:id||uid('dev'),
+      name,
+      model,
+      serial:$('devSerial')?.value.trim()||'',
+      brand:$('devBrand')?.value.trim()||'',
+      cost:Number($('devCost')?.value||0),
+      price:Number($('devPrice')?.value||0),
+      stock:Number($('devStock')?.value||0),
+      features:$('devFeatures')?.value.trim()||'',
+      d1:Number($('devD1')?.value||0),
+      d2:Number($('devD2')?.value||5),
+      d3:Number($('devD3')?.value||10),
+      d4:Number($('devD4')?.value||15),
+      supplier:$('devSupplier')?.value.trim()||'',
+      warranty:$('devWarranty')?.value.trim()||'',
+      categoryIds,
+      image
+    };
+
+    const i=state.devices.findIndex(x=>x.id===d.id);
+    if(i>=0)state.devices[i]=d;
+    else state.devices.push(d);
+
+    audit(i>=0?'EDIT_DEVICE':'ADD_DEVICE',`${d.name} ${d.model}`);
+    saveState();
+    renderDevices();
+    closeModal('deviceModal');
+    toast('Device saved');
+  }catch(err){
+    console.error('Save Device failed',err);
+    toast(`Device save failed${err?.message?': '+err.message:''}`);
+  }
+};
 
 function buildDeviceDocV7(doc){const t=docTotals(doc),vat=doc.vatMode==='vat18',r=Number(state.settings.vat||18)/100,lines=activeDocLines(doc);const blocks=lines.map((l,i)=>{const d=state.devices.find(x=>x.id===l.itemId)||{},features=String(l.features||d.features||'').split(/\n+/).filter(Boolean),unit=vat?Number(l.price)/(1+r):Number(l.price),amount=unit*Number(l.qty||0);return `<div class="device-quote-card"><div class="device-card-head"><span>DEVICE ${String(i+1).padStart(2,'0')}</span><b>${esc(l.desc||d.name||'Device')}</b></div><div class="device-card-body">${d.image?`<div class="device-image-white"><img src="${d.image}"></div>`:''}<div><div class="device-model">${esc(d.brand||l.material||'')} ${esc(d.model||l.size||'')}</div>${d.supplier?`<div class="waternote">Supplier: ${esc(d.supplier)}</div>`:''}${d.warranty?`<div class="warranty-chip">Warranty: ${esc(d.warranty)}</div>`:''}<div class="feature-grid">${features.map(f=>`<div>✓ ${esc(f)}</div>`).join('')}</div><div class="device-price-row"><span>Qty <b>${money(l.qty)}</b></span><span>Unit ${vat?'Excl. VAT ':''}<b>LKR ${money(unit)}</b></span><span>Amount <b>LKR ${money(amount)}</b></span></div></div></div></div>`}).join('');const summary=vat?`<div class="commercial-summary"><div class="sumrow"><span>Subtotal (Excl. VAT)</span><b>LKR ${money(t.net)}</b></div><div class="sumrow"><span>VAT 18%</span><b>LKR ${money(t.vat)}</b></div><div class="sumrow grand"><span>TOTAL (Incl. VAT)</span><b>LKR ${money(t.gross)}</b></div></div>`:`<div class="commercial-summary"><div class="sumrow grand"><span>Quotation Value</span><b>LKR ${money(t.gross)}</b></div></div>`;return `<div class="docbody"><div class="dochead"><div class="doctype teal">DEVICE QUOTATION</div><div class="docmeta"><b>QUOTATION NO.</b> ${esc(doc.serial)}<br><b>DATE</b> ${esc(fmtDate(doc.date))}<br><b>VALIDITY</b> ${doc.validity} Days</div></div><div class="customerbox"><div><div class="label">Quoted To</div><div class="custname">${esc(doc.customer?.name||'')}</div><div class="custaddr">${esc(doc.customer?.address||'').replace(/\n/g,'<br>')}<br>${esc(doc.customer?.phone||'')}</div></div><div class="docmeta"><b>PREPARED BY</b> ${esc(doc.createdBy||'')}</div></div><div class="docsection">DEVICES & TECHNICAL SPECIFICATIONS</div>${blocks}${summary}<div class="terms"><h4>DEVICE TERMS & CONDITIONS</h4><div class="termrow"><b>Warranty:</b> One-to-one replacement applies to verified manufacturing defects during the stated warranty period.</div><div class="termrow"><b>Support:</b> Free 24-hour online support and online troubleshooting.</div><div class="termrow"><b>Repairs:</b> Service labour is free after warranty; replacement parts are charged separately.</div><div class="termrow"><b>Delivery:</b> Courier charges apply unless otherwise agreed in writing.</div>${doc.extraNote?`<div class="termrow"><b>Note:</b> ${esc(doc.extraNote)}</div>`:''}</div></div><div class="docfoot"><b>Thank you for the opportunity to quote.</b><span>${esc(state.settings.quoteFooter)}</span></div>`}
 buildDeviceDocHTML=buildDeviceDocV7;
