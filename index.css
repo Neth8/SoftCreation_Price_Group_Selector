@@ -1826,127 +1826,68 @@ input[type="radio"]{
 .paper *{
   --ui-shadow:initial;
 }
+
 /* =========================================================
-   CUSTOMER VAT TOGGLE
+   v1.0.15 — DEVICE LOCAL IMAGE STORAGE
    ========================================================= */
-
-.vat-customer-card{
-  width:100%;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:18px;
-  padding:14px 16px;
-  border:1px solid #d8e4e6;
-  border-radius:15px;
-  background:linear-gradient(
-    145deg,
-    #ffffff,
-    #f8fbfc
-  );
-  transition:
-    border-color .18s ease,
-    background .18s ease,
-    box-shadow .18s ease;
-}
-
-.vat-customer-card.enabled{
-  border-color:#a8d7d7;
-  background:
-    linear-gradient(
-      145deg,
-      #f3fbfb,
-      #ffffff
-    );
-  box-shadow:
-    0 5px 18px rgba(37,142,142,.07);
-}
-
-.vat-customer-info{
-  min-width:0;
-}
-
-.vat-customer-title{
-  color:#17243c;
-  font-size:12px;
-  font-weight:900;
-}
-
-.vat-customer-sub{
-  margin-top:3px;
-  color:#81909a;
-  font-size:9.5px;
+.device-image-storage-note{
+  margin-top:7px;
+  padding:8px 10px;
+  border:1px solid #d9e7e9;
+  border-radius:10px;
+  background:#f7fbfc;
+  color:#6e8087;
+  font-size:10px;
   line-height:1.45;
 }
-
-
-/* Switch */
-
-.vat-switch{
-  position:relative;
-  width:48px;
-  height:27px;
-  flex:0 0 48px;
-  cursor:pointer;
+.device-image-storage-note b{color:#29474f}
+.device-image-storage-status{
+  margin-top:6px;
+  font-size:10px;
+  font-weight:700;
+  color:#7b8c92;
+  overflow-wrap:anywhere;
 }
-
-.vat-switch input{
-  position:absolute;
-  opacity:0;
-  pointer-events:none;
-}
-
-.vat-slider{
-  position:absolute;
-  inset:0;
-  border-radius:999px;
-  background:#cad4d8;
-  transition:.2s ease;
-}
-
-.vat-slider:before{
-  content:'';
-  position:absolute;
-  width:21px;
-  height:21px;
-  left:3px;
-  top:3px;
-  border-radius:50%;
+.device-image-storage-status.ready{color:#966400}
+.device-image-storage-status.saved{color:#08785f}
+.device-image-storage-status.legacy{color:#9a6a00}
+.device-master-image{
+  display:block;
+  width:100%;
+  height:140px;
+  object-fit:contain;
+  margin:0 0 10px;
+  border-radius:11px;
   background:#fff;
-  box-shadow:
-    0 2px 6px rgba(20,40,55,.2);
-  transition:.2s ease;
+}
+.device-local-image-badge{
+  display:inline-flex;
+  align-items:center;
+  margin-top:7px;
+  padding:4px 7px;
+  border:1px solid #bfe1d7;
+  border-radius:999px;
+  background:#edf9f5;
+  color:#08785f;
+  font-size:8.5px;
+  font-weight:900;
+  letter-spacing:.04em;
 }
 
-.vat-switch input:checked + .vat-slider{
-  background:#258e8e;
+/* =========================================================
+   v1.0.15 — PRODUCTS / LIVE PRODUCTION CARD SPECIFICATION
+   Make the material / layout / pieces-per-roll line easier to scan.
+   ========================================================= */
+#productionProductsGrid .pp-card .pp-spec{
+  margin-top:6px!important;
+  color:#425d65!important;
+  font-size:14px!important;
+  font-weight:850!important;
+  line-height:1.55!important;
+  letter-spacing:.005em;
 }
-
-.vat-switch input:checked + .vat-slider:before{
-  transform:translateX(21px);
-}
-
-
-/* Disabled VAT fields */
-
-#custVat:disabled,
-#custVatFile:disabled{
-  opacity:.5;
-  cursor:not-allowed;
-  background:#f2f5f6;
-}
-
-
-/* Customer list tags */
-
-.vat-enabled-tag{
-  background:#e5f6ef!important;
-  color:#087449!important;
-  border-color:#b9e6d1!important;
-}
-
-.vat-disabled-tag{
-  background:#f0f3f5!important;
-  color:#697982!important;
-  border-color:#dce3e6!important;
+@media(max-width:650px){
+  #productionProductsGrid .pp-card .pp-spec{
+    font-size:13px!important;
+  }
 }

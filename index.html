@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.14 - Device Master Save Fix + Customer Price Categories Unlimited -->
+<!-- SoftCreation v1.0.15 - Local Device Image Storage + Larger Production Product Specs -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.14</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.15</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -18,7 +18,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.14</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.15</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
       <div class="topbar-actions">
@@ -300,7 +300,7 @@
 
   </div>
   <div id="convertItems"></div><div class="actions"><button class="btn green" onclick="createPIFromSelection()">Create PI with Selected Items</button></div></div></div></div>
-<div id="deviceModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Device Master</b><button class="closex" onclick="closeModal('deviceModal')">×</button></div><div class="modal-body"><div class="grid"><input id="devId" type="hidden"><div class="field"><label>Device Name</label><input id="devName" placeholder="Desktop Barcode Label Printer"></div><div class="field"><label>Model</label><input id="devModel"></div><div class="field"><label>Serial Number (Optional)</label><input id="devSerial"></div><div class="field"><label>Brand / Make</label><input id="devBrand"></div><div class="field"><label>Base Unit Price</label><input id="devPrice" type="number" step="0.01"></div><div class="field"><label>Available Qty</label><input id="devStock" type="number" step="1"></div><div class="field"><label>Device Image</label><input id="devImage" type="file" accept="image/*"></div><div class="field full"><label>Features (one per line)</label><textarea id="devFeatures" placeholder="Resolution: 203 DPI&#10;Interface: USB + Ethernet&#10;Printing Method: Direct Thermal"></textarea></div><div class="section">Automatic Quantity Prices</div><div class="field"><label>1-5 Qty Discount %</label><input id="devD1" type="number" value="0"></div><div class="field"><label>6-10 Qty Discount %</label><input id="devD2" type="number" value="5"></div><div class="field"><label>11-20 Qty Discount %</label><input id="devD3" type="number" value="10"></div><div class="field"><label>21+ Qty Discount %</label><input id="devD4" type="number" value="15"></div></div><div class="actions"><button class="btn primary" onclick="saveDevice()">Save Device</button><button id="deleteDeviceBtn" class="btn red" onclick="deleteDevice()">Delete</button></div></div></div></div>
+<div id="deviceModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Device Master</b><button class="closex" onclick="closeModal('deviceModal')">×</button></div><div class="modal-body"><div class="grid"><input id="devId" type="hidden"><div class="field"><label>Device Name</label><input id="devName" placeholder="Desktop Barcode Label Printer"></div><div class="field"><label>Model</label><input id="devModel"></div><div class="field"><label>Serial Number (Optional)</label><input id="devSerial"></div><div class="field"><label>Brand / Make</label><input id="devBrand"></div><div class="field"><label>Base Unit Price</label><input id="devPrice" type="number" step="0.01"></div><div class="field"><label>Available Qty</label><input id="devStock" type="number" step="1"></div><div class="field"><label>Device Image</label><input id="devImage" type="file" accept="image/*"><div class="device-image-storage-note">Large image is stored in the browser-local app folder <b>SoftCreation/device-images</b>. Only a small preview is kept with the device record.</div><div id="devImageStorageStatus" class="device-image-storage-status">No image selected.</div></div><div class="field full"><label>Features (one per line)</label><textarea id="devFeatures" placeholder="Resolution: 203 DPI&#10;Interface: USB + Ethernet&#10;Printing Method: Direct Thermal"></textarea></div><div class="section">Automatic Quantity Prices</div><div class="field"><label>1-5 Qty Discount %</label><input id="devD1" type="number" value="0"></div><div class="field"><label>6-10 Qty Discount %</label><input id="devD2" type="number" value="5"></div><div class="field"><label>11-20 Qty Discount %</label><input id="devD3" type="number" value="10"></div><div class="field"><label>21+ Qty Discount %</label><input id="devD4" type="number" value="15"></div></div><div class="actions"><button class="btn primary" onclick="saveDevice()">Save Device</button><button id="deleteDeviceBtn" class="btn red" onclick="deleteDevice()">Delete</button></div></div></div></div>
 <div id="devicePickerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Add Devices to Quotation</b><button class="closex" onclick="closeModal('devicePickerModal')">×</button></div><div class="modal-body"><div id="devicePickerList"></div></div></div></div>
 <div id="toast" class="toast"></div><div id="printHost" style="display:none"></div>
 
@@ -1771,6 +1771,307 @@ saveDevice=async function(){
   }
 };
 
+
+/* v1.0.15 - Device images use browser-local file storage instead of keeping
+   the full image inside the synced application state.  Preferred storage is
+   Origin Private File System (OPFS), which is available in Chromium-based
+   browsers without asking the user for a Windows-specific folder.  IndexedDB
+   is used as a fallback.  The logical app path is the same everywhere:
+   SoftCreation/device-images/<device-id>.png
+
+   Only a small JPEG preview is kept in the device record so cards, quotations
+   and another PC can still show a lightweight image even when that PC does not
+   have the original local file. */
+const DEVICE_IMAGE_FOLDER_V1015='SoftCreation/device-images';
+const DEVICE_IMAGE_DB_V1015='softcreation_device_images_v1';
+const DEVICE_IMAGE_STORE_V1015='files';
+const deviceImageUrlCacheV1015=new Map();
+
+function deviceImageLogicalPathV1015(deviceId){
+  return `${DEVICE_IMAGE_FOLDER_V1015}/${String(deviceId||'device').replace(/[^a-zA-Z0-9_.-]/g,'_')}.png`;
+}
+function deviceImageFileNameV1015(path=''){
+  return String(path).split('/').filter(Boolean).pop()||'';
+}
+function dataUrlToBlobV1015(dataUrl){
+  return fetch(dataUrl).then(r=>r.blob());
+}
+function deviceImageThumbnailV1015(dataUrl,max=360){
+  return new Promise(resolve=>{
+    const im=new Image();
+    im.onload=()=>{
+      const scale=Math.min(1,max/Math.max(im.naturalWidth||1,im.naturalHeight||1));
+      const cv=document.createElement('canvas');
+      cv.width=Math.max(1,Math.round(im.naturalWidth*scale));
+      cv.height=Math.max(1,Math.round(im.naturalHeight*scale));
+      const x=cv.getContext('2d');
+      x.fillStyle='#fff';
+      x.fillRect(0,0,cv.width,cv.height);
+      x.drawImage(im,0,0,cv.width,cv.height);
+      let out=cv.toDataURL('image/jpeg',.72);
+      if(out.length>120000)out=cv.toDataURL('image/jpeg',.55);
+      resolve(out);
+    };
+    im.onerror=()=>resolve('');
+    im.src=dataUrl;
+  });
+}
+
+async function deviceImageOpfsDirV1015(create=true){
+  if(!navigator.storage?.getDirectory)throw new Error('OPFS not supported');
+  const root=await navigator.storage.getDirectory();
+  const app=await root.getDirectoryHandle('SoftCreation',{create});
+  return app.getDirectoryHandle('device-images',{create});
+}
+async function deviceImageSaveOpfsV1015(path,blob){
+  const dir=await deviceImageOpfsDirV1015(true);
+  const fileName=deviceImageFileNameV1015(path);
+  const handle=await dir.getFileHandle(fileName,{create:true});
+  const writable=await handle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+  return 'opfs';
+}
+async function deviceImageReadOpfsV1015(path){
+  const dir=await deviceImageOpfsDirV1015(false);
+  const handle=await dir.getFileHandle(deviceImageFileNameV1015(path));
+  return handle.getFile();
+}
+async function deviceImageDeleteOpfsV1015(path){
+  try{
+    const dir=await deviceImageOpfsDirV1015(false);
+    await dir.removeEntry(deviceImageFileNameV1015(path));
+  }catch(_){ }
+}
+
+function deviceImageDbV1015(){
+  return new Promise((resolve,reject)=>{
+    if(!window.indexedDB)return reject(new Error('IndexedDB not supported'));
+    const req=indexedDB.open(DEVICE_IMAGE_DB_V1015,1);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains(DEVICE_IMAGE_STORE_V1015))db.createObjectStore(DEVICE_IMAGE_STORE_V1015);
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error||new Error('Could not open local image database'));
+  });
+}
+async function deviceImageSaveIdbV1015(path,blob){
+  const db=await deviceImageDbV1015();
+  try{
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(DEVICE_IMAGE_STORE_V1015,'readwrite');
+      tx.objectStore(DEVICE_IMAGE_STORE_V1015).put(blob,path);
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error||new Error('Could not save local image'));
+      tx.onabort=()=>reject(tx.error||new Error('Local image save was aborted'));
+    });
+  }finally{db.close()}
+  return 'indexeddb';
+}
+async function deviceImageReadIdbV1015(path){
+  const db=await deviceImageDbV1015();
+  try{
+    return await new Promise((resolve,reject)=>{
+      const tx=db.transaction(DEVICE_IMAGE_STORE_V1015,'readonly');
+      const req=tx.objectStore(DEVICE_IMAGE_STORE_V1015).get(path);
+      req.onsuccess=()=>resolve(req.result||null);
+      req.onerror=()=>reject(req.error||new Error('Could not read local image'));
+    });
+  }finally{db.close()}
+}
+async function deviceImageDeleteIdbV1015(path){
+  try{
+    const db=await deviceImageDbV1015();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(DEVICE_IMAGE_STORE_V1015,'readwrite');
+      tx.objectStore(DEVICE_IMAGE_STORE_V1015).delete(path);
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error);
+    });
+    db.close();
+  }catch(_){ }
+}
+
+async function saveDeviceImageLocalV1015(deviceId,file){
+  const original=await fileDataUrl(file);
+  let processed=original;
+  try{processed=await removeConnectedBackground(original)}catch(_){ }
+  const blob=await dataUrlToBlobV1015(processed);
+  const thumbnail=await deviceImageThumbnailV1015(processed);
+  const path=deviceImageLogicalPathV1015(deviceId);
+  let storage='';
+  try{
+    storage=await deviceImageSaveOpfsV1015(path,blob);
+  }catch(opfsError){
+    console.warn('OPFS device image save unavailable; using IndexedDB fallback.',opfsError);
+    storage=await deviceImageSaveIdbV1015(path,blob);
+  }
+  const cached=deviceImageUrlCacheV1015.get(path);
+  if(cached){try{URL.revokeObjectURL(cached)}catch(_){ }deviceImageUrlCacheV1015.delete(path)}
+  return {path,storage,thumbnail,fileName:file?.name||'',bytes:Number(blob.size||0)};
+}
+
+async function readDeviceImageLocalV1015(device){
+  const path=device?.imagePath;
+  if(!path)return null;
+  let blob=null;
+  if(device.imageStorage==='indexeddb'){
+    blob=await deviceImageReadIdbV1015(path);
+  }else{
+    try{blob=await deviceImageReadOpfsV1015(path)}catch(_){blob=await deviceImageReadIdbV1015(path)}
+  }
+  return blob instanceof Blob?blob:null;
+}
+async function deviceImageUrlV1015(device){
+  const path=device?.imagePath;
+  if(!path)return '';
+  if(deviceImageUrlCacheV1015.has(path))return deviceImageUrlCacheV1015.get(path);
+  try{
+    const blob=await readDeviceImageLocalV1015(device);
+    if(!blob)return '';
+    const url=URL.createObjectURL(blob);
+    deviceImageUrlCacheV1015.set(path,url);
+    return url;
+  }catch(_){return ''}
+}
+async function deleteDeviceImageLocalV1015(device){
+  const path=device?.imagePath;
+  if(!path)return;
+  await Promise.allSettled([deviceImageDeleteOpfsV1015(path),deviceImageDeleteIdbV1015(path)]);
+  const cached=deviceImageUrlCacheV1015.get(path);
+  if(cached){try{URL.revokeObjectURL(cached)}catch(_){ }deviceImageUrlCacheV1015.delete(path)}
+}
+async function hydrateDeviceImagesV1015(devices){
+  for(const d of devices||[]){
+    if(!d?.imagePath)continue;
+    const el=document.querySelector(`img[data-device-local-id="${CSS.escape(String(d.id))}"]`);
+    if(!el)continue;
+    const url=await deviceImageUrlV1015(d);
+    if(url)el.src=url;
+  }
+}
+function updateDeviceImageStorageStatusV1015(device){
+  const el=$('devImageStorageStatus');
+  if(!el)return;
+  if(device?.imagePath){
+    el.innerHTML=`Saved locally: <b>${esc(device.imagePath)}</b>${device.imageFileName?` • Source: ${esc(device.imageFileName)}`:''}`;
+    el.className='device-image-storage-status saved';
+  }else if(device?.image){
+    el.textContent='Legacy embedded image. Select an image and save once to move it to local image storage.';
+    el.className='device-image-storage-status legacy';
+  }else{
+    el.textContent='No image selected.';
+    el.className='device-image-storage-status';
+  }
+}
+
+/* Replace Device Master rendering so it prefers the local file and falls back
+   to the lightweight synced preview on another PC/browser. */
+renderDevices=function(){
+  const q=($('deviceSearch')?.value||'').toLowerCase();
+  const arr=state.devices.filter(d=>[d.name,d.model,d.brand,d.features].join(' ').toLowerCase().includes(q));
+  $('deviceList').innerHTML=arr.length?arr.map(d=>`<div class="device-card">${(d.image||d.imagePath)?`<img class="device-master-image" data-device-local-id="${esc(d.id)}" src="${d.image||''}" alt="${esc(d.name||'Device')}">`:''}<b>${esc(d.name)}</b><div>${esc(d.brand||'')} ${esc(d.model||'')}</div><div class="small">Stock: ${money(d.stock)} • Base: LKR ${money(d.price)}</div>${d.imagePath?`<div class="device-local-image-badge">LOCAL IMAGE</div>`:''}<div class="actions"><button class="btn ghost sm" onclick="openDeviceModal('${d.id}')">Edit</button></div></div>`).join(''):'<div class="empty">No devices added.</div>';
+  hydrateDeviceImagesV1015(arr);
+};
+
+const openDeviceModalV1015=openDeviceModal;
+openDeviceModal=function(id=''){
+  const result=openDeviceModalV1015(id);
+  const d=state.devices.find(x=>x.id===id)||null;
+  updateDeviceImageStorageStatusV1015(d);
+  return result;
+};
+if($('devImage'))$('devImage').addEventListener('change',()=>{
+  const f=$('devImage').files?.[0];
+  const el=$('devImageStorageStatus');
+  if(!el)return;
+  if(f){el.textContent=`Ready to save locally: ${f.name}`;el.className='device-image-storage-status ready'}
+  else updateDeviceImageStorageStatusV1015(state.devices.find(x=>x.id===$('devId')?.value));
+});
+
+/* Final Device Master saver for v1.0.15.  The large image never enters the
+   cloud/entity state; only the small preview + logical local path are saved. */
+saveDevice=async function(){
+  try{
+    const existingId=$('devId')?.value||'';
+    if(existingId&&!protectedEdit('save device changes'))return;
+    const old=state.devices.find(x=>x.id===existingId)||{};
+    const deviceId=existingId||uid('dev');
+    const name=$('devName')?.value.trim()||'';
+    const model=$('devModel')?.value.trim()||'';
+    if(!name||!model)return toast('Device name and model are required');
+
+    let image=old.image||'';
+    let imagePath=old.imagePath||'';
+    let imageStorage=old.imageStorage||'';
+    let imageFileName=old.imageFileName||'';
+    const file=$('devImage')?.files?.[0];
+
+    if(file){
+      try{
+        const asset=await saveDeviceImageLocalV1015(deviceId,file);
+        image=asset.thumbnail||image;
+        imagePath=asset.path;
+        imageStorage=asset.storage;
+        imageFileName=asset.fileName;
+      }catch(imageErr){
+        console.error('Local device image save failed. Device data will still be saved.',imageErr);
+        try{
+          const preview=await fileDataUrl(file);
+          image=await deviceImageThumbnailV1015(preview)||image;
+        }catch(_){ }
+        toast('Image local save failed; device details will still be saved');
+      }
+    }
+
+    const categoryIds=checkedCategories('devCat');
+    const d={
+      ...old,
+      id:deviceId,
+      name,
+      model,
+      serial:$('devSerial')?.value.trim()||'',
+      brand:$('devBrand')?.value.trim()||'',
+      cost:Number($('devCost')?.value||0),
+      price:Number($('devPrice')?.value||0),
+      stock:Number($('devStock')?.value||0),
+      features:$('devFeatures')?.value.trim()||'',
+      d1:Number($('devD1')?.value||0),
+      d2:Number($('devD2')?.value||5),
+      d3:Number($('devD3')?.value||10),
+      d4:Number($('devD4')?.value||15),
+      supplier:$('devSupplier')?.value.trim()||'',
+      warranty:$('devWarranty')?.value.trim()||'',
+      categoryIds,
+      image,
+      imagePath,
+      imageStorage,
+      imageFileName
+    };
+
+    const i=state.devices.findIndex(x=>x.id===deviceId);
+    if(i>=0)state.devices[i]=d;else state.devices.push(d);
+    audit(i>=0?'EDIT_DEVICE':'ADD_DEVICE',`${d.name} ${d.model}`);
+    saveState();
+    renderDevices();
+    closeModal('deviceModal');
+    toast(file&&imagePath?'Device saved • image stored locally':'Device saved');
+  }catch(err){
+    console.error('Save Device failed',err);
+    toast(`Device save failed${err?.message?': '+err.message:''}`);
+  }
+};
+
+const deleteDeviceV1015=deleteDevice;
+deleteDevice=async function(){
+  const id=$('devId')?.value||'';
+  const before=state.devices.find(x=>x.id===id);
+  const result=deleteDeviceV1015();
+  if(before&&!state.devices.some(x=>x.id===id))await deleteDeviceImageLocalV1015(before);
+  return result;
+};
+
 function buildDeviceDocV7(doc){const t=docTotals(doc),vat=doc.vatMode==='vat18',r=Number(state.settings.vat||18)/100,lines=activeDocLines(doc);const blocks=lines.map((l,i)=>{const d=state.devices.find(x=>x.id===l.itemId)||{},features=String(l.features||d.features||'').split(/\n+/).filter(Boolean),unit=vat?Number(l.price)/(1+r):Number(l.price),amount=unit*Number(l.qty||0);return `<div class="device-quote-card"><div class="device-card-head"><span>DEVICE ${String(i+1).padStart(2,'0')}</span><b>${esc(l.desc||d.name||'Device')}</b></div><div class="device-card-body">${d.image?`<div class="device-image-white"><img src="${d.image}"></div>`:''}<div><div class="device-model">${esc(d.brand||l.material||'')} ${esc(d.model||l.size||'')}</div>${d.supplier?`<div class="waternote">Supplier: ${esc(d.supplier)}</div>`:''}${d.warranty?`<div class="warranty-chip">Warranty: ${esc(d.warranty)}</div>`:''}<div class="feature-grid">${features.map(f=>`<div>✓ ${esc(f)}</div>`).join('')}</div><div class="device-price-row"><span>Qty <b>${money(l.qty)}</b></span><span>Unit ${vat?'Excl. VAT ':''}<b>LKR ${money(unit)}</b></span><span>Amount <b>LKR ${money(amount)}</b></span></div></div></div></div>`}).join('');const summary=vat?`<div class="commercial-summary"><div class="sumrow"><span>Subtotal (Excl. VAT)</span><b>LKR ${money(t.net)}</b></div><div class="sumrow"><span>VAT 18%</span><b>LKR ${money(t.vat)}</b></div><div class="sumrow grand"><span>TOTAL (Incl. VAT)</span><b>LKR ${money(t.gross)}</b></div></div>`:`<div class="commercial-summary"><div class="sumrow grand"><span>Quotation Value</span><b>LKR ${money(t.gross)}</b></div></div>`;return `<div class="docbody"><div class="dochead"><div class="doctype teal">DEVICE QUOTATION</div><div class="docmeta"><b>QUOTATION NO.</b> ${esc(doc.serial)}<br><b>DATE</b> ${esc(fmtDate(doc.date))}<br><b>VALIDITY</b> ${doc.validity} Days</div></div><div class="customerbox"><div><div class="label">Quoted To</div><div class="custname">${esc(doc.customer?.name||'')}</div><div class="custaddr">${esc(doc.customer?.address||'').replace(/\n/g,'<br>')}<br>${esc(doc.customer?.phone||'')}</div></div><div class="docmeta"><b>PREPARED BY</b> ${esc(doc.createdBy||'')}</div></div><div class="docsection">DEVICES & TECHNICAL SPECIFICATIONS</div>${blocks}${summary}<div class="terms"><h4>DEVICE TERMS & CONDITIONS</h4><div class="termrow"><b>Warranty:</b> One-to-one replacement applies to verified manufacturing defects during the stated warranty period.</div><div class="termrow"><b>Support:</b> Free 24-hour online support and online troubleshooting.</div><div class="termrow"><b>Repairs:</b> Service labour is free after warranty; replacement parts are charged separately.</div><div class="termrow"><b>Delivery:</b> Courier charges apply unless otherwise agreed in writing.</div>${doc.extraNote?`<div class="termrow"><b>Note:</b> ${esc(doc.extraNote)}</div>`:''}</div></div><div class="docfoot"><b>Thank you for the opportunity to quote.</b><span>${esc(state.settings.quoteFooter)}</span></div>`}
 buildDeviceDocHTML=buildDeviceDocV7;
 function paymentSummary(doc){const total=docTotals(doc).gross,history=Array.isArray(doc.paymentHistory)?doc.paymentHistory:[],paid=history.filter(p=>!p.invalid).reduce((s,p)=>s+Number(p.amount||0),0),balance=Math.max(0,total-paid),eps=.01,status=balance<=eps?'paid':paid>eps?'partial':'pending';return {total,paid,balance,status,history}}
@@ -1897,7 +2198,7 @@ function enhanceProductionWorkflowV8(){
   VIEW_PERMS.production='production_manage';VIEW_PERMS.productionproducts='products_view';VIEW_PERMS.stores='stores_receive';
   state.productionRequests=state.productionRequests||[];state.notifications=state.notifications||[];state.grns=state.grns||[];
   const style=document.createElement('style');style.textContent=`
-  .prod-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}.prod-kpi{background:#f7fbfc;border:1px solid #d6e6e8;border-radius:13px;padding:12px}.prod-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.prod-kpi b{font-size:19px}.prod-board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.prod-col{background:#f5f8f9;border:1px solid #dce7e9;border-radius:12px;padding:8px;min-height:160px}.prod-col h4{margin:2px 3px 8px;color:#087f83}.prod-card{position:relative;background:#fff;border:1px solid #d5e4e6;border-left:5px solid #079c9f;border-radius:10px;padding:10px;margin-bottom:8px}.prod-card.urgent{border-left-color:#d74a4a}.prod-card.finished{border-left-color:#16885b}.prod-card.has-unread-update{padding-bottom:72px}.prod-update-gif{position:absolute;right:8px;bottom:8px;width:58px;height:58px;object-fit:contain;z-index:5;pointer-events:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,.18))}.prod-meta{font-size:10px;color:#65767d;line-height:1.5}.prod-status{font-weight:900;font-size:10px;padding:4px 7px;border-radius:12px;background:#e8f6f6;color:#087f83}.prod-history{border-left:2px solid #bddadc;margin:8px 0 0 5px;padding-left:10px;font-size:10px}.supply-pill{display:inline-block;padding:3px 7px;border-radius:12px;font-size:9px;font-weight:900;background:#e9f7f1;color:#087247}.supply-pill.production{background:#fff1d3;color:#995d00}.notification-dot{background:#d74a4a;color:#fff;border-radius:50%;font-size:9px;padding:2px 5px}.grn-ok{color:#087247;font-weight:900}.grn-bad{color:#bd2525;font-weight:900}.proof-thumb{max-width:180px;max-height:110px;border-radius:8px;border:1px solid #d5e4e6}.production-line{display:grid;grid-template-columns:28px 1.4fr 1fr .8fr 1fr;gap:7px;align-items:center;padding:8px;border-bottom:1px solid #e3ecee}.production-line input,.production-line select{padding:8px}.prod-summary-note{background:#eefafa;border:1px solid #b9dfdf;border-radius:10px;padding:9px;margin:8px 0;font-size:10px}.pp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}.pp-kpi{background:linear-gradient(135deg,#f7fbfc,#fff);border:1px solid #d6e6e8;border-radius:14px;padding:13px}.pp-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.pp-kpi b{display:block;font-size:21px;margin-top:4px}.pp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pp-card{background:#fff;border:1px solid #d5e4e6;border-radius:15px;padding:14px;box-shadow:0 7px 20px rgba(21,54,66,.06)}.pp-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pp-card-title{font-size:15px;font-weight:1000;color:#17353d}.pp-spec{font-size:10px;color:#64777f;line-height:1.5;margin-top:3px}.pp-stats{
+  .prod-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}.prod-kpi{background:#f7fbfc;border:1px solid #d6e6e8;border-radius:13px;padding:12px}.prod-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.prod-kpi b{font-size:19px}.prod-board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.prod-col{background:#f5f8f9;border:1px solid #dce7e9;border-radius:12px;padding:8px;min-height:160px}.prod-col h4{margin:2px 3px 8px;color:#087f83}.prod-card{position:relative;background:#fff;border:1px solid #d5e4e6;border-left:5px solid #079c9f;border-radius:10px;padding:10px;margin-bottom:8px}.prod-card.urgent{border-left-color:#d74a4a}.prod-card.finished{border-left-color:#16885b}.prod-card.has-unread-update{padding-bottom:72px}.prod-update-gif{position:absolute;right:8px;bottom:8px;width:58px;height:58px;object-fit:contain;z-index:5;pointer-events:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,.18))}.prod-meta{font-size:10px;color:#65767d;line-height:1.5}.prod-status{font-weight:900;font-size:10px;padding:4px 7px;border-radius:12px;background:#e8f6f6;color:#087f83}.prod-history{border-left:2px solid #bddadc;margin:8px 0 0 5px;padding-left:10px;font-size:10px}.supply-pill{display:inline-block;padding:3px 7px;border-radius:12px;font-size:9px;font-weight:900;background:#e9f7f1;color:#087247}.supply-pill.production{background:#fff1d3;color:#995d00}.notification-dot{background:#d74a4a;color:#fff;border-radius:50%;font-size:9px;padding:2px 5px}.grn-ok{color:#087247;font-weight:900}.grn-bad{color:#bd2525;font-weight:900}.proof-thumb{max-width:180px;max-height:110px;border-radius:8px;border:1px solid #d5e4e6}.production-line{display:grid;grid-template-columns:28px 1.4fr 1fr .8fr 1fr;gap:7px;align-items:center;padding:8px;border-bottom:1px solid #e3ecee}.production-line input,.production-line select{padding:8px}.prod-summary-note{background:#eefafa;border:1px solid #b9dfdf;border-radius:10px;padding:9px;margin:8px 0;font-size:10px}.pp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}.pp-kpi{background:linear-gradient(135deg,#f7fbfc,#fff);border:1px solid #d6e6e8;border-radius:14px;padding:13px}.pp-kpi span{display:block;font-size:9px;font-weight:900;color:#687b82;text-transform:uppercase}.pp-kpi b{display:block;font-size:21px;margin-top:4px}.pp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pp-card{background:#fff;border:1px solid #d5e4e6;border-radius:15px;padding:14px;box-shadow:0 7px 20px rgba(21,54,66,.06)}.pp-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pp-card-title{font-size:15px;font-weight:1000;color:#17353d}.pp-spec{font-size:14px;font-weight:800;color:#536970;line-height:1.55;margin-top:5px}.pp-stats{
     display:grid;
     grid-template-columns:repeat(4,1fr);
     gap:7px;
