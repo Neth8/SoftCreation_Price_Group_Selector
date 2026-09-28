@@ -2637,7 +2637,21 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
  function navBtn(id,label){if(document.querySelector(`[data-view="${id}"]`))return;const b=document.createElement('button');b.className='navbtn';b.dataset.view=id;b.textContent=label;b.onclick=()=>showView(id);nav.insertBefore(b,settingsBtn)}
  navBtn('branchportal','Approved Prices');navBtn('quoterequests','Quote Requests');
  document.querySelector('#settings').insertAdjacentHTML('beforebegin',`
- <section id="branchportal" class="view"><div class="panel"><div class="panel-title">Branch Network — Approved Price Portal</div><div class="panel-body"><div class="branch-hero"><h2>Approved Selling Prices</h2><p>Calculate labels and view approved device, ribbon and paper prices without accessing cost or master data.</p></div><div class="portal-grid"><div><div class="portal-card"><h3>Label Price Calculator</h3><div class="price-inputs"><div class="field"><label>Material</label><select id="bpMaterial"><option>TT</option><option>DT TOP</option><option>PVC</option><option selected>DT ECO</option><option>HIGHSTICK</option></select></div><div class="field"><label>Width (mm)</label><input id="bpWidth" type="number" value="38" min="0.01"></div><div class="field"><label>Height (mm)</label><input id="bpHeight" type="number" value="25" min="0.01"></div><div class="field"><label>Ups</label><input id="bpUps" type="number" value="1" min="1"></div><div class="field"><label>Pieces / Roll</label><input id="bpPcs" type="number" value="1000" min="1"></div></div><div class="field" style="margin-top:10px;max-width:420px"><label>Select Price Group</label><select id="bpPriceGroup" onchange="bpSelectTier(this.value)"></select><div id="bpSelectedGroupHint" class="hint"></div></div><div id="bpLabelPrices" class="portal-prices" style="margin-top:10px"></div><div class="actions"><input id="bpLabelQty" type="number" value="1" min="1" style="width:110px"><button class="btn primary" onclick="bpAddLabel()">Add Selected Label</button></div></div><div class="portal-card" style="margin-top:12px"><h3>Approved Devices</h3><div id="bpDevices"></div></div><div class="portal-card" style="margin-top:12px"><h3>Approved Ribbon & Paper</h3><div id="bpProducts"></div></div></div><div><div class="portal-card"><h3>Quotation Request</h3><div class="grid"><div class="field full"><label>Customer / Company</label><input id="bpCustomer"></div><div class="field"><label>Contact Number</label><input id="bpPhone"></div><div class="field"><label>Email</label><input id="bpEmail"></div><div class="field full"><label>Address / Delivery Location</label><textarea id="bpAddress"></textarea></div><div class="field"><label>Payment Mode</label><select id="bpPayMode"><option value="cash">Cash</option><option value="credit">Credit</option></select></div><div class="field"><label>VAT Requirement</label><select id="bpVat"><option value="none">No VAT Breakdown</option><option value="vat18">VAT Breakdown</option></select></div><div class="field full"><label>Request Note</label><textarea id="bpNote" placeholder="Delivery, validity or special instructions"></textarea></div></div><div id="bpCart" class="portal-cart"></div><div class="actions"><button class="btn green" onclick="submitBranchQuoteRequest()">Send Quotation Request</button><button class="btn ghost" onclick="bpClearCart()">Clear</button></div></div><div class="portal-card" style="margin-top:12px"><h3>My Requests</h3><div id="bpMyRequests"></div></div></div></div></div></div></section>
+ <section id="branchportal" class="view"><div class="panel"><div class="panel-title">Branch Network — Approved Price Portal</div><div class="panel-body"><div class="branch-hero"><h2>Approved Selling Prices</h2><p>Calculate labels and view approved device, ribbon and paper prices without accessing cost or master data.</p></div><div class="portal-grid"><div><div class="portal-card"><h3>Label Price Calculator</h3><div class="price-inputs"><div class="field"><label>Material</label><select id="bpMaterial"><option>TT</option><option>DT TOP</option><option>PVC</option><option selected>DT ECO</option><option>HIGHSTICK</option></select></div><div class="field"><label>Width (mm)</label><input id="bpWidth" type="number" value="38" min="0.01"></div><div class="field"><label>Height (mm)</label><input id="bpHeight" type="number" value="25" min="0.01"></div><div class="field"><label>Ups</label><input id="bpUps" type="number" value="1" min="1"></div><div class="field"><label>Pieces / Roll</label><input id="bpPcs" type="number" value="1000" min="1"></div></div><div class="field" style="margin-top:10px;max-width:420px"><label>Select Price Group</label><select id="bpPriceGroup" onchange="bpSelectTier(this.value)"></select><div id="bpSelectedGroupHint" class="hint"></div></div><div id="bpLabelPrices" class="portal-prices" style="margin-top:10px"></div><div class="actions"><input id="bpLabelQty" type="number" value="1" min="1" style="width:110px"><button class="btn primary" onclick="bpAddLabel()">Add Selected Label</button></div></div><div class="portal-card" style="margin-top:12px"><h3>Approved Devices</h3><div id="bpDevices"></div></div><div class="portal-card" style="margin-top:12px"><h3>Approved Ribbon & Paper</h3><div id="bpProducts"></div></div></div><div><div class="portal-card"><h3>Quotation Request</h3><div class="grid"><div class="field full"><label>Customer / Company</label><input id="bpCustomer"></div><div class="field"><label>Contact Number</label><input id="bpPhone"></div><div class="field"><label>Email</label><input id="bpEmail"></div><div class="field full"><label>Address / Delivery Location</label><textarea id="bpAddress"></textarea></div><div class="field"><label>Payment Mode</label><select id="bpPayMode"><option value="cash">Cash</option><option value="credit">Credit</option></select></div><div class="field"><label>VAT Requirement</label><select id="bpVat"><option value="none">No VAT Breakdown</option><option value="vat18">VAT Breakdown</option></select></div><div class="field full"><label>Request Note</label><div class="field full">
+  <label>Request Note</label>
+  <textarea
+    id="bpNote"
+    placeholder="Validity, special instructions or other notes"
+  ></textarea>
+</div>
+
+<div class="field full">
+  <label>Delivery Address</label>
+  <textarea
+    id="bpDeliveryAddress"
+    placeholder="Enter the delivery address for this quotation request"
+  ></textarea>
+</div></div></div><div id="bpCart" class="portal-cart"></div><div class="actions"><button class="btn green" onclick="submitBranchQuoteRequest()">Send Quotation Request</button><button class="btn ghost" onclick="bpClearCart()">Clear</button></div></div><div class="portal-card" style="margin-top:12px"><h3>My Requests</h3><div id="bpMyRequests"></div></div></div></div></div></div></section>
  <section id="quoterequests" class="view"><div class="panel"><div class="panel-title">Branch Quotation Request Desk</div><div class="panel-body"><div class="notice">Open a request and convert it directly into a quotation draft. Requested item prices remain frozen.</div><div class="listbar"><select id="brStatusFilter" onchange="renderBranchRequests()"><option value="">All statuses</option><option>Pending</option><option>In Review</option><option>Completed</option><option>Rejected</option></select></div><div id="branchRequestList"></div></div></div></section>`);
  let bpCart=[],bpSelectedTier='';window.bpSelectTier=function(id){bpSelectedTier=id;bpCalculate()};
  function allowedCats(type){const u=userRecord()||currentUser;return (state.priceCategories||[]).filter(c=>c.active!==false&&(c.appliesTo||[]).includes(type)&&(currentUser?.role==='admin'||(u?.priceCategoryIds||[]).includes(c.id)))}
@@ -2648,12 +2662,530 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
  function renderBpCart(){const total=bpCart.reduce((s,l)=>s+l.qty*l.price,0);$('bpCart').innerHTML=bpCart.length?`<table class="table"><thead><tr><th>Item</th><th>Tier</th><th>Qty</th><th>Price</th><th>Amount</th><th></th></tr></thead><tbody>${bpCart.map((l,i)=>`<tr><td><b>${esc(l.desc)}</b><div class="small">${esc([l.size,l.material,l.layout,l.pcs?l.pcs+' pcs':''].filter(Boolean).join(' / '))}</div></td><td>${esc(l.priceTier)}</td><td>${money(l.qty)} ${esc(l.unit)}</td><td>LKR ${money(l.price)}</td><td><b>LKR ${money(l.qty*l.price)}</b></td><td><button class="btn red sm" onclick="bpCart.splice(${i},1);renderBpCart()">×</button></td></tr>`).join('')}</tbody></table><div class="sumline"><span>Requested Item Total</span><strong>LKR ${money(total)}</strong></div>`:'<div class="empty">Add approved items to prepare a request.</div>'}
  window.renderBpCart=renderBpCart;window.bpClearCart=function(){bpCart=[];renderBpCart()};
  function assignedHandler(){const u=userRecord();return u?.quoteHandler||state.users.find(x=>x.role==='manager'&&x.active!==false)?.username||'admin'}
- window.submitBranchQuoteRequest=function(){if(!bpCart.length)return toast('Add at least one item');const customer=$('bpCustomer').value.trim(),phone=$('bpPhone').value.trim(),email=$('bpEmail').value.trim();if(!customer||(!phone&&!email))return toast('Customer name and phone or email are required');const r={id:uid('qreq'),requestNo:`BR/QR/${today().replaceAll('-','')}/${String((state.quoteRequests.length||0)+1).padStart(3,'0')}`,date:today(),status:'Pending',requester:currentUser.username,requesterName:currentUser.display,handler:assignedHandler(),customer:{name:customer,phone,email,address:$('bpAddress').value.trim()},payMode:$('bpPayMode').value,vatMode:$('bpVat').value,note:$('bpNote').value.trim(),lines:JSON.parse(JSON.stringify(bpCart)),createdAt:new Date().toISOString(),history:[{status:'Pending',by:currentUser.display,at:new Date().toISOString()}]};state.quoteRequests.unshift(r);notifyV8(r.handler,'Branch Quotation Request',`${r.requestNo} • ${customer} • ${r.lines.length} item(s)`,r.id);audit('BRANCH_QUOTE_REQUEST',`${r.requestNo} ${customer}`);saveState();bpClearCart();['bpCustomer','bpPhone','bpEmail','bpAddress','bpNote'].forEach(id=>$(id).value='');renderMyBranchRequests();toast(`Request ${r.requestNo} sent`)};
+window.submitBranchQuoteRequest=function(){
+
+  if(!bpCart.length){
+    return toast('Add at least one item');
+  }
+
+  const customer =
+    $('bpCustomer').value.trim();
+
+  const phone =
+    $('bpPhone').value.trim();
+
+  const email =
+    $('bpEmail').value.trim();
+
+  if(
+    !customer ||
+    (!phone && !email)
+  ){
+    return toast(
+      'Customer name and phone or email are required'
+    );
+  }
+
+
+  const r = {
+
+    id:uid('qreq'),
+
+    requestNo:
+      `BR/QR/${today().replaceAll('-','')}/${String(
+        (state.quoteRequests.length || 0) + 1
+      ).padStart(3,'0')}`,
+
+    date:today(),
+
+    status:'Pending',
+
+    requester:currentUser.username,
+
+    requesterName:currentUser.display,
+
+    handler:assignedHandler(),
+
+
+    customer:{
+      name:customer,
+      phone:phone,
+      email:email,
+
+      // Existing customer / billing address
+      address:
+        $('bpAddress').value.trim(),
+
+      // NEW request-specific delivery address
+      delivery:
+        $('bpDeliveryAddress').value.trim()
+    },
+
+
+    payMode:
+      $('bpPayMode').value,
+
+    vatMode:
+      $('bpVat').value,
+
+    note:
+      $('bpNote').value.trim(),
+
+    lines:
+      JSON.parse(
+        JSON.stringify(bpCart)
+      ),
+
+    createdAt:
+      new Date().toISOString(),
+
+    history:[
+      {
+        status:'Pending',
+        by:currentUser.display,
+        at:new Date().toISOString()
+      }
+    ]
+
+  };
+
+
+  state.quoteRequests.unshift(r);
+
+
+  notifyV8(
+    r.handler,
+    'Branch Quotation Request',
+    `${r.requestNo} • ${customer} • ${r.lines.length} item(s)`,
+    r.id
+  );
+
+
+  audit(
+    'BRANCH_QUOTE_REQUEST',
+    `${r.requestNo} ${customer}`
+  );
+
+
+  saveState();
+
+  bpClearCart();
+
+
+  [
+    'bpCustomer',
+    'bpPhone',
+    'bpEmail',
+    'bpAddress',
+    'bpNote',
+    'bpDeliveryAddress'
+  ].forEach(id=>{
+
+    if($(id)){
+      $(id).value='';
+    }
+
+  });
+
+
+  renderMyBranchRequests();
+
+  toast(
+    `Request ${r.requestNo} sent`
+  );
+
+};
  function requestVisible(r){return currentUser?.role==='admin'||r.requester===currentUser?.username||r.handler===currentUser?.username||hasPerm('manage_quote_requests')}
  function renderMyBranchRequests(){$('bpMyRequests').innerHTML=(state.quoteRequests||[]).filter(r=>r.requester===currentUser?.username).slice(0,12).map(r=>`<div class="portal-item"><b>${esc(r.requestNo)}</b> • ${esc(r.customer.name)} <span class="request-status ${r.status.toLowerCase()}">${esc(r.status)}</span><div class="small">${esc(r.date)} • ${r.lines.length} items • Handler: ${esc(ownerDisplay(r.handler))}${r.quoteSerial?` • Quotation ${esc(r.quoteSerial)}`:''}</div></div>`).join('')||'<div class="empty">No requests submitted.</div>'}
- window.renderBranchRequests=function(){const f=$('brStatusFilter')?.value||'',a=(state.quoteRequests||[]).filter(r=>requestVisible(r)&&(!f||r.status===f));$('branchRequestList').innerHTML=a.length?`<table class="table"><thead><tr><th>Request</th><th>Branch User</th><th>Customer</th><th>Items / Value</th><th>Status</th><th></th></tr></thead><tbody>${a.map(r=>`<tr><td><b>${esc(r.requestNo)}</b><div class="small">${esc(r.date)} • Assigned ${esc(ownerDisplay(r.handler))}</div></td><td>${esc(r.requesterName)}<div class="small">${esc(r.requester)}</div></td><td><b>${esc(r.customer.name)}</b><div class="small">${esc(r.customer.phone||r.customer.email)}</div></td><td>${r.lines.length} item(s)<div class="small">LKR ${money(r.lines.reduce((s,l)=>s+l.qty*l.price,0))}</div></td><td><span class="request-status ${r.status.toLowerCase()}">${esc(r.status)}</span>${r.quoteSerial?`<div class="small">${esc(r.quoteSerial)}</div>`:''}</td><td><button class="btn ghost sm" onclick="openBranchRequest('${r.id}')">Open</button>${r.status!=='Completed'?` <button class="btn primary sm" onclick="convertBranchRequest('${r.id}')">Make Quotation</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">No quotation requests.</div>'};
+window.renderBranchRequests=function(){
+
+  const f =
+    $('brStatusFilter')?.value || '';
+
+  const a =
+    (state.quoteRequests || [])
+    .filter(
+      r=>
+        requestVisible(r) &&
+        (!f || r.status === f)
+    );
+
+
+  $('branchRequestList').innerHTML =
+    a.length
+
+    ? `
+      <table class="table">
+
+        <thead>
+          <tr>
+            <th>Request</th>
+            <th>Branch User</th>
+            <th>Customer</th>
+            <th>Items / Value</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody>
+
+          ${a.map(r=>`
+
+            <tr>
+
+              <td>
+
+                <b>
+                  ${esc(r.requestNo)}
+                </b>
+
+                <div class="small">
+                  ${esc(r.date)}
+                  • Assigned
+                  ${esc(ownerDisplay(r.handler))}
+                </div>
+
+              </td>
+
+
+              <td>
+
+                ${esc(r.requesterName)}
+
+                <div class="small">
+                  ${esc(r.requester)}
+                </div>
+
+              </td>
+
+
+              <td>
+
+                <b>
+                  ${esc(r.customer.name)}
+                </b>
+
+                <div class="small">
+                  ${esc(
+                    r.customer.phone ||
+                    r.customer.email ||
+                    ''
+                  )}
+                </div>
+
+
+                ${
+                  r.customer.address
+                    ? `
+                      <div class="small">
+                        <b>Address:</b>
+                        ${esc(r.customer.address)}
+                      </div>
+                    `
+                    : ''
+                }
+
+
+                ${
+                  r.customer.delivery
+                    ? `
+                      <div
+                        class="small"
+                        style="
+                          margin-top:4px;
+                          color:#087f83;
+                          font-weight:700
+                        "
+                      >
+                        <b>Delivery:</b>
+                        ${esc(r.customer.delivery)}
+                      </div>
+                    `
+                    : ''
+                }
+
+              </td>
+
+
+              <td>
+
+                ${r.lines.length} item(s)
+
+                <div class="small">
+                  LKR
+                  ${money(
+                    r.lines.reduce(
+                      (s,l)=>s+l.qty*l.price,
+                      0
+                    )
+                  )}
+                </div>
+
+              </td>
+
+
+              <td>
+
+                <span
+                  class="request-status ${r.status.toLowerCase()}"
+                >
+                  ${esc(r.status)}
+                </span>
+
+                ${
+                  r.quoteSerial
+                    ? `
+                      <div class="small">
+                        ${esc(r.quoteSerial)}
+                      </div>
+                    `
+                    : ''
+                }
+
+              </td>
+
+
+              <td>
+
+                <button
+                  class="btn ghost sm"
+                  onclick="openBranchRequest('${r.id}')"
+                >
+                  Open
+                </button>
+
+                ${
+                  r.status !== 'Completed'
+                    ? `
+                      <button
+                        class="btn primary sm"
+                        onclick="convertBranchRequest('${r.id}')"
+                      >
+                        Make Quotation
+                      </button>
+                    `
+                    : ''
+                }
+
+              </td>
+
+            </tr>
+
+          `).join('')}
+
+        </tbody>
+
+      </table>
+    `
+
+    : `
+      <div class="empty">
+        No quotation requests.
+      </div>
+    `;
+
+};
  window.openBranchRequest=function(id){const r=state.quoteRequests.find(x=>x.id===id);if(!r||!requestVisible(r))return;alert(`${r.requestNo}\nCustomer: ${r.customer.name}\n\n${r.lines.map(l=>`${l.desc} | ${l.size} | ${l.qty} ${l.unit} x LKR ${money(l.price)}`).join('\n')}\n\nNote: ${r.note||'-'}`)};
- window.convertBranchRequest=function(id){const r=state.quoteRequests.find(x=>x.id===id);if(!r||!requestVisible(r)||!hasPerm('manage_quote_requests'))return toast('Request manager privilege required');let c=state.customers.find(x=>x.ownerUser===currentUser.username&&(x.phone&&x.phone===r.customer.phone||x.name.toLowerCase()===r.customer.name.toLowerCase()));if(!c){c={id:uid('cust'),name:r.customer.name,phone:r.customer.phone,email:r.customer.email,address:r.customer.address,delivery:'',map:'',vat:'',specialPrices:{},priceHistory:[],ownerUser:currentUser.username,sourceRequestId:r.id};state.customers.push(c)}const hasDevice=r.lines.some(x=>x.kind==='device'),hasOther=r.lines.some(x=>x.kind!=='device');if(hasDevice&&hasOther)return toast('Device and label/product items require separate quotation requests');newDocument('Q',hasDevice?'device':'label');refreshCustomerPick();$('customerSelect').value=c.id;fillCustomer(c.id);$('payMode').value=r.payMode;$('vatMode').value=r.vatMode;state.current.sourceBranchRequestId=r.id;renderLineRows(r.lines.map(l=>({...l,use:true,costSnapshot:null})));r.status='In Review';r.history.push({status:'In Review',by:currentUser.display,at:new Date().toISOString()});saveState();renderCurrent();toast('Quotation draft created from branch request')};
+window.convertBranchRequest=function(id){
+
+  const r =
+    state.quoteRequests.find(
+      x=>x.id===id
+    );
+
+
+  if(
+    !r ||
+    !requestVisible(r) ||
+    !hasPerm('manage_quote_requests')
+  ){
+
+    return toast(
+      'Request manager privilege required'
+    );
+
+  }
+
+
+  let c =
+    state.customers.find(
+      x=>
+        x.ownerUser === currentUser.username &&
+        (
+          (
+            x.phone &&
+            x.phone === r.customer.phone
+          )
+          ||
+          (
+            x.name &&
+            r.customer.name &&
+            x.name.toLowerCase() ===
+            r.customer.name.toLowerCase()
+          )
+        )
+    );
+
+
+  /* -----------------------------------------
+     Create customer if it does not exist
+     ----------------------------------------- */
+
+  if(!c){
+
+    c = {
+
+      id:uid('cust'),
+
+      name:
+        r.customer.name,
+
+      phone:
+        r.customer.phone,
+
+      email:
+        r.customer.email,
+
+      address:
+        r.customer.address,
+
+      // NEW
+      delivery:
+        r.customer.delivery || '',
+
+      map:'',
+
+      vat:'',
+
+      specialPrices:{},
+
+      priceHistory:[],
+
+      ownerUser:
+        currentUser.username,
+
+      sourceRequestId:
+        r.id
+
+    };
+
+
+    state.customers.push(c);
+
+  }
+
+
+  const hasDevice =
+    r.lines.some(
+      x=>x.kind==='device'
+    );
+
+  const hasOther =
+    r.lines.some(
+      x=>x.kind!=='device'
+    );
+
+
+  if(
+    hasDevice &&
+    hasOther
+  ){
+
+    return toast(
+      'Device and label/product items require separate quotation requests'
+    );
+
+  }
+
+
+  /* -----------------------------------------
+     Create quotation
+     ----------------------------------------- */
+
+  newDocument(
+    'Q',
+    hasDevice
+      ? 'device'
+      : 'label'
+  );
+
+
+  refreshCustomerPick();
+
+
+  $('customerSelect').value =
+    c.id;
+
+
+  fillCustomer(c.id);
+
+
+  /* -----------------------------------------
+     REQUEST-SPECIFIC DELIVERY ADDRESS
+     Always wins over saved customer delivery.
+     ----------------------------------------- */
+
+  if($('deliveryAddress')){
+
+    $('deliveryAddress').value =
+      r.customer.delivery ||
+      c.delivery ||
+      '';
+
+  }
+
+
+  $('payMode').value =
+    r.payMode;
+
+
+  $('vatMode').value =
+    r.vatMode;
+
+
+  state.current.sourceBranchRequestId =
+    r.id;
+
+
+  renderLineRows(
+
+    r.lines.map(
+      l=>({
+        ...l,
+        use:true,
+        costSnapshot:null
+      })
+    )
+
+  );
+
+
+  r.status =
+    'In Review';
+
+
+  r.history.push({
+
+    status:'In Review',
+
+    by:currentUser.display,
+
+    at:new Date().toISOString()
+
+  });
+
+
+  saveState();
+
+  renderCurrent();
+
+
+  toast(
+    'Quotation draft created from branch request'
+  );
+
+};
  const persist85=persistCurrentDocument;persistCurrentDocument=async function(){const reqId=state.current?.sourceBranchRequestId,res=await persist85();if(res&&reqId){const r=state.quoteRequests.find(x=>x.id===reqId);if(r){r.status='Completed';r.quoteId=res.id;r.quoteSerial=res.serial;r.completedBy=currentUser.display;r.completedAt=new Date().toISOString();r.history.push({status:'Completed',by:currentUser.display,at:r.completedAt});notifyV8(r.requester,'Quotation Ready',`${r.requestNo} completed as ${res.serial}`,r.id);saveState();renderBranchRequests()}}return res};
  // Add an explicit handler to User Management and preserve it on save.
  const priceBox=$('userPriceCategoryChoices')?.closest('.field');if(priceBox)priceBox.insertAdjacentHTML('afterend','<div class="field full"><label>Quotation Request Handler</label><select id="userQuoteHandler"><option value="admin">Administrator</option></select><div class="hint">Requests from this branch user are routed to the selected internal user.</div></div>');
