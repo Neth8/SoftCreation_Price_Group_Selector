@@ -5113,5 +5113,889 @@ spgsProductionJson=
   }
 
 })();
+/* =========================================================
+   LABEL MASTER - ERP LIVE STOCK SEARCH
+   ========================================================= */
+
+(function(){
+
+  const LM_ERP_URL =
+    'https://qyxgamverzdmhtvezbft.supabase.co/functions/v1/erp-stock-search';
+
+  const LM_ERP_BRANCH = 2;
+
+  let lmTimer = null;
+  let lmSeq = 0;
+  let lmRows = [];
+  let lmActive = -1;
+
+  const lmCache = new Map();
+
+
+  function lmEsc(v){
+    return typeof esc === 'function'
+      ? esc(String(v ?? ''))
+      : String(v ?? '').replace(/[&<>"']/g,c=>({
+          '&':'&amp;',
+          '<':'&lt;',
+          '>':'&gt;',
+          '"':'&quot;',
+          "'":'&#39;'
+        }[c]));
+  }
+
+
+  function lmMoney(v,currency='LKR'){
+
+    const n = Number(v);
+
+    return Number.isFinite(n)
+      ? `${currency} ${n.toLocaleString(undefined,{
+          minimumFractionDigits:2,
+          maximumFractionDigits:2
+        })}`
+      : '-';
+  }
+
+
+  function lmStockClass(q){
+
+    q = Number(q || 0);
+
+    if(q <= 0) return 'out';
+    if(q <= 5) return 'low';
+
+    return 'ok';
+  }
+
+
+  function lmStockLabel(q){
+
+    q = Number(q || 0);
+
+    if(q <= 0) return 'OUT OF STOCK';
+    if(q <= 5) return 'LOW STOCK';
+
+    return 'IN STOCK';
+  }
+
+
+  function lmInitial(name){
+
+    const txt =
+      String(name || '').trim();
+
+    if(!txt) return 'P';
+
+    return txt
+      .split(/\s+/)
+      .slice(0,2)
+      .map(x=>x.charAt(0))
+      .join('')
+      .toUpperCase();
+  }
+
+
+  function lmSupabaseKey(){
+
+    const key =
+      (
+        localStorage.getItem(
+          'spgs_supabase_browser_key_v1'
+        ) || ''
+      ).trim();
+
+    if(!key){
+
+      throw new Error(
+        'Supabase browser key is not configured on this device.'
+      );
+    }
+
+    return key;
+  }
+
+
+  async function lmERPRequest(q){
+
+    const cacheKey =
+      q.toLowerCase();
+
+    if(lmCache.has(cacheKey)){
+      return lmCache.get(cacheKey);
+    }
+
+
+    const key =
+      lmSupabaseKey();
+
+    const controller =
+      new AbortController();
+
+    const timeout =
+      setTimeout(
+        ()=>controller.abort(),
+        12000
+      );
+
+
+    try{
+
+      const res =
+        await fetch(
+          LM_ERP_URL,
+          {
+            method:'POST',
+
+            headers:{
+              'Content-Type':'application/json',
+              'apikey':key,
+              'Authorization':'Bearer ' + key
+            },
+
+            body:JSON.stringify({
+              q:q,
+              branch_id:LM_ERP_BRANCH
+            }),
+
+            signal:controller.signal
+          }
+        );
+
+
+      let body = {};
+
+      try{
+        body = await res.json();
+      }catch(e){}
+
+
+      if(!res.ok){
+
+        throw new Error(
+          body?.error ||
+          body?.message ||
+          `ERP service returned ${res.status}`
+        );
+      }
+
+
+      if(body?.success === false){
+
+        throw new Error(
+          body?.error ||
+          body?.message ||
+          'ERP search failed.'
+        );
+      }
+
+
+      const rows =
+        Array.isArray(body?.data)
+          ? body.data
+          : [];
+
+
+      lmCache.set(
+        cacheKey,
+        rows
+      );
+
+
+      if(lmCache.size > 30){
+
+        const first =
+          lmCache.keys().next().value;
+
+        lmCache.delete(first);
+      }
+
+
+      return rows;
+
+    }finally{
+
+      clearTimeout(timeout);
+
+    }
+  }
+
+
+  function lmStatus(type,text){
+
+    const el =
+      document.getElementById(
+        'lmErpStockStatus'
+      );
+
+    if(!el) return;
+
+
+    el.className =
+      'erp-lookup-status' +
+      (type ? ' ' + type : '');
+
+
+    el.innerHTML =
+      `<span class="erp-status-dot"></span>${lmEsc(text)}`;
+  }
+
+
+  function lmShowClear(show){
+
+    const btn =
+      document.getElementById(
+        'lmErpStockClear'
+      );
+
+    if(btn){
+      btn.classList.toggle(
+        'show',
+        !!show
+      );
+    }
+  }
+
+
+  function lmHideSuggestions(){
+
+    const box =
+      document.getElementById(
+        'lmErpStockSuggestions'
+      );
+
+    if(box){
+      box.classList.remove('show');
+    }
+
+    lmActive = -1;
+  }
+
+
+  function lmRenderSuggestions(rows){
+
+    const box =
+      document.getElementById(
+        'lmErpStockSuggestions'
+      );
+
+    if(!box) return;
+
+
+    lmRows = rows || [];
+    lmActive = -1;
+
+
+    if(!lmRows.length){
+
+      box.innerHTML = `
+        <div class="erp-suggest-message">
+          No ERP products found for this search.
+        </div>
+      `;
+
+      box.classList.add('show');
+
+      return;
+    }
+
+
+    box.innerHTML =
+      lmRows
+      .slice(0,10)
+      .map((p,i)=>{
+
+        const qty =
+          Number(
+            p.stock_quantity || 0
+          );
+
+        const cls =
+          lmStockClass(qty);
+
+        const meta =
+          [
+            p.category,
+            p.brand
+          ]
+          .filter(Boolean)
+          .join(' • ')
+          ||
+          'ERP Product';
+
+
+        return `
+
+          <button
+            type="button"
+            class="erp-suggestion-item"
+            onclick="lmSelectERPProduct(${i})"
+          >
+
+            <div class="erp-suggestion-avatar">
+              ${lmEsc(
+                lmInitial(p.name)
+              )}
+            </div>
+
+
+            <div class="erp-suggestion-main">
+
+              <div class="erp-suggestion-code">
+                ${lmEsc(
+                  p.code || 'NO CODE'
+                )}
+              </div>
+
+
+              <div class="erp-suggestion-name">
+                ${lmEsc(
+                  p.name || '-'
+                )}
+              </div>
+
+
+              <div class="erp-suggestion-meta">
+                ${lmEsc(meta)}
+              </div>
+
+            </div>
+
+
+            <div class="erp-suggestion-right">
+
+              <div class="erp-suggestion-price">
+
+                ${lmEsc(
+                  lmMoney(
+                    p.price,
+                    p.currency || 'LKR'
+                  )
+                )}
+
+              </div>
+
+
+              <div class="erp-suggestion-stock">
+
+                <strong>
+                  ${qty.toLocaleString()}
+                </strong>
+
+                <span class="erp-mini-stock ${cls}">
+                  ${lmStockLabel(qty)}
+                </span>
+
+              </div>
+
+            </div>
+
+          </button>
+
+        `;
+
+      })
+      .join('');
+
+
+    box.classList.add('show');
+  }
+
+
+  function lmRenderSelected(p){
+
+    const box =
+      document.getElementById(
+        'lmErpStockSelected'
+      );
+
+    if(!box) return;
+
+
+    if(!p){
+
+      box.innerHTML = '';
+
+      return;
+    }
+
+
+    const qty =
+      Number(
+        p.stock_quantity || 0
+      );
+
+    const cls =
+      lmStockClass(qty);
+
+
+    const checked =
+      new Date()
+      .toLocaleTimeString(
+        [],
+        {
+          hour:'2-digit',
+          minute:'2-digit'
+        }
+      );
+
+
+    box.innerHTML = `
+
+      <div class="erp-selected-card">
+
+        <div class="erp-selected-top">
+
+          <div class="erp-selected-product">
+
+            <div class="erp-selected-label">
+              ERP PRODUCT SELECTED
+            </div>
+
+
+            <div class="erp-selected-name">
+              ${lmEsc(
+                p.name || '-'
+              )}
+            </div>
+
+
+            <div class="erp-selected-code">
+
+              Product Code:
+
+              <strong>
+                ${lmEsc(
+                  p.code || '-'
+                )}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div class="erp-selected-stock ${cls}">
+
+            <div class="erp-selected-stock-number">
+              ${qty.toLocaleString()}
+            </div>
+
+            <div class="erp-selected-stock-caption">
+              ${lmStockLabel(qty)}
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="erp-selected-grid">
+
+          <div class="erp-selected-info">
+
+            <span>ERP PRICE</span>
+
+            <b>
+              ${lmEsc(
+                lmMoney(
+                  p.price,
+                  p.currency || 'LKR'
+                )
+              )}
+            </b>
+
+          </div>
+
+
+          <div class="erp-selected-info">
+
+            <span>CATEGORY</span>
+
+            <b>
+              ${lmEsc(
+                p.category || '-'
+              )}
+            </b>
+
+          </div>
+
+
+          <div class="erp-selected-info">
+
+            <span>BRAND</span>
+
+            <b>
+              ${lmEsc(
+                p.brand || '-'
+              )}
+            </b>
+
+          </div>
+
+        </div>
+
+
+        <div class="erp-selected-footer">
+
+          <div>
+            Live availability from
+            <strong>
+              ERP Branch ${LM_ERP_BRANCH}
+            </strong>
+          </div>
+
+          <div>
+            Checked ${lmEsc(checked)}
+          </div>
+
+        </div>
+
+      </div>
+
+    `;
+  }
+
+
+  async function lmLoad(q){
+
+    const seq =
+      ++lmSeq;
+
+
+    lmStatus(
+      'loading',
+      `Searching ERP Branch ${LM_ERP_BRANCH}...`
+    );
+
+
+    try{
+
+      const rows =
+        await lmERPRequest(q);
+
+
+      if(seq !== lmSeq){
+        return;
+      }
+
+
+      lmRenderSuggestions(rows);
+
+
+      if(rows.length){
+
+        lmStatus(
+          'ok',
+          `${rows.length} matching ERP product${rows.length === 1 ? '' : 's'} found. Select one to view stock.`
+        );
+
+      }else{
+
+        lmStatus(
+          '',
+          'No ERP product matched your search.'
+        );
+
+      }
+
+
+    }catch(e){
+
+      if(seq !== lmSeq){
+        return;
+      }
+
+
+      console.error(
+        'Label Master ERP search failed',
+        e
+      );
+
+
+      lmStatus(
+        'error',
+        e?.name === 'AbortError'
+          ? 'ERP request timed out.'
+          : (
+              e?.message ||
+              'Could not contact ERP.'
+            )
+      );
+    }
+  }
+
+
+  window.lmErpStockType =
+    function(value){
+
+      const q =
+        String(
+          value || ''
+        ).trim();
+
+
+      clearTimeout(lmTimer);
+
+      lmShowClear(
+        q.length > 0
+      );
+
+      lmRenderSelected(null);
+
+
+      if(q.length < 2){
+
+        lmSeq++;
+        lmRows = [];
+
+        lmHideSuggestions();
+
+        lmStatus(
+          '',
+          'Type at least 2 characters to search ERP products.'
+        );
+
+        return;
+      }
+
+
+      lmStatus(
+        'loading',
+        'Waiting for product search...'
+      );
+
+
+      lmTimer =
+        setTimeout(
+          ()=>lmLoad(q),
+          600
+        );
+    };
+
+
+  window.lmSelectERPProduct =
+    function(index){
+
+      const p =
+        lmRows[index];
+
+      if(!p) return;
+
+
+      const input =
+        document.getElementById(
+          'lmErpStockSearch'
+        );
+
+
+      if(input){
+
+        input.value =
+          `${p.code || ''} — ${p.name || ''}`;
+
+      }
+
+
+      lmShowClear(true);
+
+      lmHideSuggestions();
+
+      lmRenderSelected(p);
+
+
+      lmStatus(
+        'ok',
+        `Live stock loaded from ERP Branch ${LM_ERP_BRANCH}.`
+      );
+    };
+
+
+  function lmRefreshActive(){
+
+    const items =
+      document.querySelectorAll(
+        '#lmErpStockSuggestions .erp-suggestion-item'
+      );
+
+
+    items.forEach(
+      (el,i)=>{
+        el.classList.toggle(
+          'active',
+          i === lmActive
+        );
+      }
+    );
+
+
+    if(
+      lmActive >= 0 &&
+      items[lmActive]
+    ){
+
+      items[lmActive]
+      .scrollIntoView({
+        block:'nearest'
+      });
+
+    }
+  }
+
+
+  window.lmErpStockKey =
+    function(event){
+
+      const box =
+        document.getElementById(
+          'lmErpStockSuggestions'
+        );
+
+
+      if(
+        !box ||
+        !box.classList.contains('show')
+      ){
+        return;
+      }
+
+
+      const count =
+        Math.min(
+          lmRows.length,
+          10
+        );
+
+
+      if(!count) return;
+
+
+      if(event.key === 'ArrowDown'){
+
+        event.preventDefault();
+
+        lmActive =
+          lmActive < count - 1
+            ? lmActive + 1
+            : 0;
+
+        lmRefreshActive();
+
+      }else if(event.key === 'ArrowUp'){
+
+        event.preventDefault();
+
+        lmActive =
+          lmActive > 0
+            ? lmActive - 1
+            : count - 1;
+
+        lmRefreshActive();
+
+      }else if(event.key === 'Enter'){
+
+        event.preventDefault();
+
+        window.lmSelectERPProduct(
+          lmActive >= 0
+            ? lmActive
+            : 0
+        );
+
+      }else if(event.key === 'Escape'){
+
+        lmHideSuggestions();
+
+      }
+    };
+
+
+  window.lmErpStockFocus =
+    function(){
+
+      const input =
+        document.getElementById(
+          'lmErpStockSearch'
+        );
+
+
+      if(
+        input &&
+        input.value.trim().length >= 2 &&
+        lmRows.length
+      ){
+
+        document
+          .getElementById(
+            'lmErpStockSuggestions'
+          )
+          ?.classList
+          .add('show');
+
+      }
+    };
+
+
+  window.lmClearERPStock =
+    function(){
+
+      clearTimeout(lmTimer);
+
+      lmSeq++;
+      lmRows = [];
+      lmActive = -1;
+
+
+      const input =
+        document.getElementById(
+          'lmErpStockSearch'
+        );
+
+
+      if(input){
+
+        input.value = '';
+
+        input.focus();
+
+      }
+
+
+      lmRenderSelected(null);
+
+      lmShowClear(false);
+
+      lmHideSuggestions();
+
+
+      lmStatus(
+        '',
+        'Type at least 2 characters to search ERP products.'
+      );
+    };
+
+
+  document.addEventListener(
+    'click',
+    function(e){
+
+      const wrap =
+        document.getElementById(
+          'lmErpWrap'
+        );
+
+
+      if(
+        wrap &&
+        !wrap.contains(e.target)
+      ){
+
+        lmHideSuggestions();
+
+      }
+    }
+  );
+
+})();
 </script>
 </body></html>
