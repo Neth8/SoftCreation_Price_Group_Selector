@@ -3749,21 +3749,45 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
 
 <!-- CUSTOMER LOGIN ONLY: separate delivery override. Hidden for admin/internal users. -->
 <div class="field full" id="bpCustomerSeparateDeliveryBlock" style="display:none">
+<div class="bp-delivery-toggle">
 
-  <label class="bp-delivery-toggle">
-    <input
-      id="bpSeparateDelivery"
-      type="checkbox"
-      onchange="toggleBpSeparateDelivery()"
-    >
+  <!-- Internal value used by existing request logic -->
+  <input
+    id="bpSeparateDelivery"
+    type="checkbox"
+    hidden
+  >
 
-    <span class="bp-delivery-switch"></span>
+  <button
+    id="bpSeparateDeliveryToggle"
+    class="bp-toggle-btn"
+    type="button"
+    aria-pressed="false"
+    onclick="toggleBpSeparateDeliveryButton()"
+  >
 
-    <span class="bp-delivery-toggle-copy">
-      <b>Deliver to a separate location</b>
-      <small>Turn this on only when delivery is different from the registered customer address.</small>
-    </span>
-  </label>
+    <span class="bp-toggle-off">OFF</span>
+
+    <span class="bp-toggle-on">ON</span>
+
+    <span class="bp-toggle-knob"></span>
+
+  </button>
+
+
+  <span class="bp-delivery-toggle-copy">
+
+    <b>
+      Deliver to a separate location
+    </b>
+
+    <small>
+      Turn this on only when delivery is different from the registered customer address.
+    </small>
+
+  </span>
+
+</div>
 
   <div
     id="bpSeparateDeliveryFields"
@@ -4037,8 +4061,78 @@ window.submitBranchQuoteRequest=function(){
   if($('bpSeparateDelivery')){
     $('bpSeparateDelivery').checked=false;
   }
+window.toggleBpSeparateDeliveryButton =
+function(){
+
+  const checkbox =
+    $('bpSeparateDelivery');
+
+  if(!checkbox){
+    return;
+  }
+
+
+  checkbox.checked =
+    !checkbox.checked;
+
 
   toggleBpSeparateDelivery();
+
+};
+window.toggleBpSeparateDelivery =
+function(){
+
+  const enabled =
+    !!$('bpSeparateDelivery')?.checked;
+
+
+  const fields =
+    $('bpSeparateDeliveryFields');
+
+
+  const toggle =
+    $('bpSeparateDeliveryToggle');
+
+
+  if(fields){
+
+    fields.hidden =
+      !enabled;
+
+  }
+
+
+  if(toggle){
+
+    toggle.setAttribute(
+      'aria-pressed',
+      enabled
+        ? 'true'
+        : 'false'
+    );
+
+  }
+
+
+  [
+    'bpDeliveryLine1',
+    'bpDeliveryLine2',
+    'bpDeliveryContact1'
+  ].forEach(id=>{
+
+    const el =
+      $(id);
+
+    if(el){
+
+      el.required =
+        enabled;
+
+    }
+
+  });
+
+};
 
 
   renderMyBranchRequests();
