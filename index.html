@@ -4462,6 +4462,75 @@ window.renderBranchRequests=function(){
 
 };
  window.openBranchRequest=function(id){const r=state.quoteRequests.find(x=>x.id===id);if(!r||!requestVisible(r))return;alert(`${r.requestNo}\nCustomer: ${r.customer.name}\n\n${r.lines.map(l=>`${l.desc} | ${l.size} | ${l.qty} ${l.unit} x LKR ${money(l.price)}`).join('\n')}\n\nNote: ${r.note||'-'}`)};
+/* ---------------------------------------------------------
+   QUOTE REQUEST -> QUOTATION DELIVERY TRANSFER
+
+   If the branch/customer selected "Deliver to a separate
+   location", copy the request-specific address + contact
+   details into the quotation Delivery Address field.
+
+   Older requests that do not have the separate-delivery
+   fields continue to use the saved request/customer delivery.
+   --------------------------------------------------------- */
+function branchRequestDeliveryForQuotation(r,c){
+
+  const rc = r?.customer || {};
+
+  if(rc.separateDelivery){
+
+    const lines = [];
+
+    /* Future/backward compatibility: include receiver/customer
+       name if that field exists on a request. */
+    if(rc.deliveryCustomerName){
+      lines.push(String(rc.deliveryCustomerName).trim());
+    }
+
+    if(rc.deliveryLine1){
+      lines.push(String(rc.deliveryLine1).trim());
+    }
+
+    if(rc.deliveryLine2){
+      lines.push(String(rc.deliveryLine2).trim());
+    }
+
+    /* Older separate-delivery requests may only have the
+       combined delivery string. Use it only when line fields
+       are not available. */
+    if(
+      !rc.deliveryLine1 &&
+      !rc.deliveryLine2 &&
+      rc.delivery
+    ){
+      lines.push(String(rc.delivery).trim());
+    }
+
+    if(rc.deliveryContact){
+      lines.push(`Contact: ${String(rc.deliveryContact).trim()}`);
+    }
+
+    if(rc.deliveryContact2){
+      lines.push(`Second Contact: ${String(rc.deliveryContact2).trim()}`);
+    }
+
+    const requestSpecificDelivery =
+      lines
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+
+    if(requestSpecificDelivery){
+      return requestSpecificDelivery;
+    }
+  }
+
+  return (
+    rc.delivery ||
+    c?.delivery ||
+    ''
+  );
+}
+
 window.convertBranchRequest=function(id){
 
   const r =
@@ -4525,9 +4594,12 @@ window.convertBranchRequest=function(id){
       address:
         r.customer.address,
 
-      // NEW
+      /* Do not save a one-off separate delivery location as the
+         customer's permanent Delivery Address in Customer Master. */
       delivery:
-        r.customer.delivery || '',
+        r.customer.separateDelivery
+          ? ''
+          : (r.customer.delivery || ''),
 
       map:'',
 
@@ -4598,15 +4670,27 @@ window.convertBranchRequest=function(id){
 
   /* -----------------------------------------
      REQUEST-SPECIFIC DELIVERY ADDRESS
-     Always wins over saved customer delivery.
+
+     When the customer used the Separate Delivery toggle,
+     transfer every supplied delivery detail to the quotation
+     Delivery Address field:
+       - Address Line 1
+       - Address Line 2
+       - Contact Number
+       - Second Contact Number (when supplied)
+       - Delivery Customer/Receiver Name (when available)
+
+     If the toggle was OFF, preserve the existing default
+     request/customer delivery-address behaviour.
      ----------------------------------------- */
 
   if($('deliveryAddress')){
 
     $('deliveryAddress').value =
-      r.customer.delivery ||
-      c.delivery ||
-      '';
+      branchRequestDeliveryForQuotation(
+        r,
+        c
+      );
 
   }
 
