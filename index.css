@@ -1891,3 +1891,635 @@ input[type="radio"]{
     font-size:13px!important;
   }
 }
+/* =====================================================================
+   SOFTCREATION SYSTEM-WIDE LIGHT / DARK MODE
+   ===================================================================== */
+
+/* ---------------------------------------------------------
+   THEME TOGGLE
+   --------------------------------------------------------- */
+
+.theme-toggle{
+  position:relative;
+  width:62px;
+  height:36px;
+  flex:0 0 62px;
+  border:1px solid var(--ui-line);
+  border-radius:999px;
+  padding:0;
+  background:#eef5f6;
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(20,52,70,.05);
+  transition:
+    background .2s ease,
+    border-color .2s ease,
+    box-shadow .2s ease;
+}
+
+.theme-toggle-sun,
+.theme-toggle-moon{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  z-index:1;
+  font-size:13px;
+  line-height:1;
+  pointer-events:none;
+}
+
+.theme-toggle-sun{
+  left:8px;
+  color:#d29413;
+}
+
+.theme-toggle-moon{
+  right:8px;
+  color:#657888;
+}
+
+.theme-toggle-knob{
+  position:absolute;
+  left:4px;
+  top:4px;
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:
+    0 3px 9px rgba(20,45,55,.18);
+  transition:
+    transform .22s ease,
+    background .22s ease;
+  z-index:2;
+}
+
+html[data-theme="dark"] .theme-toggle{
+  background:#22343c;
+  border-color:#40535b;
+}
+
+html[data-theme="dark"] .theme-toggle-knob{
+  transform:translateX(27px);
+  background:#dbe8eb;
+}
+
+html[data-theme="dark"] .theme-toggle-sun{
+  color:#718187;
+}
+
+html[data-theme="dark"] .theme-toggle-moon{
+  color:#dce9ec;
+}
+
+
+/* ---------------------------------------------------------
+   DARK THEME VARIABLES
+   --------------------------------------------------------- */
+
+html[data-theme="dark"]{
+
+  --ui-accent:#38a7a5;
+  --ui-accent-2:#247d91;
+
+  --ui-accent-soft:#183235;
+  --ui-accent-soft-2:#17272d;
+
+  --ui-ink:#eef5f6;
+  --ui-text:#c9d6da;
+  --ui-muted:#8fa2aa;
+
+  --ui-line:#32464e;
+  --ui-line-soft:#263940;
+
+  --ui-surface:#17262c;
+  --ui-surface-alt:#1c2d33;
+
+  --ui-bg:#0d171b;
+
+  --ui-shadow:
+    0 12px 32px rgba(0,0,0,.24),
+    0 1px 2px rgba(0,0,0,.15);
+
+  --ui-shadow-hover:
+    0 18px 38px rgba(0,0,0,.30);
+
+  --ui-focus:
+    0 0 0 4px rgba(56,167,165,.16);
+
+
+  /* Legacy variables */
+
+  --teal:#38a7a5;
+  --teal2:#247d91;
+
+  --ink:#eef5f6;
+  --muted:#8fa2aa;
+
+  --bg:#0d171b;
+  --line:#32464e;
+  --soft:#183235;
+
+  --shadow:var(--ui-shadow);
+}
+
+
+/* ---------------------------------------------------------
+   PAGE / APPLICATION
+   --------------------------------------------------------- */
+
+html[data-theme="dark"],
+html[data-theme="dark"] body{
+  background:
+    radial-gradient(
+      circle at 12% 0%,
+      rgba(38,123,137,.15),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      #0c1519,
+      #101d22 48%,
+      #0c161c
+    ) !important;
+
+  color:var(--ui-ink);
+}
+
+
+/* ---------------------------------------------------------
+   HEADER / NAVIGATION
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .topbar,
+html[data-theme="dark"] .topbar.app-shell-header{
+  background:rgba(20,34,40,.97) !important;
+  border-color:var(--ui-line) !important;
+  color:var(--ui-ink);
+}
+
+html[data-theme="dark"] .brandmark .c{
+  color:#eef5f6;
+}
+
+html[data-theme="dark"] .brandtext b{
+  color:#eef5f6;
+}
+
+html[data-theme="dark"] .brandtext span{
+  color:var(--ui-muted);
+}
+
+html[data-theme="dark"] .shell-version{
+  background:#17373a;
+  border-color:#305052;
+  color:#82d5d3;
+}
+
+html[data-theme="dark"] .nav,
+html[data-theme="dark"] .nav-shell,
+html[data-theme="dark"] .mobile-nav-head{
+  background:#15242a !important;
+  border-color:var(--ui-line) !important;
+}
+
+html[data-theme="dark"] .navbtn{
+  color:#b8c8cd;
+}
+
+html[data-theme="dark"] .navbtn:hover{
+  background:#1d3439;
+  border-color:#315057;
+  color:#72cac8;
+}
+
+html[data-theme="dark"] .navbtn.active{
+  color:#fff;
+}
+
+
+/* ---------------------------------------------------------
+   PROFILE
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .user-profile-btn{
+  background:#1a2b31 !important;
+  border-color:#354950 !important;
+  color:#eef5f6 !important;
+}
+
+html[data-theme="dark"] .user-profile-btn:hover,
+html[data-theme="dark"] .user-profile-btn[aria-expanded="true"]{
+  background:#20343a !important;
+  border-color:#477078 !important;
+}
+
+html[data-theme="dark"] .user-profile-copy strong{
+  color:#eef5f6;
+}
+
+html[data-theme="dark"] .user-profile-copy small,
+html[data-theme="dark"] .profile-chevron{
+  color:#90a4ab;
+}
+
+html[data-theme="dark"] .user-profile-menu{
+  background:#17272d !important;
+  border-color:#33474e !important;
+  color:#e9f1f3;
+}
+
+html[data-theme="dark"] .profile-menu-head,
+html[data-theme="dark"] .profile-menu-sep{
+  border-color:#2d4148;
+}
+
+html[data-theme="dark"] .profile-role-row{
+  background:#1c3035;
+  border-color:#31474c;
+}
+
+html[data-theme="dark"] .profile-menu-item{
+  color:#cbd9dc;
+}
+
+html[data-theme="dark"] .profile-menu-item:hover{
+  background:#20363c;
+}
+
+
+/* ---------------------------------------------------------
+   CARDS / PANELS / MAIN SURFACES
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .panel-body,
+html[data-theme="dark"] .portal-card,
+html[data-theme="dark"] .device-card,
+html[data-theme="dark"] .admin-report,
+html[data-theme="dark"] .viewer-top{
+  background:#17262c !important;
+  border-color:#30444b !important;
+  color:#eaf2f4;
+}
+
+html[data-theme="dark"] .card .v{
+  color:#edf5f6;
+}
+
+html[data-theme="dark"] .card .k,
+html[data-theme="dark"] .card .sub,
+html[data-theme="dark"] .small,
+html[data-theme="dark"] .hint{
+  color:#8fa2aa;
+}
+
+html[data-theme="dark"] .section{
+  color:#61c2c0;
+  border-color:#354a50;
+}
+
+
+/* ---------------------------------------------------------
+   FORM CONTROLS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .field label{
+  color:#b8c9ce;
+}
+
+html[data-theme="dark"] .field input,
+html[data-theme="dark"] .field select,
+html[data-theme="dark"] .field textarea,
+html[data-theme="dark"] .search,
+html[data-theme="dark"] .item-tools input,
+html[data-theme="dark"] .item-tools select,
+html[data-theme="dark"] .special-row input,
+html[data-theme="dark"] .special-row select,
+html[data-theme="dark"] .line-table input,
+html[data-theme="dark"] .line-table select{
+  background:#112027 !important;
+  border-color:#354a52 !important;
+  color:#e5eef0 !important;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder{
+  color:#70848c;
+}
+
+html[data-theme="dark"] .field input:focus,
+html[data-theme="dark"] .field select:focus,
+html[data-theme="dark"] .field textarea:focus,
+html[data-theme="dark"] .search:focus{
+  border-color:#45aaa9 !important;
+  box-shadow:var(--ui-focus) !important;
+}
+
+
+/* ---------------------------------------------------------
+   BUTTONS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .btn{
+  background:#263a41;
+  color:#dbe7ea;
+}
+
+html[data-theme="dark"] .btn.ghost{
+  background:#192a30 !important;
+  border-color:#354a51 !important;
+  color:#d8e4e7 !important;
+}
+
+html[data-theme="dark"] .btn.ghost:hover{
+  background:#22383e !important;
+}
+
+html[data-theme="dark"] .shell-icon-btn,
+html[data-theme="dark"] .mobile-nav-toggle{
+  background:#192a30 !important;
+  border-color:#354a51 !important;
+  color:#dce7e9 !important;
+}
+
+
+/* ---------------------------------------------------------
+   TABLES
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .table,
+html[data-theme="dark"] .line-table{
+  background:#17262c;
+  color:#dce7ea;
+}
+
+html[data-theme="dark"] .table th,
+html[data-theme="dark"] .line-table th{
+  background:#20343a !important;
+  border-color:#334950 !important;
+  color:#b9cbd0 !important;
+}
+
+html[data-theme="dark"] .table td,
+html[data-theme="dark"] .line-table td{
+  background:#17262c !important;
+  border-color:#2c4148 !important;
+  color:#dce7ea;
+}
+
+html[data-theme="dark"] .table tbody tr:hover td{
+  background:#1c3036 !important;
+}
+
+
+/* ---------------------------------------------------------
+   MODALS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .modal{
+  background:rgba(3,8,11,.72);
+}
+
+html[data-theme="dark"] .modal-card,
+html[data-theme="dark"] .modal-head,
+html[data-theme="dark"] .modal-body{
+  background:#17262c !important;
+  border-color:#32464d !important;
+  color:#e8f0f2;
+}
+
+html[data-theme="dark"] .closex{
+  background:#253940;
+  color:#e1ecee;
+}
+
+
+/* ---------------------------------------------------------
+   PRICE CALCULATOR / CUSTOMER SOURCE
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .price-calc,
+html[data-theme="dark"] .customer-autofill{
+  background:
+    linear-gradient(
+      135deg,
+      #172b30,
+      #142329
+    ) !important;
+
+  border-color:#34565a !important;
+}
+
+html[data-theme="dark"] .price-option{
+  background:#192a30 !important;
+  border-color:#344a51 !important;
+}
+
+html[data-theme="dark"] .price-option .tier,
+html[data-theme="dark"] .price-option .ex{
+  color:#94a8ae;
+}
+
+html[data-theme="dark"] .price-option .inc{
+  color:#e8f1f2;
+}
+
+html[data-theme="dark"] .price-option.selected{
+  background:#1c383b !important;
+  border-color:#43aaa8 !important;
+}
+
+html[data-theme="dark"] .customer-source-row input[type=file],
+html[data-theme="dark"] .customer-source-preview{
+  background:#14252b !important;
+  border-color:#344950 !important;
+  color:#dbe6e9;
+}
+
+
+/* ---------------------------------------------------------
+   ERP STOCK LOOKUPS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .erp-lookup-panel,
+html[data-theme="dark"] .erp-search-box,
+html[data-theme="dark"] .erp-suggestions,
+html[data-theme="dark"] .erp-selected-card,
+html[data-theme="dark"] .erp-selected-info,
+html[data-theme="dark"] .erp-branch-chip{
+  background:#17282e !important;
+  border-color:#344b52 !important;
+  color:#dce8ea !important;
+}
+
+html[data-theme="dark"] .erp-lookup-subtitle,
+html[data-theme="dark"] .erp-lookup-status{
+  color:#91a6ac;
+}
+
+
+/* ---------------------------------------------------------
+   INFORMATION / STATUS AREAS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .notice{
+  background:#342d18 !important;
+  border-color:#62552a !important;
+  color:#e5cf82 !important;
+}
+
+html[data-theme="dark"] .suggestion{
+  background:#173126;
+  border-color:#28583f;
+  color:#92d5ac;
+}
+
+html[data-theme="dark"] .protected-note{
+  background:#192a30;
+  border-color:#30454c;
+  color:#96aab0;
+}
+
+html[data-theme="dark"] .empty{
+  color:#82979e;
+}
+
+
+/* ---------------------------------------------------------
+   PURCHASE / PRODUCTION / OPERATIONS CARDS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .po-kpi,
+html[data-theme="dark"] .prod-kpi,
+html[data-theme="dark"] .pp-kpi,
+html[data-theme="dark"] .pp-card{
+  background:#18292f !important;
+  border-color:#31474e !important;
+  color:#e4edef !important;
+}
+
+
+/* ---------------------------------------------------------
+   VIEWER BACKGROUND
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .paperwrap,
+html[data-theme="dark"] .viewer-paperwrap{
+  background:
+    radial-gradient(
+      circle at 0 0,
+      rgba(57,167,165,.08),
+      transparent 38%
+    ),
+    #101c21 !important;
+
+  border-color:#30434a !important;
+}
+
+
+/* ---------------------------------------------------------
+   DEVICE IMAGE UI
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .device-image-storage-note{
+  background:#17282e;
+  border-color:#30474e;
+  color:#92a6ac;
+}
+
+html[data-theme="dark"] .device-image-storage-note b{
+  color:#d7e5e8;
+}
+
+
+/* ---------------------------------------------------------
+   LOGIN
+   Saved theme also applies before login.
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .login-screen{
+  background:
+    linear-gradient(
+      135deg,
+      #06171c,
+      #123a40
+    );
+}
+
+html[data-theme="dark"] .login-box{
+  background:#17262c !important;
+  border:1px solid #31464d;
+  color:#e9f2f3;
+}
+
+
+/* ---------------------------------------------------------
+   MOBILE DARK OVERRIDES
+   --------------------------------------------------------- */
+
+@media(max-width:900px){
+
+  html[data-theme="dark"] body{
+    background:#0d171b !important;
+  }
+
+  html[data-theme="dark"] .nav-shell{
+    background:#15242a !important;
+    border-right-color:#30444b !important;
+  }
+
+  html[data-theme="dark"] .mobile-nav-head{
+    background:
+      linear-gradient(
+        135deg,
+        #182b30,
+        #15242a
+      ) !important;
+
+    border-color:#30444b !important;
+  }
+
+}
+
+
+/* ---------------------------------------------------------
+   SCROLLBARS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb{
+  background:#40545b;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-track{
+  background:#142229;
+}
+
+
+/* ---------------------------------------------------------
+   VERY IMPORTANT:
+   QUOTATION / PI / PO PAPER MUST ALWAYS STAY WHITE.
+   Dark mode affects application UI only.
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .paper,
+html[data-theme="dark"] #paper,
+html[data-theme="dark"] #viewerPaper,
+html[data-theme="dark"] .pdf-capture-host,
+html[data-theme="dark"] .po-pdf-capture{
+  background-color:#fff !important;
+  color:#17243c !important;
+}
+
+
+/* Print must always stay light */
+
+@media print{
+
+  html[data-theme="dark"],
+  html[data-theme="dark"] body{
+    background:#fff !important;
+    color:#17243c !important;
+  }
+
+}

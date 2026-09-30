@@ -5,6 +5,36 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
+
+<script>
+(function(){
+
+  const KEY = 'softcreation_theme_v1';
+
+  try{
+
+    const saved =
+      localStorage.getItem(KEY);
+
+    const theme =
+      saved === 'dark'
+        ? 'dark'
+        : 'light';
+
+    document.documentElement
+      .setAttribute(
+        'data-theme',
+        theme
+      );
+
+    document.documentElement.style.colorScheme =
+      theme;
+
+  }catch(e){}
+
+})();
+</script>
+
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
@@ -21,8 +51,24 @@
         <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.15</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
-      <div class="topbar-actions">
-        <div class="user-profile-wrap">
+<div class="topbar-actions">
+
+  <!-- LIGHT / DARK MODE -->
+  <button
+    id="themeToggle"
+    class="theme-toggle"
+    type="button"
+    onclick="toggleAppTheme()"
+    aria-label="Switch to dark mode"
+    aria-pressed="false"
+    title="Switch to dark mode"
+  >
+    <span class="theme-toggle-sun">☀</span>
+    <span class="theme-toggle-moon">☾</span>
+    <span class="theme-toggle-knob"></span>
+  </button>
+
+  <div class="user-profile-wrap">
           <button class="user-profile-btn" id="userProfileBtn" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleProfileMenu(event)">
             <span class="user-avatar" id="userAvatar">U</span>
             <span class="user-profile-copy">
@@ -9087,5 +9133,155 @@ Please record customer payments or increase the customer's approved credit limit
 
 
 })();
+/* =========================================================
+   SOFTCREATION LIGHT / DARK THEME
+   ========================================================= */
+
+const SOFTCREATION_THEME_KEY =
+  'softcreation_theme_v1';
+
+
+function getAppTheme(){
+
+  return (
+    document.documentElement
+      .getAttribute('data-theme') ||
+    'light'
+  );
+
+}
+
+
+function updateThemeToggle(){
+
+  const btn =
+    document.getElementById(
+      'themeToggle'
+    );
+
+  if(!btn){
+    return;
+  }
+
+
+  const dark =
+    getAppTheme() === 'dark';
+
+
+  btn.setAttribute(
+    'aria-pressed',
+    dark ? 'true' : 'false'
+  );
+
+
+  btn.setAttribute(
+    'aria-label',
+    dark
+      ? 'Switch to light mode'
+      : 'Switch to dark mode'
+  );
+
+
+  btn.title =
+    dark
+      ? 'Switch to light mode'
+      : 'Switch to dark mode';
+
+}
+
+
+function applyAppTheme(
+  theme,
+  save=true
+){
+
+  const mode =
+    theme === 'dark'
+      ? 'dark'
+      : 'light';
+
+
+  document.documentElement
+    .setAttribute(
+      'data-theme',
+      mode
+    );
+
+
+  document.documentElement.style.colorScheme =
+    mode;
+
+
+  if(save){
+
+    try{
+
+      localStorage.setItem(
+        SOFTCREATION_THEME_KEY,
+        mode
+      );
+
+    }catch(e){}
+
+  }
+
+
+  updateThemeToggle();
+
+}
+
+
+function toggleAppTheme(){
+
+  const next =
+    getAppTheme() === 'dark'
+      ? 'light'
+      : 'dark';
+
+
+  applyAppTheme(
+    next,
+    true
+  );
+
+}
+
+
+if(
+  document.readyState === 'loading'
+){
+
+  document.addEventListener(
+    'DOMContentLoaded',
+    updateThemeToggle
+  );
+
+}else{
+
+  updateThemeToggle();
+
+}
+
+
+/* Sync another browser tab if open */
+
+window.addEventListener(
+  'storage',
+  function(e){
+
+    if(
+      e.key ===
+      SOFTCREATION_THEME_KEY
+    ){
+
+      applyAppTheme(
+        e.newValue || 'light',
+        false
+      );
+
+    }
+
+  }
+);
 </script>
 </body></html>
