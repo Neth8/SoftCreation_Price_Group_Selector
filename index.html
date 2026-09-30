@@ -3758,21 +3758,17 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
     hidden
   >
 
-  <button
-    id="bpSeparateDeliveryToggle"
-    class="bp-toggle-btn"
-    type="button"
-    aria-pressed="false"
-    onclick="toggleBpSeparateDeliveryButton()"
-  >
-
-    <span class="bp-toggle-off">OFF</span>
-
-    <span class="bp-toggle-on">ON</span>
-
-    <span class="bp-toggle-knob"></span>
-
-  </button>
+<button
+  id="bpSeparateDeliveryToggle"
+  class="bp-toggle-btn"
+  type="button"
+  aria-pressed="false"
+  onclick="window.toggleBpSeparateDeliveryButton()"
+>
+  <span class="bp-toggle-off">OFF</span>
+  <span class="bp-toggle-on">ON</span>
+  <span class="bp-toggle-knob"></span>
+</button>
 
 
   <span class="bp-delivery-toggle-copy">
@@ -9718,5 +9714,72 @@ window.addEventListener(
 
   }
 );
+window.toggleBpSeparateDeliveryButton = function(){
+
+  const checkbox =
+    document.getElementById('bpSeparateDelivery');
+
+  const button =
+    document.getElementById('bpSeparateDeliveryToggle');
+
+  const fields =
+    document.getElementById('bpSeparateDeliveryFields');
+
+
+  if(!checkbox){
+    console.error('bpSeparateDelivery not found');
+    return;
+  }
+
+
+  /* Toggle ON / OFF */
+  checkbox.checked =
+    !checkbox.checked;
+
+
+  const enabled =
+    checkbox.checked;
+
+
+  /* Update button state */
+  if(button){
+
+    button.setAttribute(
+      'aria-pressed',
+      enabled ? 'true' : 'false'
+    );
+
+  }
+
+
+  /* Show / hide delivery fields */
+  if(fields){
+
+    fields.hidden =
+      !enabled;
+
+  }
+
+
+  /* Required only when separate delivery is ON */
+  [
+    'bpDeliveryLine1',
+    'bpDeliveryLine2',
+    'bpDeliveryContact1'
+  ].forEach(function(id){
+
+    const el =
+      document.getElementById(id);
+
+    if(el){
+
+      el.required =
+        enabled;
+
+    }
+
+  });
+
+};
 </script>
 </body></html>
