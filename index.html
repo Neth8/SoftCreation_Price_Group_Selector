@@ -1709,7 +1709,22 @@ function reviseQuote(id){
   const n=JSON.parse(JSON.stringify(old));n.id=uid('doc');n.rev=(old.rev||0)+1;n.serial=serialFor('Q',old.core,n.rev);n.revisionOf=old.id;n.replacedBy=null;n.created=Date.now();old.replacedBy=n.id;
   state.docs.unshift(n);saveState();openDocument(n.id);toast('Revision created; previous quotation is now hidden from active list')
 }
-function convertQuote(id){openDocument(id);setTimeout(convertCurrentToPI,50)}
+function convertQuote(id){
+
+  // Load the selected quotation into the internal editor state
+  openDocument(id);
+
+  setTimeout(()=>{
+
+    // Keep Pro Forma list as the background screen
+    showView('pis');
+
+    // Open the existing PI item-selection popup
+    convertCurrentToPI();
+
+  },50);
+
+}
 function convertCurrentToPI(){const d=collectCurrent();if(!d||d.type!=='Q')return;$('convertItems').innerHTML=(d.lines||[]).map((l,i)=>`<label class="checkline" style="padding:9px;border-bottom:1px solid #e4ecee"><input type="checkbox" class="convcheck" data-i="${i}" checked><span><b>${esc(l.desc)}</b> — ${esc([l.size,l.material,l.layout].filter(Boolean).join(' / '))} <span class="small">${money(l.qty)} ${esc(l.unit)} @ LKR ${money(l.price)}</span></span></label>`).join('');$('convertModal').classList.add('show')}
 function createPIFromSelection(){
   const q=collectCurrent(),sel=[...document.querySelectorAll('.convcheck:checked')].map(x=>Number(x.dataset.i));
