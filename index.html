@@ -8190,5 +8190,344 @@ spgsProductionJson=
   );
 
 })();
+/* =========================================================
+   CUSTOMER CREDIT LIMIT CONTROL
+   Prevent quotation -> PI when credit exposure exceeds limit
+   ========================================================= */
+
+(function(){
+
+  function sameCreditCustomerV1016(doc,customer){
+
+    if(!doc || !customer){
+      return false;
+    }
+
+    /* Best match: customer ID */
+    if(
+      doc.customerId &&
+      doc.customerId === customer.id
+    ){
+      return true;
+    }
+
+    /* Legacy document fallback */
+    if(
+      customer.phone &&
+      doc.customer?.phone &&
+      customer.phone === doc.customer.phone
+    ){
+      return true;
+    }
+
+    if(
+      customer.name &&
+      doc.customer?.name &&
+      customer.name.trim().toLowerCase() ===
+      doc.customer.name.trim().toLowerCase()
+    ){
+      return true;
+    }
+
+    return false;
+  }
+
+
+  function customerCreditOutstandingV1016(customer){
+
+    return (state.docs || [])
+      .filter(d=>
+
+        d.type === 'PI' &&
+
+        /* Only credit transactions consume credit limit */
+        (d.payMode || 'credit') === 'credit' &&
+
+        /* Ignore replaced/closed duplicate document if any */
+        !d.replacedBy &&
+
+        sameCreditCustomerV1016(
+          d,
+          customer
+        )
+
+      )
+      .reduce((total,d)=>{
+
+        /*
+         * Use your existing PI payment ledger.
+         * Paid PI = 0 balance
+         * Part paid PI = remaining balance
+         * Unpaid PI = full PI amount
+         */
+
+        if(
+          typeof paymentSummary === 'function'
+        ){
+
+          return (
+            total +
+            Number(
+              paymentSummary(d).balance || 0
+            )
+          );
+
+        }
+
+
+        /* Safety fallback */
+
+        const gross =
+          typeof docTotals === 'function'
+            ? Number(docTotals(d).gross || 0)
+            : (d.lines || []).reduce(
+                (s,l)=>
+                  s +
+                  Number(l.qty || 0) *
+                  Number(l.price || 0),
+                0
+              );
+
+
+        const paid =
+          (d.paymentHistory || [])
+          .filter(p=>!p.invalid)
+          .reduce(
+            (s,p)=>
+              s +
+              Number(p.amount || 0),
+            0
+          );
+
+
+        return (
+          total +
+          Math.max(
+            0,
+            gross - paid
+          )
+        );
+
+      },0);
+
+  }
+
+
+  function selectedPIAmountV1016(q){
+
+    const selected =
+      [
+        ...document.querySelectorAll(
+          '.convcheck:checked'
+        )
+      ]
+      .map(
+        x=>Number(x.dataset.i)
+      );
+
+
+    return selected.reduce(
+      (total,index)=>{
+
+        const line =
+          q.lines?.[index];
+
+        if(!line){
+          return total;
+        }
+
+        return (
+          total +
+          Number(line.qty || 0) *
+          Number(line.price || 0)
+        );
+
+      },
+      0
+    );
+
+  }
+
+
+  function checkCustomerCreditForPIV1016(){
+
+    const q =
+      typeof collectCurrent === 'function'
+        ? collectCurrent()
+        : null;
+
+
+    if(
+      !q ||
+      q.type !== 'Q'
+    ){
+
+      return true;
+
+    }
+
+
+    const customer =
+      state.customers.find(
+        c=>c.id === q.customerId
+      );
+
+
+    if(!customer){
+
+      return true;
+
+    }
+
+
+    /* Cash customers do not use credit limit */
+
+    if(
+      customer.paymentMode !== 'credit'
+    ){
+
+      return true;
+
+    }
+
+
+    const creditLimit =
+      Math.max(
+        0,
+        Number(
+          customer.creditLimit || 0
+        )
+      );
+
+
+    const currentOutstanding =
+      customerCreditOutstandingV1016(
+        customer
+      );
+
+
+    const newPIAmount =
+      selectedPIAmountV1016(q);
+
+
+    const projectedOutstanding =
+      currentOutstanding +
+      newPIAmount;
+
+
+    const overAmount =
+      projectedOutstanding -
+      creditLimit;
+
+
+    if(
+      projectedOutstanding <=
+      creditLimit + 0.01
+    ){
+
+      return true;
+
+    }
+
+
+    const msg =
+`PI CREATION BLOCKED — CREDIT LIMIT EXCEEDED
+
+Customer:
+${customer.name || 'Selected Customer'}
+
+Credit Limit:
+LKR ${money(creditLimit)}
+
+Current Outstanding:
+LKR ${money(currentOutstanding)}
+
+This PI Value:
+LKR ${money(newPIAmount)}
+
+Projected Outstanding:
+LKR ${money(projectedOutstanding)}
+
+Over Credit Limit By:
+LKR ${money(Math.max(0,overAmount))}
+
+Please record customer payments or increase the customer's approved credit limit before creating this PI.`;
+
+
+    console.warn(
+      'Customer credit limit exceeded',
+      {
+        customer:customer.name,
+        creditLimit,
+        currentOutstanding,
+        newPIAmount,
+        projectedOutstanding,
+        overAmount
+      }
+    );
+
+
+    /* Short system feedback */
+
+    if(
+      typeof toast === 'function'
+    ){
+
+      toast(
+        `PI blocked — ${customer.name} exceeds credit limit by LKR ${money(Math.max(0,overAmount))}`
+      );
+
+    }
+
+
+    /*
+     * Full feedback message.
+     * This keeps the user from missing the reason.
+     */
+
+    alert(msg);
+
+
+    return false;
+
+  }
+
+
+  /*
+   * Preserve ALL existing PI logic:
+   * permissions
+   * ERP stock
+   * selected items
+   * production planning
+   * production requests
+   * quotation -> PI linking
+   */
+
+  const createPIBaseV1016 =
+    window.createPIFromSelection;
+
+
+  window.createPIFromSelection =
+    function(){
+
+      if(
+        !checkCustomerCreditForPIV1016()
+      ){
+
+        return false;
+
+      }
+
+
+      return createPIBaseV1016
+        .apply(
+          this,
+          arguments
+        );
+
+    };
+
+
+})();
 </script>
 </body></html>
