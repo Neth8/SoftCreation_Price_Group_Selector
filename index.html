@@ -3557,7 +3557,160 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
  VIEW_PERMS.branchportal='branch_portal';VIEW_PERMS.quoterequests='manage_quote_requests';
  const css=document.createElement('style');css.textContent=`
  .branch-hero{background:linear-gradient(135deg,#073b4c,#079c9f);color:#fff;border-radius:16px;padding:18px;margin-bottom:14px}.branch-hero h2{margin:0 0 5px}.branch-hero p{margin:0;opacity:.86}
- .portal-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}.portal-card{border:1px solid #cfe2e4;border-radius:14px;padding:13px;background:#fff}.portal-card h3{margin:0 0 10px;color:#087f83}.portal-prices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.portal-price{border:2px solid var(--pc,#079c9f);border-radius:11px;padding:9px;background:#fff;text-align:left}.portal-price.selected{box-shadow:0 0 0 3px #b7eeee}.portal-price b{font-size:15px;display:block}.portal-item{border-bottom:1px solid #dce8ea;padding:9px 0}.portal-cart{max-height:330px;overflow:auto}.request-status{display:inline-block;padding:4px 8px;border-radius:999px;background:#eaf5f5;color:#087f83;font-weight:900;font-size:9px}.request-status.completed{background:#e1f5e9;color:#08713e}.request-status.rejected{background:#ffe5e5;color:#a91d1d}@media(max-width:850px){.portal-grid{grid-template-columns:1fr}.portal-prices{grid-template-columns:1fr 1fr}}
+ .portal-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}.portal-card{border:1px solid #cfe2e4;border-radius:14px;padding:13px;background:#fff}.portal-card h3{margin:0 0 10px;color:#087f83}.portal-prices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.portal-price{border:2px solid var(--pc,#079c9f);border-radius:11px;padding:9px;background:#fff;text-align:left}.portal-price.selected{box-shadow:0 0 0 3px #b7eeee}.portal-price b{font-size:15px;display:block}.portal-item{border-bottom:1px solid #dce8ea;padding:9px 0}.portal-cart{max-height:330px;overflow:auto}.request-status{display:inline-block;padding:4px 8px;border-radius:999px;background:#eaf5f5;color:#087f83;font-weight:900;font-size:9px}.request-status.completed{background:#e1f5e9;color:#08713e}.request-status.rejected{background:#ffe5e5;color:#a91d1d}
+ /* =========================================================
+   APPROVED PRICES - MY REQUESTS CARDS
+   ========================================================= */
+
+#bpMyRequests{
+  display:grid;
+  gap:12px;
+}
+
+.myreq-card{
+  border:1px solid #d7e5e7;
+  border-radius:18px;
+  background:#fff;
+  padding:14px;
+  box-shadow:0 8px 22px rgba(15,42,56,.05);
+}
+
+.myreq-top{
+  margin-bottom:10px;
+}
+
+.myreq-title-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.myreq-code{
+  font-size:15px;
+  font-weight:900;
+  color:#102a43;
+  line-height:1.25;
+}
+
+.myreq-customer{
+  margin-top:4px;
+  font-size:13px;
+  font-weight:800;
+  color:#1d3b53;
+}
+
+.myreq-pill{
+  display:inline-flex;
+  align-items:center;
+  padding:6px 11px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.2px;
+  white-space:nowrap;
+  border:1px solid transparent;
+}
+
+.myreq-pill.pending{
+  background:#fff3d8;
+  color:#a45b00;
+  border-color:#f5d59a;
+}
+
+.myreq-pill.review{
+  background:#e2f0ff;
+  color:#1155a3;
+  border-color:#bbd7ff;
+}
+
+.myreq-pill.completed{
+  background:#dff7e8;
+  color:#107548;
+  border-color:#bfe8cd;
+}
+
+.myreq-pill.rejected{
+  background:#ffe2e2;
+  color:#b42318;
+  border-color:#f5b5b5;
+}
+
+.myreq-banner{
+  border-radius:14px;
+  padding:12px 13px;
+  margin-bottom:11px;
+  border:1px solid transparent;
+}
+
+.myreq-banner.pending{
+  background:linear-gradient(135deg,#fff8ea,#fff1cf);
+  border-color:#f4ddb0;
+}
+
+.myreq-banner.review{
+  background:linear-gradient(135deg,#eef6ff,#e0eeff);
+  border-color:#c8ddff;
+}
+
+.myreq-banner.completed{
+  background:linear-gradient(135deg,#ecfbf1,#ddf7e6);
+  border-color:#bfe7cb;
+}
+
+.myreq-banner.rejected{
+  background:linear-gradient(135deg,#fff1f1,#ffe1e1);
+  border-color:#f3bcbc;
+}
+
+.myreq-banner-title{
+  font-size:12px;
+  font-weight:900;
+  margin-bottom:4px;
+  color:#16324a;
+}
+
+.myreq-banner-text{
+  font-size:11px;
+  line-height:1.5;
+  color:#415a6b;
+}
+
+.myreq-meta{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+
+.myreq-meta div{
+  border:1px solid #e3edf0;
+  background:#f9fcfd;
+  border-radius:12px;
+  padding:10px 11px;
+}
+
+.myreq-meta span{
+  display:block;
+  font-size:9px;
+  font-weight:800;
+  color:#80919b;
+  text-transform:uppercase;
+  letter-spacing:.3px;
+  margin-bottom:4px;
+}
+
+.myreq-meta b{
+  display:block;
+  font-size:11px;
+  color:#16324a;
+}
+
+@media(max-width:700px){
+  .myreq-meta{
+    grid-template-columns:1fr;
+  }
+}@media(max-width:850px){.portal-grid{grid-template-columns:1fr}.portal-prices{grid-template-columns:1fr 1fr}}
  `;document.head.appendChild(css);
  const nav=document.querySelector('.nav'),settingsBtn=document.querySelector('[data-view="settings"]');
  function navBtn(id,label){if(document.querySelector(`[data-view="${id}"]`))return;const b=document.createElement('button');b.className='navbtn';b.dataset.view=id;b.textContent=label;b.onclick=()=>showView(id);nav.insertBefore(b,settingsBtn)}
@@ -3722,7 +3875,128 @@ window.submitBranchQuoteRequest=function(){
 
 };
  function requestVisible(r){return currentUser?.role==='admin'||r.requester===currentUser?.username||r.handler===currentUser?.username||hasPerm('manage_quote_requests')}
- function renderMyBranchRequests(){$('bpMyRequests').innerHTML=(state.quoteRequests||[]).filter(r=>r.requester===currentUser?.username).slice(0,12).map(r=>`<div class="portal-item"><b>${esc(r.requestNo)}</b> • ${esc(r.customer.name)} <span class="request-status ${r.status.toLowerCase()}">${esc(r.status)}</span><div class="small">${esc(r.date)} • ${r.lines.length} items • Handler: ${esc(ownerDisplay(r.handler))}${r.quoteSerial?` • Quotation ${esc(r.quoteSerial)}`:''}</div></div>`).join('')||'<div class="empty">No requests submitted.</div>'}
+function branchRequestStatusMeta(status,r){
+
+  const s = String(status || '').toLowerCase();
+
+  if(s === 'completed'){
+    return {
+      key:'completed',
+      title:'Quotation Completed',
+      text: r?.quoteSerial
+        ? `Your request has been converted into quotation ${r.quoteSerial}.`
+        : 'Your request has been completed and quotation preparation is finished.'
+    };
+  }
+
+  if(s === 'in review'){
+    return {
+      key:'review',
+      title:'Under Review',
+      text:'Your request is currently being reviewed by the quotation team.'
+    };
+  }
+
+  if(s === 'rejected'){
+    return {
+      key:'rejected',
+      title:'Request Rejected',
+      text:'This request was rejected. Please contact the handler for clarification.'
+    };
+  }
+
+  return {
+    key:'pending',
+    title:'Waiting for Review',
+    text:'Your request has been submitted successfully and is waiting for review.'
+  };
+}
+
+
+function renderMyBranchRequests(){
+
+  const rows =
+    (state.quoteRequests || [])
+      .filter(r=>r.requester===currentUser?.username)
+      .slice(0,12);
+
+  $('bpMyRequests').innerHTML =
+    rows.length
+      ? rows.map(r=>{
+
+          const meta =
+            branchRequestStatusMeta(r.status,r);
+
+          return `
+            <div class="myreq-card ${meta.key}">
+
+              <div class="myreq-top">
+                <div class="myreq-title-row">
+                  <div class="myreq-code">
+                    ${esc(r.requestNo)}
+                  </div>
+
+                  <span class="myreq-pill ${meta.key}">
+                    ${esc(r.status)}
+                  </span>
+                </div>
+
+                <div class="myreq-customer">
+                  ${esc(r.customer?.name || '-')}
+                </div>
+              </div>
+
+
+              <div class="myreq-banner ${meta.key}">
+                <div class="myreq-banner-title">
+                  ${esc(meta.title)}
+                </div>
+
+                <div class="myreq-banner-text">
+                  ${esc(meta.text)}
+                </div>
+              </div>
+
+
+              <div class="myreq-meta">
+                <div>
+                  <span>Date</span>
+                  <b>${esc(r.date || '-')}</b>
+                </div>
+
+                <div>
+                  <span>Items</span>
+                  <b>${Number(r.lines?.length || 0)} item(s)</b>
+                </div>
+
+                <div>
+                  <span>Handler</span>
+                  <b>${esc(ownerDisplay(r.handler))}</b>
+                </div>
+
+                <div>
+                  <span>Quotation</span>
+                  <b>${esc(r.quoteSerial || 'Not created yet')}</b>
+                </div>
+              </div>
+
+
+              <div class="actions" style="margin-top:10px">
+                <button
+                  class="btn ghost sm"
+                  onclick="openBranchRequest('${r.id}')"
+                >
+                  View
+                </button>
+              </div>
+
+            </div>
+          `;
+
+        }).join('')
+
+      : '<div class="empty">No requests submitted.</div>';
+}
 window.renderBranchRequests=function(){
 
   const f =
