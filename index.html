@@ -97,11 +97,40 @@
         <div class="panel-title"><span id="editorTitle">Document Entry</span><span id="serialBadge" style="font-size:11px"></span></div>
         <div class="panel-body">
           <div class="grid">
-            <div class="field"><label>Document Type</label><select id="docType"><option value="Q">Quotation</option><option value="PI">Pro Forma Invoice</option></select></div>
-            <div class="field"><label>Document Date</label><input id="docDate" type="date"/></div>
-            <div class="field"><label>Payment Mode</label><select id="payMode"><option value="credit">Credit</option><option value="cash">Cash</option></select></div>
-            <div class="field"><label>VAT Mode</label><select id="vatMode"><option value="none">No VAT Breakdown</option><option value="vat18">VAT Inclusive - Show 18% Breakdown</option></select></div>
-            <div class="field"><label>Validity</label><select id="validity"><option value="14">14 Days</option><option value="7">7 Days</option><option value="30">30 Days</option></select></div>
+<!-- Internal document type control.
+     Kept for existing system logic, but no longer shown to the user. -->
+<select id="docType" hidden>
+  <option value="Q">Quotation</option>
+  <option value="PI">Pro Forma Invoice</option>
+</select>
+
+<!-- Document Date remains visible -->
+<div class="field">
+  <label>Document Date</label>
+  <input id="docDate" type="date"/>
+</div>
+
+<!-- Internal payment mode.
+     Later this will be automatically filled from Customer Master. -->
+<select id="payMode" hidden>
+  <option value="credit">Credit</option>
+  <option value="cash">Cash</option>
+</select>
+<!-- Internal VAT mode.
+     Automatically controlled by the selected customer. -->
+<select id="vatMode" hidden>
+  <option value="none">No VAT Breakdown</option>
+  <option value="vat18">VAT Inclusive - Show 18% Breakdown</option>
+</select>
+
+
+<!-- Internal quotation category.
+     Controlled by the entry point:
+     Label Quotation / Device Quotation / PI -->
+<select id="quoteCategory" hidden>
+  <option value="label">Label Quotation</option>
+  <option value="device">Device Quotation</option>
+</select>
             <div class="field"><label>Quotation Category</label><select id="quoteCategory"><option value="label">Label Quotation</option><option value="device">Device Quotation</option></select></div>
             <div class="field" id="poRefField"><label>PO / Reference (PI Only)</label><input id="poRef" placeholder="Enter customer PO number before generating PI"/></div>
 
@@ -111,14 +140,49 @@
             <div class="field full"><label>Billing Address</label><textarea id="customerAddress"></textarea></div>
             <div class="field full"><label>Delivery Address</label><textarea id="deliveryAddress" placeholder="Leave blank to use billing address"></textarea></div>
             <div class="field"><label>Google Location</label><input id="googleLocation"/></div><div class="field"><label>VAT No. / Ref</label><input id="customerVat"/></div>
+<!--
+  Source Attachments & Auto Fill removed from New Document UI.
+  These hidden elements are retained because older system functions
+  still reference their IDs.
+-->
+<div hidden>
 
-            <div class="section">Source Attachments & Auto Fill</div>
-            <div class="field full"><div class="attach-grid">
-              <div class="drop"><b>PO / Order Attachment</b><div class="meta">PDF, JPG, JPEG, PNG</div><input id="poFile" type="file" accept="application/pdf,image/*"/><div id="poPreview" class="previewbox"></div></div>
-              <div class="drop"><b>Quotation Attachment</b><div class="meta">Use Auto Fill to read supported PDF text</div><input id="quoteFile" type="file" accept="application/pdf,image/*"/><div id="quotePreview" class="previewbox"></div></div>
-              <div class="drop"><b>WhatsApp / Customer Detail Image</b><div class="meta">Image / screenshot for visual reference</div><input id="chatFile" type="file" accept="image/*,application/pdf"/><div id="chatPreview" class="previewbox"></div></div>
-            </div></div>
-            <div class="field full"><label class="checkline"><input type="checkbox" id="autoFillQuote"/> Auto Fill from attached Quotation / Source</label><textarea id="sourceText" class="sourceText" placeholder="Or paste / type PO, quotation or WhatsApp text here..."></textarea><div class="actions"><button class="btn ghost sm" onclick="autoReadSource()">Read Attachment / Auto Fill</button><button class="btn ghost sm" onclick="parseSourceText()">Parse Typed Text</button></div><div class="hint">PDF reading uses an optional browser library. If unavailable/offline, preview the file and type/paste the required details manually.</div></div>
+  <input
+    id="poFile"
+    type="file"
+    accept="application/pdf,image/*"
+  >
+
+  <div id="poPreview"></div>
+
+
+  <input
+    id="quoteFile"
+    type="file"
+    accept="application/pdf,image/*"
+  >
+
+  <div id="quotePreview"></div>
+
+
+  <input
+    id="chatFile"
+    type="file"
+    accept="image/*,application/pdf"
+  >
+
+  <div id="chatPreview"></div>
+
+
+  <input
+    id="autoFillQuote"
+    type="checkbox"
+  >
+
+
+  <textarea id="sourceText"></textarea>
+
+</div>
 
             <div class="section">Label Price Calculator — Excel Formula</div>
             <div class="price-calc">
@@ -452,8 +516,107 @@
   <div class="field"><label>Customer / Company Name <span class="required-dot">*</span></label><input id="custName" placeholder="Auto-fill or type only if no source"/></div>
   <div class="field"><label>Contact Person</label><input id="custContactPerson" placeholder="Optional"/></div>
   <div class="field"><label>Contact Number <span class="required-dot">*</span></label><input id="custPhone" placeholder="At least phone or email"/></div>
-  <div class="field"><label>Email <span class="required-dot">*</span></label><input id="custEmail" placeholder="At least phone or email"/></div>
-  <div class="field"><label>VAT No. / Ref</label><input id="custVat"/></div>
+<div class="field">
+  <label>Email <span class="required-dot">*</span></label>
+  <input id="custEmail" placeholder="At least phone or email"/>
+</div>
+
+
+<div class="section">
+  Customer Payment Terms
+</div>
+
+
+<div class="field">
+
+  <label>Payment Mode</label>
+
+  <select
+    id="custPaymentMode"
+    onchange="updateCustomerPaymentTermsUI()"
+  >
+    <option value="cash">Cash Customer</option>
+    <option value="credit">Credit Customer</option>
+  </select>
+
+  <div class="hint">
+    Quotations will automatically use this customer's payment mode.
+  </div>
+
+</div>
+
+
+<div class="field">
+
+  <label>Credit Period</label>
+
+  <select id="custCreditDays">
+
+    <option value="7">7 Days</option>
+    <option value="14">14 Days</option>
+    <option value="21">21 Days</option>
+    <option value="30">30 Days</option>
+    <option value="45">45 Days</option>
+    <option value="60">60 Days</option>
+    <option value="90">90 Days</option>
+
+  </select>
+
+</div>
+
+
+<div class="field">
+
+  <label>Credit Limit (LKR)</label>
+
+  <input
+    id="custCreditLimit"
+    type="number"
+    min="0"
+    step="0.01"
+    value="0"
+    placeholder="e.g. 250000.00"
+  />
+
+  <div class="hint">
+    Maximum approved outstanding credit for this customer.
+  </div>
+
+</div>
+<div class="section">
+  VAT Settings
+</div>
+
+
+<div class="field">
+
+  <label>VAT Customer</label>
+
+  <select
+    id="custVatEnabled"
+    onchange="updateCustomerVatUI()"
+  >
+    <option value="no">Non-VAT Customer</option>
+    <option value="yes">VAT Customer</option>
+  </select>
+
+  <div class="hint">
+    Quotations and Pro Forma Invoices will automatically use this customer's VAT setting.
+  </div>
+
+</div>
+
+
+<div class="field">
+
+  <label>VAT No. / Ref</label>
+
+  <input
+    id="custVat"
+    placeholder="Enter VAT registration number"
+  />
+
+</div>
   <div class="field"><label>Google Location</label><input id="custMap" placeholder="Google Maps link if available"/></div>
   <div class="field full"><label>Billing Address</label><textarea id="custAddress" placeholder="Auto-fill from customer source where possible"></textarea></div>
   <div class="field full"><label>Delivery Address (if different)</label><textarea id="custDelivery"></textarea></div>
@@ -685,8 +848,110 @@ function docTotals(doc){let gross=activeDocLines(doc).reduce((a,l)=>a+(Number(l.
 function currentPricingForItem(item,customerId,payMode){const c=state.customers.find(x=>x.id===customerId);const sp=c&&c.specialPrices&&c.specialPrices[item.id];if(sp){if(payMode==='cash'&&sp.cash!==''&&sp.cash!=null)return Number(sp.cash);if(payMode==='credit'&&sp.credit!==''&&sp.credit!=null)return Number(sp.credit)}const cash=Number(item.cash||0),markup=Number(item.creditMarkup ?? state.settings.creditMarkup ?? 0);return payMode==='cash'?cash:Number(item.creditPrice||cash*(1+markup/100))}
 
 function refreshCustomerPick(){const sel=$('customerSelect'),v=sel.value;sel.innerHTML='<option value="">-- Select customer --</option>'+state.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');if(state.customers.some(c=>c.id===v))sel.value=v;const mp=$('masterItemPick'),mv=mp.value;mp.innerHTML='<option value="">-- Item Master --</option>'+state.items.map(i=>`<option value="${i.id}">${esc([i.size,i.material,i.layout,i.pcs?i.pcs+'pcs':''].filter(Boolean).join(' / '))}</option>`).join('');if(state.items.some(i=>i.id===mv))mp.value=mv}
-function fillCustomer(id){const c=state.customers.find(x=>x.id===id);if(!c)return;$('customerPhone').value=c.phone||'';$('customerEmail').value=c.email||'';$('customerAddress').value=c.address||'';$('deliveryAddress').value=c.delivery||'';$('googleLocation').value=c.map||'';$('customerVat').value=c.vat||'';syncPricesToCustomer();showCustomerPriceSuggestion();renderCurrent()}
-$('customerSelect').addEventListener('change',()=>fillCustomer($('customerSelect').value));$('payMode').addEventListener('change',()=>{if($('payMode').value==='cash'){$('validity').value='7'}else $('validity').value='14';syncPricesToCustomer();renderCurrent()});$('vatMode').addEventListener('change',renderCurrent);$('docType').addEventListener('change',()=>{if(!state.current)return;state.current.type=$('docType').value;updateEditorVisibility();renderCurrent()});$('quoteCategory').addEventListener('change',()=>{updateEditorVisibility();renderCurrent()});['docDate','validity','poRef','customerPhone','customerEmail','customerAddress','deliveryAddress','googleLocation','customerVat','extraNote','delivery3','whatsappTracking'].forEach(id=>$(id).addEventListener('input',renderCurrent));
+function fillCustomer(id){
+
+  const c =
+    state.customers.find(
+      x=>x.id===id
+    );
+
+
+  if(!c){
+    return;
+  }
+
+
+  $('customerPhone').value =
+    c.phone || '';
+
+  $('customerEmail').value =
+    c.email || '';
+
+  $('customerAddress').value =
+    c.address || '';
+
+  $('deliveryAddress').value =
+    c.delivery || '';
+
+  $('googleLocation').value =
+    c.map || '';
+
+  $('customerVat').value =
+    c.vat || '';
+
+
+  /* ========================================
+     PAYMENT MODE FROM CUSTOMER
+     ======================================== */
+
+  const paymentMode =
+    c.paymentMode === 'cash'
+      ? 'cash'
+      : 'credit';
+
+
+  $('payMode').value =
+    paymentMode;
+
+
+  /* ========================================
+     VAT MODE FROM CUSTOMER
+     ======================================== */
+
+  const vatEnabled =
+    c.vatEnabled !== undefined
+      ? !!c.vatEnabled
+      : !!c.vat;
+
+
+  $('vatMode').value =
+    vatEnabled
+      ? 'vat18'
+      : 'none';
+
+
+  /* ========================================
+     ACTIVE DOCUMENT CUSTOMER TERMS
+     ======================================== */
+
+  if(state.current){
+
+    state.current.customerPaymentMode =
+      paymentMode;
+
+    state.current.customerCreditDays =
+      paymentMode === 'credit'
+        ? Number(c.creditDays || 0)
+        : 0;
+
+    state.current.customerCreditLimit =
+      paymentMode === 'credit'
+        ? Number(c.creditLimit || 0)
+        : 0;
+
+    state.current.customerVatEnabled =
+      vatEnabled;
+
+  }
+
+
+  /* Recalculate Cash / Credit prices */
+
+  syncPricesToCustomer();
+
+  showCustomerPriceSuggestion();
+
+  renderCurrent();
+
+}
+$('customerSelect').addEventListener('change',()=>fillCustomer($('customerSelect').value));
+$('payMode').addEventListener('change',()=>{
+
+  syncPricesToCustomer();
+
+  renderCurrent();
+
+});$('vatMode').addEventListener('change',renderCurrent);$('docType').addEventListener('change',()=>{if(!state.current)return;state.current.type=$('docType').value;updateEditorVisibility();renderCurrent()});$('quoteCategory').addEventListener('change',()=>{updateEditorVisibility();renderCurrent()});['docDate','validity','poRef','customerPhone','customerEmail','customerAddress','deliveryAddress','googleLocation','customerVat','extraNote','delivery3','whatsappTracking'].forEach(id=>$(id).addEventListener('input',renderCurrent));
 function syncPricesToCustomer(){document.querySelectorAll('#lineBody tr').forEach(tr=>{const iid=tr.dataset.itemId;if(!iid)return;const item=state.items.find(x=>x.id===iid);if(item){tr.querySelector('.lprice').value=currentPricingForItem(item,$('customerSelect').value,$('payMode').value).toFixed(2)}});recalcLines()}
 function newDocument(type='Q',category='label'){showView('editor');resetEditor(false);const date=today(),core=nextCore(date);state.current={id:uid('doc'),type,category,core,rev:0,date,serial:serialFor(type,core,0),lines:[],attachments:{},sourceQuoteId:null,createdBy:currentUser?.display||'',createdByUser:currentUser?.username||''};$('docType').value=type;$('quoteCategory').value=category;$('docDate').value=date;$('payMode').value='credit';$('vatMode').value='none';$('validity').value='14';$('poRef').value='';$('customerSelect').value='';['customerPhone','customerEmail','customerAddress','deliveryAddress','googleLocation','customerVat','extraNote','sourceText'].forEach(id=>$(id).value='');$('delivery3').checked=true;$('whatsappTracking').checked=true;clearAttachments();updateEditorVisibility();renderLineRows([]);renderCurrent();saveState()}
 function resetEditor(showDash=true){
@@ -1480,6 +1745,65 @@ function docTable(arr,isQ){
   }).join('')}</tbody></table>`
 }
 function renderCustomers(){const q=($('customerSearch')?.value||'').toLowerCase(),arr=state.customers.filter(c=>[c.name,c.address,c.phone,c.email].join(' ').toLowerCase().includes(q));$('customerList').innerHTML=!arr.length?'<div class="empty">No customers found.</div>':`<table class="table"><thead><tr><th>Customer</th><th>Contact</th><th>Billing / Delivery</th><th>VAT</th><th>Price History</th><th></th></tr></thead><tbody>${arr.map(c=>`<tr><td><b>${esc(c.name)}</b><div class="small">${esc(c.contactPerson||'')}${c.contactPerson&&c.email?' • ':''}${esc(c.email||'')}</div></td><td>${esc(c.phone||'-')}<div class="small">${c.map?'<span class="tag">Google Location</span>':''}</div></td><td>${esc(c.address||'-')}<div class="small">Delivery: ${esc(c.delivery||'Same as billing')}</div></td><td>${esc(c.vat||'-')}</td><td>${(c.priceHistory||[]).length} saved prices<div class="small">${Object.keys(c.specialPrices||{}).length} special rules</div></td><td><button class="btn ghost sm" onclick="openCustomerModal('${c.id}')">Edit</button></td></tr>`).join('')}</tbody></table>`}
+function updateCustomerPaymentTermsUI(){
+
+  const mode =
+    $('custPaymentMode')?.value || 'cash';
+
+  const isCredit =
+    mode === 'credit';
+
+
+  const days =
+    $('custCreditDays');
+
+  const limit =
+    $('custCreditLimit');
+
+
+  if(days){
+    days.disabled = !isCredit;
+  }
+
+  if(limit){
+    limit.disabled = !isCredit;
+  }
+
+}
+function updateCustomerVatUI(){
+
+  const enabled =
+    $('custVatEnabled')?.value === 'yes';
+
+
+  const vatNo =
+    $('custVat');
+
+  const vatFile =
+    $('custVatFile');
+
+
+  if(vatNo){
+
+    vatNo.disabled =
+      !enabled;
+
+    vatNo.placeholder =
+      enabled
+        ? 'Enter VAT registration number'
+        : 'VAT disabled for this customer';
+
+  }
+
+
+  if(vatFile){
+
+    vatFile.disabled =
+      !enabled;
+
+  }
+
+}
 function openCustomerModal(id=''){
   pastedCustomerFile=null;
   const c=state.customers.find(x=>x.id===id);
@@ -1487,9 +1811,73 @@ function openCustomerModal(id=''){
   $('custName').value=c?.name||'';
   $('custContactPerson').value=c?.contactPerson||'';
   $('custPhone').value=c?.phone||'';
-  $('custEmail').value=c?.email||'';
-  $('custVat').value=c?.vat||'';
-  $('custAddress').value=c?.address||'';
+
+
+/* Customer payment terms */
+
+$('custPaymentMode').value =
+  c
+    ? (
+        c.paymentMode === 'cash'
+          ? 'cash'
+          : 'credit'
+      )
+    : 'cash';
+
+
+$('custCreditDays').value =
+  String(
+    Number(
+      c?.creditDays || 14
+    )
+  );
+
+
+$('custCreditLimit').value =
+  Number(
+    c?.creditLimit || 0
+  );
+
+
+updateCustomerPaymentTermsUI();
+
+$('custEmail').value =
+  c?.email || '';
+
+
+/* ========================================
+   CUSTOMER VAT SETTING
+   Existing customer compatibility:
+   - saved vatEnabled -> use it
+   - old customer with VAT number -> VAT ON
+   - new customer -> VAT OFF
+   ======================================== */
+
+const vatEnabled =
+  c
+    ? (
+        c.vatEnabled !== undefined
+          ? !!c.vatEnabled
+          : !!c.vat
+      )
+    : false;
+
+
+$('custVatEnabled').value =
+  vatEnabled
+    ? 'yes'
+    : 'no';
+
+
+$('custVat').value =
+  c?.vat || '';
+
+
+updateCustomerVatUI();
+
+
+$('custAddress').value =
+  c?.address || '';
   $('custDelivery').value=c?.delivery||'';
   $('custMap').value=c?.map||'';
   $('custNotes').value=c?.notes||'';
@@ -1519,12 +1907,45 @@ async function saveCustomer(){
   if($('custVatFile').files[0])vatFile=await putFile($('custVatFile').files[0],'VAT Certificate');
   if($('custSourceFile').files[0]||pastedCustomerFile)sourceFile=await putFile($('custSourceFile').files[0]||pastedCustomerFile,'Customer Source');
   const c={...old,id,
-    name:$('custName').value.trim(),
-    contactPerson:$('custContactPerson').value.trim(),
-    phone:$('custPhone').value.trim(),
-    email:$('custEmail').value.trim(),
-    vat:$('custVat').value.trim(),
-    address:$('custAddress').value.trim(),
+name:$('custName').value.trim(),
+
+contactPerson:
+  $('custContactPerson').value.trim(),
+
+phone:
+  $('custPhone').value.trim(),
+
+
+email:
+  $('custEmail').value.trim(),
+
+
+/* CUSTOMER VAT SETTINGS */
+
+vatEnabled:
+  $('custVatEnabled').value === 'yes',
+
+vat:
+  $('custVat').value.trim(),
+
+
+address:
+  $('custAddress').value.trim(),
+/* CUSTOMER COMMERCIAL TERMS */
+
+paymentMode:
+  $('custPaymentMode').value,
+
+creditDays:
+  Number(
+    $('custCreditDays').value || 0
+  ),
+
+creditLimit:
+  Number(
+    $('custCreditLimit').value || 0
+  ),
+
     delivery:$('custDelivery').value.trim(),
     map:$('custMap').value.trim(),
     notes:$('custNotes').value.trim(),
