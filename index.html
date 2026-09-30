@@ -106,8 +106,13 @@
 
 <!-- Document Date remains visible -->
 <div class="field">
-  <label>Document Date</label>
-  <input id="docDate" type="date"/>
+  <label>Validity</label>
+
+  <select id="validity">
+    <option value="14">14 Days</option>
+    <option value="7">7 Days</option>
+    <option value="30">30 Days</option>
+  </select>
 </div>
 
 <!-- Internal payment mode.
@@ -127,11 +132,11 @@
 <!-- Internal quotation category.
      Controlled by the entry point:
      Label Quotation / Device Quotation / PI -->
+<!-- Internal quotation category -->
 <select id="quoteCategory" hidden>
   <option value="label">Label Quotation</option>
   <option value="device">Device Quotation</option>
 </select>
-            <div class="field"><label>Quotation Category</label><select id="quoteCategory"><option value="label">Label Quotation</option><option value="device">Device Quotation</option></select></div>
             <div class="field" id="poRefField"><label>PO / Reference (PI Only)</label><input id="poRef" placeholder="Enter customer PO number before generating PI"/></div>
 
             <div class="section">Customer</div>
@@ -951,7 +956,31 @@ $('payMode').addEventListener('change',()=>{
 
   renderCurrent();
 
-});$('vatMode').addEventListener('change',renderCurrent);$('docType').addEventListener('change',()=>{if(!state.current)return;state.current.type=$('docType').value;updateEditorVisibility();renderCurrent()});$('quoteCategory').addEventListener('change',()=>{updateEditorVisibility();renderCurrent()});['docDate','validity','poRef','customerPhone','customerEmail','customerAddress','deliveryAddress','googleLocation','customerVat','extraNote','delivery3','whatsappTracking'].forEach(id=>$(id).addEventListener('input',renderCurrent));
+});$('vatMode').addEventListener('change',renderCurrent);$('docType').addEventListener('change',()=>{if(!state.current)return;state.current.type=$('docType').value;updateEditorVisibility();renderCurrent()});$('quoteCategory').addEventListener('change',()=>{updateEditorVisibility();renderCurrent()});[
+  'docDate',
+  'validity',
+  'poRef',
+  'customerPhone',
+  'customerEmail',
+  'customerAddress',
+  'deliveryAddress',
+  'googleLocation',
+  'customerVat',
+  'extraNote',
+  'delivery3',
+  'whatsappTracking'
+].forEach(id=>{
+
+  const el = $(id);
+
+  if(el){
+    el.addEventListener(
+      'input',
+      renderCurrent
+    );
+  }
+
+});
 function syncPricesToCustomer(){document.querySelectorAll('#lineBody tr').forEach(tr=>{const iid=tr.dataset.itemId;if(!iid)return;const item=state.items.find(x=>x.id===iid);if(item){tr.querySelector('.lprice').value=currentPricingForItem(item,$('customerSelect').value,$('payMode').value).toFixed(2)}});recalcLines()}
 function newDocument(type='Q',category='label'){showView('editor');resetEditor(false);const date=today(),core=nextCore(date);state.current={id:uid('doc'),type,category,core,rev:0,date,serial:serialFor(type,core,0),lines:[],attachments:{},sourceQuoteId:null,createdBy:currentUser?.display||'',createdByUser:currentUser?.username||''};$('docType').value=type;$('quoteCategory').value=category;$('docDate').value=date;$('payMode').value='credit';$('vatMode').value='none';$('validity').value='14';$('poRef').value='';$('customerSelect').value='';['customerPhone','customerEmail','customerAddress','deliveryAddress','googleLocation','customerVat','extraNote','sourceText'].forEach(id=>$(id).value='');$('delivery3').checked=true;$('whatsappTracking').checked=true;clearAttachments();updateEditorVisibility();renderLineRows([]);renderCurrent();saveState()}
 function resetEditor(showDash=true){
