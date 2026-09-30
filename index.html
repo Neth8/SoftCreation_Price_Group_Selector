@@ -3794,6 +3794,18 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
 
     <div class="bp-delivery-grid">
 
+      <div class="field full">
+        <label>
+          Customer Name
+          <span class="required-dot">*</span>
+        </label>
+        <input
+          id="bpDeliveryCustomerName"
+          type="text"
+          placeholder="Customer / Receiver name"
+        >
+      </div>
+
       <div class="field">
         <label>
           Address Line 1
@@ -3871,6 +3883,7 @@ window.toggleBpSeparateDelivery=function(){
   }
 
   [
+    'bpDeliveryCustomerName',
     'bpDeliveryLine1',
     'bpDeliveryLine2',
     'bpDeliveryContact1'
@@ -3915,6 +3928,9 @@ window.submitBranchQuoteRequest=function(){
   const separateDelivery =
     !!$('bpSeparateDelivery')?.checked;
 
+  const deliveryCustomerName =
+    $('bpDeliveryCustomerName')?.value.trim() || '';
+
   const deliveryLine1 =
     $('bpDeliveryLine1')?.value.trim() || '';
 
@@ -3926,6 +3942,31 @@ window.submitBranchQuoteRequest=function(){
 
   const deliveryContact2 =
     $('bpDeliveryContact2')?.value.trim() || '';
+
+
+  if(separateDelivery){
+
+    if(!deliveryCustomerName){
+      $('bpDeliveryCustomerName')?.focus();
+      return toast('Customer Name is required for separate delivery');
+    }
+
+    if(!deliveryLine1){
+      $('bpDeliveryLine1')?.focus();
+      return toast('Address Line 1 is required');
+    }
+
+    if(!deliveryLine2){
+      $('bpDeliveryLine2')?.focus();
+      return toast('Address Line 2 is required');
+    }
+
+    if(!deliveryContact){
+      $('bpDeliveryContact1')?.focus();
+      return toast('Delivery contact number is required');
+    }
+
+  }
 
 
   const r = {
@@ -3961,6 +4002,11 @@ window.submitBranchQuoteRequest=function(){
 
       separateDelivery:
         separateDelivery,
+
+      deliveryCustomerName:
+        separateDelivery
+          ? deliveryCustomerName
+          : '',
 
       deliveryLine1:
         separateDelivery
@@ -4041,6 +4087,7 @@ window.submitBranchQuoteRequest=function(){
     'bpAddress',
     'bpNote',
     'bpDeliveryAddress',
+    'bpDeliveryCustomerName',
     'bpDeliveryLine1',
     'bpDeliveryLine2',
     'bpDeliveryContact1',
@@ -4111,6 +4158,7 @@ function(){
 
 
   [
+    'bpDeliveryCustomerName',
     'bpDeliveryLine1',
     'bpDeliveryLine2',
     'bpDeliveryContact1'
@@ -4483,7 +4531,7 @@ function branchRequestDeliveryForQuotation(r,c){
     /* Future/backward compatibility: include receiver/customer
        name if that field exists on a request. */
     if(rc.deliveryCustomerName){
-      lines.push(String(rc.deliveryCustomerName).trim());
+      lines.push(`Customer: ${String(rc.deliveryCustomerName).trim()}`);
     }
 
     if(rc.deliveryLine1){
@@ -4920,10 +4968,12 @@ window.convertBranchRequest=function(id){
      const separate=!!$('bpSeparateDelivery')?.checked;
 
      if(separate){
+       const deliveryCustomerName=$('bpDeliveryCustomerName')?.value.trim()||'';
        const line1=$('bpDeliveryLine1')?.value.trim()||'';
        const line2=$('bpDeliveryLine2')?.value.trim()||'';
        const contact1=$('bpDeliveryContact1')?.value.trim()||'';
 
+       if(!deliveryCustomerName){$('bpDeliveryCustomerName')?.focus();return toast('Customer Name is required for separate delivery')}
        if(!line1){$('bpDeliveryLine1')?.focus();return toast('Address Line 1 is required')}
        if(!line2){$('bpDeliveryLine2')?.focus();return toast('Address Line 2 is required')}
        if(!contact1){$('bpDeliveryContact1')?.focus();return toast('Delivery contact number is required')}
@@ -4942,7 +4992,7 @@ window.convertBranchRequest=function(id){
    if(directPortalCustomer() && (state.quoteRequests||[]).length>before){
      loadBranchCustomerProfile();
      if($('bpSeparateDelivery'))$('bpSeparateDelivery').checked=false;
-     ['bpDeliveryLine1','bpDeliveryLine2','bpDeliveryContact1','bpDeliveryContact2'].forEach(id=>{if($(id))$(id).value=''});
+     ['bpDeliveryCustomerName','bpDeliveryLine1','bpDeliveryLine2','bpDeliveryContact1','bpDeliveryContact2'].forEach(id=>{if($(id))$(id).value=''});
      if(typeof toggleBpSeparateDelivery==='function')toggleBpSeparateDelivery();
    }
 
@@ -9847,6 +9897,7 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   /* Required only when separate delivery is ON */
   [
+    'bpDeliveryCustomerName',
     'bpDeliveryLine1',
     'bpDeliveryLine2',
     'bpDeliveryContact1'
