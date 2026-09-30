@@ -1719,20 +1719,249 @@ function reviseQuote(id){
   const n=JSON.parse(JSON.stringify(old));n.id=uid('doc');n.rev=(old.rev||0)+1;n.serial=serialFor('Q',old.core,n.rev);n.revisionOf=old.id;n.replacedBy=null;n.created=Date.now();old.replacedBy=n.id;
   state.docs.unshift(n);saveState();openDocument(n.id);toast('Revision created; previous quotation is now hidden from active list')
 }
+function sameCustomerForPICreditCheck(doc,customer){
+
+  if(!doc || !customer){
+    return false;
+  }
+
+  // Best match - Customer Master ID
+  if(
+    doc.customerId &&
+    doc.customerId === customer.id
+  ){
+    return true;
+  }
+
+  // Legacy document fallback - phone
+  if(
+    customer.phone &&
+    doc.customer?.phone &&
+    String(customer.phone).trim() ===
+    String(doc.customer.phone).trim()
+  ){
+    return true;
+  }
+
+  // Legacy document fallback - customer name
+  if(
+    customer.name &&
+    doc.customer?.name &&
+    String(customer.name).trim().toLowerCase() ===
+    String(doc.customer.name).trim().toLowerCase()
+  ){
+    return true;
+  }
+
+  return false;
+}
+
+
+function getCustomerPIOutstanding(customer){
+
+  return (state.docs || [])
+
+    .filter(d=>
+
+      // Only Pro Forma Invoices
+      d.type === 'PI' &&
+
+      // Only credit PIs
+      (d.payMode || 'credit') === 'credit' &&
+
+      // Ignore replaced documents
+      !d.replacedBy &&
+
+      sameCustomerForPICreditCheck(
+        d,
+        customer
+      )
+
+    )
+
+    .reduce((total,d)=>{
+
+      /*
+       * Use existing payment system.
+       *
+       * Unpaid PI     -> full balance
+       * Part paid PI  -> remaining balance
+       * Paid PI       -> zero
+       */
+
+      if(
+        typeof paymentSummary === 'function'
+      ){
+
+        return (
+          total +
+          Number(
+            paymentSummary(d).balance || 0
+          )
+        );
+
+      }
+
+
+      // Safety fallback
+      const gross =
+        typeof docTotals === 'function'
+          ? Number(
+              docTotals(d).gross || 0
+            )
+          : (d.lines || []).reduce(
+              (sum,line)=>
+                sum +
+                Number(line.qty || 0) *
+                Number(line.price || 0),
+              0
+            );
+
+
+      const paid =
+        (d.paymentHistory || [])
+          .filter(p=>!p.invalid)
+          .reduce(
+            (sum,p)=>
+              sum +
+              Number(p.amount || 0),
+            0
+          );
+
+
+      return (
+        total +
+        Math.max(
+          0,
+          gross - paid
+        )
+      );
+
+    },0);
+
+}
+
+
 function convertQuote(id){
 
-  // Load the selected quotation into the internal editor state
+  const quotation =
+    state.docs.find(
+      d=>
+        d.id === id &&
+        d.type === 'Q'
+    );
+
+
+  if(!quotation){
+
+    toast('Quotation not found');
+
+    return;
+
+  }
+
+
+  const customer =
+    state.customers.find(
+      c=>c.id === quotation.customerId
+    );
+
+
+  /*
+   * Only credit customers use credit limit control.
+   */
+
+  if(
+    customer &&
+    customer.paymentMode === 'credit'
+  ){
+
+    const creditLimit =
+      Math.max(
+        0,
+        Number(
+          customer.creditLimit || 0
+        )
+      );
+
+
+    const outstanding =
+      getCustomerPIOutstanding(
+        customer
+      );
+
+
+    /*
+     * Existing customer outstanding is already
+     * above the approved credit limit.
+     */
+
+    if(
+      outstanding >
+      creditLimit + 0.01
+    ){
+
+      const exceededBy =
+        outstanding -
+        creditLimit;
+
+
+      toast(
+        `PI blocked — ${customer.name} is over the credit limit`
+      );
+
+
+      alert(
+`CREDIT LIMIT EXCEEDED
+
+Customer:
+${customer.name || 'Customer'}
+
+Credit Limit:
+LKR ${money(creditLimit)}
+
+Current PI Outstanding:
+LKR ${money(outstanding)}
+
+Over Credit Limit By:
+LKR ${money(exceededBy)}
+
+A new Pro Forma Invoice cannot be created for this customer until the outstanding balance is reduced or the approved credit limit is increased.`
+      );
+
+
+      return;
+
+    }
+
+  }
+
+
+  /*
+   * Credit check passed.
+   * Load quotation internally.
+   */
+
   openDocument(id);
 
-  setTimeout(()=>{
 
-    // Keep Pro Forma list as the background screen
-    showView('pis');
+  /*
+   * Keep Pro Forma screen in the background.
+   */
 
-    // Open the existing PI item-selection popup
-    convertCurrentToPI();
+  showView('pis');
 
-  },50);
+
+  /*
+   * Open existing PI item-selection popup.
+   */
+
+  setTimeout(
+    ()=>{
+      convertCurrentToPI();
+    },
+    50
+  );
 
 }
 function convertCurrentToPI(){const d=collectCurrent();if(!d||d.type!=='Q')return;$('convertItems').innerHTML=(d.lines||[]).map((l,i)=>`<label class="checkline" style="padding:9px;border-bottom:1px solid #e4ecee"><input type="checkbox" class="convcheck" data-i="${i}" checked><span><b>${esc(l.desc)}</b> — ${esc([l.size,l.material,l.layout].filter(Boolean).join(' / '))} <span class="small">${money(l.qty)} ${esc(l.unit)} @ LKR ${money(l.price)}</span></span></label>`).join('');$('convertModal').classList.add('show')}
