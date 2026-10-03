@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.19 - A4 Quotation Preview + Single-Page PDF Stability -->
+<!-- SoftCreation v1.0.19 - Proper Multi-Page Quotation Preview + PDF -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -1234,88 +1234,6 @@ function buildDocHTML(doc,forPrint=false){
   </div>
   <div class="docfoot"><b>${q?'Thank you for the opportunity to quote.':'Thank you for your order.'}</b><span>${esc(q?state.settings.quoteFooter:state.settings.piFooter)}</span></div>`;
 }
-/* v1.0.19 - Keep quotation/PI preview locked to one physical A4 page.
-   The old .paper rule used min-height only, so a longer quotation could make
-   the paper itself grow. That stretched the letterhead in the viewer and the
-   browser print fallback could create a second page. */
-const SC_A4_WIDTH_V1019=794;
-const SC_A4_HEIGHT_V1019=1123;
-
-function resetPaperFitV1019(paper){
-  if(!paper)return;
-  const body=paper.querySelector('.docbody');
-  if(!body)return;
-  body.style.transform='';
-  body.style.transformOrigin='';
-  body.style.right='';
-  body.style.width='';
-  body.removeAttribute('data-paper-fit');
-}
-
-function fitPaperToSinglePageV1019(paper){
-  if(!paper)return 1;
-  const body=paper.querySelector('.docbody');
-  if(!body)return 1;
-  resetPaperFitV1019(paper);
-
-  const paperHeight=paper.clientHeight||SC_A4_HEIGHT_V1019;
-  const baseWidth=body.getBoundingClientRect().width||678;
-  const bodyTop=body.offsetTop||parseFloat(getComputedStyle(body).top)||0;
-  let bodyLimit=paperHeight;
-  const settlement=paper.querySelector('.pi-settlement-footer');
-  const foot=paper.querySelector('.docfoot');
-  if(settlement&&settlement.offsetTop>bodyTop)bodyLimit=Math.min(bodyLimit,settlement.offsetTop-8);
-  if(foot&&foot.offsetTop>bodyTop)bodyLimit=Math.min(bodyLimit,foot.offsetTop-8);
-
-  const available=Math.max(80,bodyLimit-bodyTop);
-  let required=Math.max(body.scrollHeight,body.clientHeight);
-  if(required<=available+1){
-    body.setAttribute('data-paper-fit','1.000');
-    return 1;
-  }
-
-  let scale=Math.min(1,available/required);
-  for(let n=0;n<6;n++){
-    scale=Math.max(0.2,Math.min(1,scale));
-    body.style.transformOrigin='top left';
-    body.style.right='auto';
-    body.style.width=`${baseWidth/scale}px`;
-    body.style.transform=`scale(${scale})`;
-    required=Math.max(body.scrollHeight,body.clientHeight);
-    const next=Math.min(1,available/required);
-    if(Math.abs(next-scale)<0.002){scale=next;break}
-    scale=next;
-  }
-
-  scale=Math.max(0.2,Math.min(1,scale));
-  body.style.right='auto';
-  body.style.width=`${baseWidth/scale}px`;
-  body.style.transformOrigin='top left';
-  body.style.transform=`scale(${scale})`;
-  body.setAttribute('data-paper-fit',scale.toFixed(3));
-  return scale;
-}
-
-async function waitForPaperAssetsV1019(paper){
-  if(!paper)return;
-  const imgs=[...paper.querySelectorAll('img')];
-  await Promise.all(imgs.map(img=>new Promise(resolve=>{
-    if(img.complete){resolve();return}
-    let done=false;
-    const finish=()=>{if(done)return;done=true;resolve()};
-    img.addEventListener('load',finish,{once:true});
-    img.addEventListener('error',finish,{once:true});
-    setTimeout(finish,1800);
-  })));
-  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-}
-
-async function stabilizePaperV1019(paper){
-  if(!paper)return 1;
-  await waitForPaperAssetsV1019(paper);
-  return fitPaperToSinglePageV1019(paper);
-}
-
 function renderCurrent(){
   if(!state.current){
     if($('paper'))$('paper').innerHTML='<div style="position:absolute;left:58px;right:58px;top:250px;padding:18px;border:1px dashed #9fc8ca;border-radius:12px;color:#60717d;background:rgba(255,255,255,.88)"><b style="color:#078f92">Start a New Document</b><br><span style="font-size:11px">Click New Document to create a quotation, then select a customer and add items.</span></div>';
@@ -1326,11 +1244,7 @@ function renderCurrent(){
     state.current={...state.current,...d};
     $('serialBadge').textContent=d.serial;
     $('paper').innerHTML=buildDocHTML(d);
-    if(d.type==='PI'){
-      Promise.resolve(renderQR(d)).finally(()=>stabilizePaperV1019($('paper')));
-    }else{
-      stabilizePaperV1019($('paper'));
-    }
+    if(d.type==='PI')renderQR(d);
   }catch(err){
     console.error('Preview failed',err);
     $('paper').innerHTML='<div style="position:absolute;left:58px;right:58px;top:250px;padding:18px;border:1px solid #e7b6b6;border-radius:12px;color:#8d3030;background:#fff7f7"><b>Preview error</b><br><span style="font-size:11px">Please refresh the document. If this continues, check the browser console.</span></div>';
@@ -1739,8 +1653,8 @@ async function createPaperForCapture(doc){
   if(doc.type==='PI'){
     const qr=paper.querySelector(`[id="qr_${doc.id}"]`);
     if(qr)await renderQRIn(qr,doc);
+    await new Promise(r=>setTimeout(r,120));
   }
-  await stabilizePaperV1019(paper);
   return {host,paper}
 }
 async function downloadDocPDF(doc){
@@ -1768,8 +1682,6 @@ async function downloadDocPDF(doc){
     const pdf=new jsPDF({orientation:'p',unit:'mm',format:'a4',compress:true});
     try{pdf.setDisplayMode(1.0,'continuous','UseNone')}catch(e){}
     pdf.addImage(img,'PNG',0,0,210,297,'previewExact','FAST');
-    /* This quotation/PI generator is intentionally single-page A4. */
-    while(pdf.getNumberOfPages()>1)pdf.deletePage(pdf.getNumberOfPages());
     pdf.save((doc.serial||'document').replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
     toast('PDF generated exactly from preview');
   }catch(err){
@@ -1788,17 +1700,15 @@ async function downloadSavedPDF(id){
   const d=state.docs.find(x=>x.id===id);if(!d)return;
   await downloadDocPDF(JSON.parse(JSON.stringify(d)));
 }
-async function printSavedDocument(doc){
+function printSavedDocument(doc){
   if(!doc)return;
   $('printHost').innerHTML=`<div class="paper">${buildDocHTML(doc,true)}</div>`;
   $('printHost').style.display='block';
-  const paper=$('printHost').querySelector('.paper');
   if(doc.type==='PI'){
     const h=$('printHost').querySelector(`[id="qr_${doc.id}"]`);
-    if(h)await renderQRIn(h,doc);
+    if(h)renderQRIn(h,doc);
   }
-  await stabilizePaperV1019(paper);
-  setTimeout(()=>{window.print();$('printHost').style.display='none'},120);
+  setTimeout(()=>{window.print();$('printHost').style.display='none'},350);
 }
 async function renderQRIn(holder,doc){if(!holder)return;const ok=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',()=>window.QRCode);if(!ok)return;holder.innerHTML='';const raw=b64Unicode(productionPayload(doc)),txt=state.settings.prodUrl?state.settings.prodUrl.replace(/#.*$/,'')+'#scprod='+encodeURIComponent(raw):'SC-PROD:'+raw;new QRCode(holder,{text:txt,width:70,height:70,correctLevel:QRCode.CorrectLevel.M})}
 function printCurrent(){const d=collectCurrent();if(!d)return;printSavedDocument(d)}
@@ -1813,10 +1723,7 @@ function viewDocument(id){
   $('viewerPaper').innerHTML=buildDocHTML(d,true);
   if(d.type==='PI'){
     const h=$('viewerPaper').querySelector(`[id="qr_${d.id}"]`);
-    if(h)Promise.resolve(renderQRIn(h,d)).finally(()=>stabilizePaperV1019($('viewerPaper')));
-    else stabilizePaperV1019($('viewerPaper'));
-  }else{
-    stabilizePaperV1019($('viewerPaper'));
+    if(h)renderQRIn(h,d);
   }
   $('viewerEditBtn').style.display='inline-block';
   $('viewerDeleteBtn').style.display='inline-block';
@@ -3201,7 +3108,7 @@ if($('devImage'))$('devImage').addEventListener('change',async()=>{
   }
 });
 
-/* Final Device Master saver for v1.0.18.
+/* Final Device Master saver for v1.0.19.
    - Image binary uploads immediately when the file is selected.
    - Save Device only links the already-uploaded Storage asset to the device record.
    - image/imageUrl both point at the public cloud URL so existing quotation/PDF
@@ -10425,6 +10332,491 @@ window.toggleBpSeparateDeliveryButton = function(){
   setTimeout(()=>{
     try{optimizedRefreshAll()}catch(e){}
   },0);
+
+})();
+</script>
+
+
+<script>
+/* =========================================================
+   v1.0.19 — PROFESSIONAL MULTI-PAGE QUOTATION RENDERING
+   ---------------------------------------------------------
+   Purpose:
+   - Preserve the original quotation font sizes and spacing.
+   - When content exceeds one A4 page, create real additional
+     A4 pages instead of shrinking the first page.
+   - Repeat the quotation header/customer block and footer on
+     every continuation page.
+   - Repeat table headings when item rows continue.
+   - Keep Preview and generated PDF page breaks identical.
+   - Existing PI rendering/business logic remains unchanged.
+   ========================================================= */
+(function(){
+  const SC_QUOTE_PAGE_WIDTH=794;
+  const SC_QUOTE_PAGE_HEIGHT=1123;
+
+  function scQuoteIsPagedDocument(doc){
+    return !!doc && doc.type==='Q';
+  }
+
+  function scResetPaperTargetV1019(target){
+    if(!target)return;
+    target.className='paper';
+    target.removeAttribute('style');
+  }
+
+  function scQuotationSourceV1019(doc){
+    const tpl=document.createElement('template');
+    tpl.innerHTML=String(buildDocHTML(doc,true)||'').trim();
+    const body=tpl.content.querySelector('.docbody');
+    const footer=tpl.content.querySelector('.docfoot');
+    if(!body)throw new Error('Quotation document body was not generated.');
+    return {body,footer};
+  }
+
+  function scDirectChildByClassV1019(parent,className){
+    return [...(parent?.children||[])].find(el=>el.classList?.contains(className))||null;
+  }
+
+  function scQuoteMeasureHostV1019(){
+    const host=document.createElement('div');
+    host.className='sc-quote-measure-host';
+    document.body.appendChild(host);
+    return host;
+  }
+
+  function scQuoteOverflowV1019(body){
+    return body.scrollHeight>body.clientHeight+1;
+  }
+
+  function scQuoteHasPayloadV1019(body){
+    return body.children.length>Number(body.dataset.scBaseChildren||0);
+  }
+
+  function scQuotePageV1019(host,sourceBody,footerTemplate,pageIndex){
+    const paper=document.createElement('div');
+    paper.className='paper sc-quote-page';
+    paper.dataset.scQuotePage=String(pageIndex+1);
+
+    const body=document.createElement('div');
+    body.className='docbody sc-quote-page-body';
+
+    const sourceHead=scDirectChildByClassV1019(sourceBody,'dochead');
+    const sourceCustomer=scDirectChildByClassV1019(sourceBody,'customerbox');
+
+    if(sourceHead){
+      const head=sourceHead.cloneNode(true);
+      if(pageIndex>0){
+        const type=head.querySelector('.doctype');
+        if(type){
+          const continued=document.createElement('span');
+          continued.className='sc-continuation-mark';
+          continued.textContent='CONTINUED';
+          type.appendChild(continued);
+        }
+      }
+      body.appendChild(head);
+    }
+
+    if(sourceCustomer)body.appendChild(sourceCustomer.cloneNode(true));
+
+    body.dataset.scBaseChildren=String(body.children.length);
+    paper.appendChild(body);
+
+    if(footerTemplate){
+      const footer=footerTemplate.cloneNode(true);
+      const spans=[...footer.querySelectorAll('span')];
+      const right=spans[spans.length-1];
+      if(right)right.dataset.scFooterBase=right.textContent||'';
+      paper.appendChild(footer);
+    }
+
+    host.appendChild(paper);
+    return {paper,body};
+  }
+
+  function scQuoteTableSkeletonV1019(sourceTable){
+    const table=sourceTable.cloneNode(true);
+    let tbody=table.querySelector('tbody');
+    if(!tbody){
+      tbody=document.createElement('tbody');
+      table.appendChild(tbody);
+    }
+    tbody.innerHTML='';
+    return {table,tbody};
+  }
+
+  function scQuoteTermsShellV1019(sourceTerms){
+    const shell=sourceTerms.cloneNode(true);
+    shell.querySelectorAll('.termrow').forEach(row=>row.remove());
+    return shell;
+  }
+
+  function scBuildQuotationPagesV1019(doc){
+    const source=scQuotationSourceV1019(doc);
+    const host=scQuoteMeasureHostV1019();
+    const pages=[];
+    let ctx=null;
+
+    const newPage=()=>{
+      ctx=scQuotePageV1019(host,source.body,source.footer,pages.length);
+      pages.push(ctx);
+      return ctx;
+    };
+
+    const appendAtomic=(node)=>{
+      const hadPayload=scQuoteHasPayloadV1019(ctx.body);
+      let clone=node.cloneNode(true);
+      ctx.body.appendChild(clone);
+      if(scQuoteOverflowV1019(ctx.body) && hadPayload){
+        clone.remove();
+        newPage();
+        clone=node.cloneNode(true);
+        ctx.body.appendChild(clone);
+      }
+    };
+
+    const appendTable=(sectionSource,tableSource)=>{
+      const sourceRows=[...tableSource.querySelectorAll('tbody > tr')];
+
+      const startTable=(moveIfNeeded=true)=>{
+        const hadPayload=scQuoteHasPayloadV1019(ctx.body);
+        const section=sectionSource.cloneNode(true);
+        const parts=scQuoteTableSkeletonV1019(tableSource);
+        ctx.body.appendChild(section);
+        ctx.body.appendChild(parts.table);
+
+        if(moveIfNeeded && scQuoteOverflowV1019(ctx.body) && hadPayload){
+          section.remove();
+          parts.table.remove();
+          newPage();
+          return startTable(false);
+        }
+        return parts;
+      };
+
+      let parts=startTable(true);
+
+      sourceRows.forEach(rowSource=>{
+        let row=rowSource.cloneNode(true);
+        parts.tbody.appendChild(row);
+
+        if(scQuoteOverflowV1019(ctx.body)){
+          row.remove();
+
+          if(parts.tbody.children.length===0){
+            // A single unusually tall row must remain intact; never scale text.
+            parts.tbody.appendChild(row);
+            return;
+          }
+
+          newPage();
+          parts=startTable(false);
+          row=rowSource.cloneNode(true);
+          parts.tbody.appendChild(row);
+        }
+      });
+    };
+
+    const appendDeviceSection=(sectionSource,cardSources)=>{
+      let section=null;
+      let cardsOnCurrentPage=0;
+
+      const startSection=(cardSource,allowMove)=>{
+        const hadPayload=scQuoteHasPayloadV1019(ctx.body);
+        section=sectionSource.cloneNode(true);
+        const card=cardSource.cloneNode(true);
+        ctx.body.appendChild(section);
+        ctx.body.appendChild(card);
+
+        if(allowMove && scQuoteOverflowV1019(ctx.body) && hadPayload){
+          section.remove();
+          card.remove();
+          newPage();
+          return startSection(cardSource,false);
+        }
+        cardsOnCurrentPage=1;
+      };
+
+      if(!cardSources.length){
+        appendAtomic(sectionSource);
+        return;
+      }
+
+      startSection(cardSources[0],true);
+
+      cardSources.slice(1).forEach(cardSource=>{
+        let card=cardSource.cloneNode(true);
+        ctx.body.appendChild(card);
+        if(scQuoteOverflowV1019(ctx.body)){
+          card.remove();
+          newPage();
+          section=sectionSource.cloneNode(true);
+          ctx.body.appendChild(section);
+          card=cardSource.cloneNode(true);
+          ctx.body.appendChild(card);
+          cardsOnCurrentPage=1;
+        }else{
+          cardsOnCurrentPage++;
+        }
+      });
+    };
+
+    const appendTerms=(termsSource,prefaceSource=null)=>{
+      const rows=[...termsSource.querySelectorAll('.termrow')];
+
+      const startTerms=(includePreface,moveIfNeeded=true)=>{
+        const hadPayload=scQuoteHasPayloadV1019(ctx.body);
+        const added=[];
+
+        if(includePreface && prefaceSource){
+          const preface=prefaceSource.cloneNode(true);
+          ctx.body.appendChild(preface);
+          added.push(preface);
+        }
+
+        const shell=scQuoteTermsShellV1019(termsSource);
+        ctx.body.appendChild(shell);
+        added.push(shell);
+
+        if(moveIfNeeded && scQuoteOverflowV1019(ctx.body) && hadPayload){
+          added.forEach(el=>el.remove());
+          newPage();
+          return startTerms(includePreface,false);
+        }
+        return shell;
+      };
+
+      let shell=startTerms(!!prefaceSource,true);
+
+      rows.forEach(rowSource=>{
+        let row=rowSource.cloneNode(true);
+        shell.appendChild(row);
+
+        if(scQuoteOverflowV1019(ctx.body)){
+          row.remove();
+
+          if(shell.querySelectorAll('.termrow').length===0){
+            shell.appendChild(row);
+            return;
+          }
+
+          newPage();
+          shell=startTerms(false,false);
+          row=rowSource.cloneNode(true);
+          shell.appendChild(row);
+        }
+      });
+    };
+
+    newPage();
+
+    const headerNodes=new Set([
+      scDirectChildByClassV1019(source.body,'dochead'),
+      scDirectChildByClassV1019(source.body,'customerbox')
+    ].filter(Boolean));
+
+    const content=[...source.body.children].filter(node=>!headerNodes.has(node));
+
+    for(let i=0;i<content.length;i++){
+      const node=content[i];
+      const next=content[i+1]||null;
+
+      if(node.classList?.contains('docsection') && next?.tagName==='TABLE'){
+        appendTable(node,next);
+        i++;
+        continue;
+      }
+
+      if(node.classList?.contains('docsection') && next?.classList?.contains('device-quote-card')){
+        const cards=[];
+        let j=i+1;
+        while(j<content.length && content[j].classList?.contains('device-quote-card')){
+          cards.push(content[j]);
+          j++;
+        }
+        appendDeviceSection(node,cards);
+        i=j-1;
+        continue;
+      }
+
+      if(node.classList?.contains('delivery-doc-note') && next?.classList?.contains('terms')){
+        appendTerms(next,node);
+        i++;
+        continue;
+      }
+
+      if(node.classList?.contains('terms')){
+        appendTerms(node,null);
+        continue;
+      }
+
+      appendAtomic(node);
+    }
+
+    const total=pages.length;
+    pages.forEach((pageCtx,index)=>{
+      const footer=pageCtx.paper.querySelector('.docfoot');
+      if(!footer)return;
+      const spans=[...footer.querySelectorAll('span')];
+      const right=spans[spans.length-1];
+      if(right){
+        const base=right.dataset.scFooterBase||right.textContent||'';
+        right.textContent=`${base} • Page ${index+1} of ${total}`;
+      }
+    });
+
+    const detached=pages.map(x=>x.paper);
+    detached.forEach(page=>page.remove());
+    host.remove();
+    return detached;
+  }
+
+  function scRenderQuotationV1019(target,doc){
+    if(!target)return;
+    const pages=scBuildQuotationPagesV1019(doc);
+    target.innerHTML='';
+    target.className='paper-stack sc-quotation-stack';
+    const fragment=document.createDocumentFragment();
+    pages.forEach(page=>fragment.appendChild(page));
+    target.appendChild(fragment);
+  }
+
+  async function scWaitForQuoteImagesV1019(root){
+    const images=[...root.querySelectorAll('img')];
+    await Promise.all(images.map(img=>{
+      if(img.complete)return Promise.resolve();
+      return new Promise(resolve=>{
+        const done=()=>resolve();
+        img.addEventListener('load',done,{once:true});
+        img.addEventListener('error',done,{once:true});
+        setTimeout(done,4000);
+      });
+    }));
+  }
+
+  /* Preview: preserve original font sizes and create true continuation pages. */
+  const scBaseRenderCurrentV1019=renderCurrent;
+  renderCurrent=function(){
+    const target=$('paper');
+    scResetPaperTargetV1019(target);
+    const result=scBaseRenderCurrentV1019.apply(this,arguments);
+    try{
+      const doc=state.current;
+      if(scQuoteIsPagedDocument(doc))scRenderQuotationV1019(target,doc);
+    }catch(err){
+      console.error('Multi-page quotation preview failed',err);
+      scResetPaperTargetV1019(target);
+      try{target.innerHTML=buildDocHTML(state.current||{},false)}catch(_){ }
+    }
+    return result;
+  };
+  window.renderCurrent=renderCurrent;
+
+  /* Saved-document viewer: use the same pages as the PDF. */
+  const scBaseViewDocumentV1019=viewDocument;
+  viewDocument=function(id){
+    const target=$('viewerPaper');
+    scResetPaperTargetV1019(target);
+    const result=scBaseViewDocumentV1019.apply(this,arguments);
+    try{
+      const doc=state.docs.find(x=>x.id===id);
+      if(scQuoteIsPagedDocument(doc))scRenderQuotationV1019(target,doc);
+    }catch(err){
+      console.error('Multi-page quotation viewer failed',err);
+    }
+    return result;
+  };
+  window.viewDocument=viewDocument;
+
+  /* PDF: one canvas per real A4 quotation page; no text scaling. */
+  const scBaseDownloadDocPDFV1019=downloadDocPDF;
+  downloadDocPDF=async function(doc){
+    if(!scQuoteIsPagedDocument(doc))return scBaseDownloadDocPDFV1019.apply(this,arguments);
+
+    const okCanvas=await loadScript(
+      'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+      ()=>window.html2canvas
+    );
+    const okPdf=await loadScript(
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+      ()=>window.jspdf
+    );
+
+    if(!okCanvas||!okPdf){
+      toast('PDF libraries unavailable - opening browser Print / Save as PDF');
+      return printSavedDocument(doc);
+    }
+
+    const capture=document.createElement('div');
+    capture.className='sc-quote-capture-host';
+    const pages=scBuildQuotationPagesV1019(doc);
+    pages.forEach(page=>capture.appendChild(page));
+    document.body.appendChild(capture);
+
+    try{
+      toast(`Generating ${pages.length}-page A4 quotation PDF...`);
+      await scWaitForQuoteImagesV1019(capture);
+
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:'p',unit:'mm',format:'a4',compress:true});
+      try{pdf.setDisplayMode(1.0,'continuous','UseNone')}catch(e){}
+
+      for(let i=0;i<pages.length;i++){
+        const canvas=await html2canvas(pages[i],{
+          scale:4,
+          backgroundColor:'#ffffff',
+          useCORS:true,
+          allowTaint:true,
+          logging:false,
+          width:SC_QUOTE_PAGE_WIDTH,
+          height:SC_QUOTE_PAGE_HEIGHT,
+          windowWidth:SC_QUOTE_PAGE_WIDTH,
+          windowHeight:SC_QUOTE_PAGE_HEIGHT
+        });
+
+        if(i>0)pdf.addPage('a4','p');
+        const img=canvas.toDataURL('image/png',1);
+        pdf.addImage(img,'PNG',0,0,210,297,`quotePage${i+1}`,'FAST');
+      }
+
+      pdf.save((doc.serial||'quotation').replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
+      toast(`Quotation PDF generated • ${pages.length} page${pages.length===1?'':'s'}`);
+    }catch(err){
+      console.error('Multi-page quotation PDF failed',err);
+      toast('Direct PDF failed - opening Print / Save as PDF');
+      printSavedDocument(doc);
+    }finally{
+      capture.remove();
+    }
+  };
+  window.downloadDocPDF=downloadDocPDF;
+
+  /* Browser-print fallback with explicit A4 page breaks. */
+  const scBasePrintSavedDocumentV1019=printSavedDocument;
+  printSavedDocument=function(doc){
+    if(!scQuoteIsPagedDocument(doc))return scBasePrintSavedDocumentV1019.apply(this,arguments);
+
+    const printHost=$('printHost');
+    if(!printHost)return;
+    printHost.innerHTML='';
+
+    const stack=document.createElement('div');
+    stack.className='sc-print-stack';
+    const pages=scBuildQuotationPagesV1019(doc);
+    pages.forEach(page=>stack.appendChild(page));
+    printHost.appendChild(stack);
+    printHost.style.display='block';
+
+    scWaitForQuoteImagesV1019(stack).finally(()=>{
+      setTimeout(()=>{
+        window.print();
+        printHost.style.display='none';
+        printHost.innerHTML='';
+      },250);
+    });
+  };
+  window.printSavedDocument=printSavedDocument;
 
 })();
 </script>
