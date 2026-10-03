@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.24 - Customer Compliance Docs + User Assignment + Secure Password UI -->
+<!-- SoftCreation v1.0.25 - Customer Update Validation + Introduced By System User Fix -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.24</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.25</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.24</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.25</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -599,7 +599,7 @@
 
   <div class="section">Customer Details</div>
 
-  <div class="field"><label>Customer / Company Name <span class="required-dot">*</span></label><input id="custName" placeholder="Type"/></div>
+  <div class="field"><label>Customer / Company Name <span class="required-dot">*</span></label><input id="custName" placeholder="Auto-fill or type only if no source"/></div>
   <div class="field"><label>Contact Person</label><input id="custContactPerson" placeholder="Optional"/></div>
   <div class="field"><label>Contact Number <span class="required-dot">*</span></label><input id="custPhone" placeholder="At least phone or email"/></div>
 <div class="field">
@@ -704,7 +704,7 @@
 
 </div>
   <div class="field"><label>Google Location</label><input id="custMap" placeholder="Google Maps link if available"/></div>
-  <div class="field full"><label>Billing Address</label><textarea id="custAddress" placeholder="Fill from customer source"></textarea></div>
+  <div class="field full"><label>Billing Address</label><textarea id="custAddress" placeholder="Auto-fill from customer source where possible"></textarea></div>
   <div class="field full"><label>Delivery Address (if different)</label><textarea id="custDelivery"></textarea></div>
   <!-- Legacy local VAT input kept hidden. New certificates use Supabase Storage. -->
   <div hidden aria-hidden="true">
@@ -2398,7 +2398,7 @@ $('custAddress').value =
 }
 function addSpecialPriceRow(iid='',cash='',credit=''){const d=document.createElement('div');d.className='special-row';d.innerHTML=`<select class="spItem"><option value="">Select Item</option>${state.items.map(i=>`<option value="${i.id}" ${i.id===iid?'selected':''}>${esc([i.size,i.material,i.layout].filter(Boolean).join(' / '))}</option>`).join('')}</select><input class="spCash" type="number" step="0.01" placeholder="Cash" value="${cash??''}"><input class="spCredit" type="number" step="0.01" placeholder="Credit" value="${credit??''}"><button class="btn red sm" onclick="this.parentElement.remove()">×</button>`;$('specialPriceRows').appendChild(d)}
 async function saveCustomer(){
-  if(!customerMinimumReady())return toast('Customer Name + Contact Number or Email is required');
+  if(!customerMinimumReady())return customerSaveErrorV1025('Customer Name + Contact Number or Email is required.','custName');
   const id=$('custId').value||uid('cust'),old=state.customers.find(c=>c.id===id)||{},sp={};
   if($('custId').value&&!protectedEdit('save customer changes'))return;
   document.querySelectorAll('.special-row').forEach(r=>{const iid=r.querySelector('.spItem').value;if(iid)sp[iid]={cash:r.querySelector('.spCash').value,credit:r.querySelector('.spCredit').value}});
@@ -12502,9 +12502,9 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     const html=`
       <div class="field" id="custAssignedSystemUserFieldV1024">
-        <label>Assigned System User / Freelancer <span class="required-dot">*</span></label>
+        <label>Introduced By <span class="required-dot">*</span></label>
         <select id="custAssignedSystemUser"></select>
-        <div class="hint">Assign the system account responsible for this customer. This is also used by the existing customer ownership / visibility flow.</div>
+        <div class="hint">Select the system user / freelancer who introduced or manages this customer. This assignment also controls the existing customer ownership / visibility flow.</div>
       </div>
     `;
 
@@ -12657,7 +12657,7 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     const assignedUsername=$('custAssignedSystemUser')?.value||'';
     if(!assignedUsername){
-      return toast('Select the responsible System User / Freelancer');
+      return customerSaveErrorV1025('Select the Introduced By system user / freelancer.','custAssignedSystemUser');
     }
 
     const assignedUser=(state.users||[]).find(u=>
@@ -12666,7 +12666,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     );
 
     if(!assignedUser){
-      return toast('Selected system user is unavailable');
+      return customerSaveErrorV1025('Selected Introduced By system user is unavailable.','custAssignedSystemUser');
     }
 
     const noBr=!!$('custNoBr')?.checked;
@@ -12680,10 +12680,10 @@ window.toggleBpSeparateDeliveryButton = function(){
       brApprover=adminForPasswordV1024(password);
 
       if(!brApprover){
-        return toast('Valid administrator password is required for No BR approval');
+        return customerSaveErrorV1025('Valid administrator password is required to approve this customer without a BR certificate.','custBrAdminPassword');
       }
     }else if(!brFile&&!old.brDocument){
-      return toast('Upload the BR Certificate, or select "Customer does not have a BR certificate" and enter an Admin password');
+      return customerSaveErrorV1025('BR Certificate is required. Upload the BR, or select "Customer does not have a BR certificate" and enter an Administrator password.','custBrCloudFile');
     }
 
     const saveBtn=$('saveCustBtn');
@@ -12829,6 +12829,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       }
 
       calculateLabelPrice();
+      clearCustomerSaveErrorV1025();
       toast('Customer saved');
 
     }catch(err){
@@ -12896,6 +12897,186 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
   };
   try{updateCustomerSaveState=window.updateCustomerSaveState}catch(_){}
+
+  /* -------------------------------------------------------
+     v1.0.25 — Customer update UX / referral assignment fix
+     ------------------------------------------------------- */
+
+  window.clearCustomerSaveErrorV1025=function(){
+    const box=$('custSaveErrorV1025');
+    if(!box)return;
+    box.textContent='';
+    box.style.display='none';
+  };
+
+  window.customerSaveErrorV1025=function(message,focusId=''){
+    let box=$('custSaveErrorV1025');
+
+    if(!box){
+      const actions=$('saveCustBtn')?.closest('.actions');
+      if(actions){
+        actions.insertAdjacentHTML(
+          'beforebegin',
+          '<div id="custSaveErrorV1025" class="customer-save-error-v1025" style="display:none"></div>'
+        );
+        box=$('custSaveErrorV1025');
+      }
+    }
+
+    if(box){
+      box.textContent=message;
+      box.style.display='block';
+      box.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+
+    /*
+      Modal sits above the legacy toast layer, so also raise the toast
+      via CSS and keep this inline error visible inside the modal.
+    */
+    toast(message);
+
+    const target=focusId?$(focusId):null;
+    if(target){
+      setTimeout(()=>{
+        try{
+          target.focus({preventScroll:true});
+        }catch(_){
+          target.focus?.();
+        }
+      },120);
+    }
+
+    return false;
+  };
+
+  function configureCustomerReferralUIV1025(){
+    ensureCustomerAssignedUserFieldV1024();
+
+    const assigned=$('custAssignedSystemUser');
+    if(assigned?.closest('.field')){
+      assigned.closest('.field').style.display='';
+    }
+
+    /*
+      The old Introducer Master / commission controls are retained in DOM
+      only for legacy records and commission history. They are no longer
+      the visible "Introduced By" field. The visible field is now the
+      System User / Freelancer dropdown requested for customer ownership.
+    */
+    ['custIntroducer','custIntroType','custIntroRate','custIntroBasis','custIntroHint']
+      .forEach(id=>{
+        const el=$(id);
+        const field=el?.closest('.field');
+        if(field)field.style.display='none';
+      });
+  }
+
+  const populateCustomerAssignedUserV1025=populateCustomerAssignedUserV1024;
+  populateCustomerAssignedUserV1024=function(customer=null){
+    populateCustomerAssignedUserV1025(customer);
+
+    const sel=$('custAssignedSystemUser');
+    if(sel){
+      /*
+        Existing customers without ownerUser are assigned to the currently
+        logged-in user only as the UI default. The value is persisted only
+        after Save Customer is successfully completed.
+      */
+      const c=customer||currentCustomerFromModalV1024();
+      const selected=
+        c?.ownerUser||
+        c?.referralUsername||
+        currentUser?.username||
+        '';
+
+      if(selected&&[...sel.options].some(o=>o.value===selected)){
+        sel.value=selected;
+      }
+    }
+  };
+
+  const openCustomerModalV1025=openCustomerModal;
+  window.openCustomerModal=function(id=''){
+    const result=openCustomerModalV1025(id);
+    const c=state.customers.find(x=>x.id===id)||null;
+
+    configureCustomerReferralUIV1025();
+    populateCustomerAssignedUserV1024(c);
+    clearCustomerSaveErrorV1025();
+
+    /*
+      Legacy customer with no BR:
+      make the compliance reason obvious immediately instead of allowing a
+      later save attempt to look like it silently failed.
+    */
+    if(c && !c.brDocument && !c.brNoCertificate){
+      const status=$('custBrDocStatus');
+      if(status){
+        status.textContent=
+          'This existing customer has no BR certificate on file. Upload the BR, or select the No BR option and enter an Administrator password before saving changes.';
+        status.className='customer-cloud-doc-status override';
+      }
+    }
+
+    return result;
+  };
+  try{openCustomerModal=window.openCustomerModal}catch(_){}
+
+  /*
+    The old referral/commission dropdown is now hidden. Preserve its
+    existing value instead of accidentally changing legacy commission data
+    while the new visible Introduced By field updates ownerUser.
+  */
+  const saveCustomerV1025=saveCustomer;
+  window.saveCustomer=async function(){
+    clearCustomerSaveErrorV1025();
+
+    const existingId=$('custId')?.value||'';
+    const old=state.customers.find(c=>c.id===existingId)||null;
+    const legacyIntroducerId=old?.introducerId||'';
+    const legacyIntroRuleType=old?.introRuleType||'default';
+    const legacyIntroRate=old?.introRate??0;
+    const legacyIntroBasis=old?.introBasis||'net';
+
+    const result=await saveCustomerV1025();
+
+    /*
+      Final save function already stores the selected system user into
+      ownerUser / referralUsername. Restore the hidden legacy commission
+      introducer fields so this UI change cannot rewrite old commission
+      assignments.
+    */
+    const savedId=existingId||$('customerSelect')?.value||'';
+    const c=state.customers.find(x=>x.id===savedId);
+
+    if(c && old){
+      let changed=false;
+
+      if(c.introducerId!==legacyIntroducerId){
+        c.introducerId=legacyIntroducerId;
+        changed=true;
+      }
+      if(c.introRuleType!==legacyIntroRuleType){
+        c.introRuleType=legacyIntroRuleType;
+        changed=true;
+      }
+      if(Number(c.introRate||0)!==Number(legacyIntroRate||0)){
+        c.introRate=Number(legacyIntroRate||0);
+        changed=true;
+      }
+      if(c.introBasis!==legacyIntroBasis){
+        c.introBasis=legacyIntroBasis;
+        changed=true;
+      }
+
+      if(changed)saveState();
+    }
+
+    return result;
+  };
+  try{saveCustomer=window.saveCustomer}catch(_){}
+
+  configureCustomerReferralUIV1025();
 
   ensureSecurePasswordModalV1024();
   ensureCustomerAssignedUserFieldV1024();
