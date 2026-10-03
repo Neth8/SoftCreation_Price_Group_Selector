@@ -3425,3 +3425,162 @@ html[data-theme="dark"] .customer-item-selected-tag{
   }
 }
 
+/* =========================================================
+   v1.0.24 — CUSTOMER COMPLIANCE + PASSWORD UX
+   ========================================================= */
+
+/* Duplicate calculator history is intentionally removed.
+   Price history now lives only under Customer Item Master. */
+#customerPriceSuggestion{
+  display:none!important;
+}
+
+.customer-cloud-doc-card{
+  border:1px solid #d5e4e7;
+  border-radius:12px;
+  background:#f9fcfd;
+  padding:11px;
+  margin-top:2px;
+}
+.customer-cloud-doc-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:7px;
+}
+.customer-cloud-doc-head label{
+  display:block;
+  margin-bottom:2px;
+}
+.customer-cloud-doc-status{
+  margin-top:7px;
+  padding:7px 9px;
+  border:1px solid #dbe6e9;
+  border-radius:9px;
+  background:#f2f6f7;
+  color:#61747c;
+  font-size:9.5px;
+  line-height:1.4;
+}
+.customer-cloud-doc-status.ready{
+  border-color:#b9dcdf;
+  background:#eefafa;
+  color:#08777a;
+}
+.customer-cloud-doc-status.saved{
+  border-color:#bfe3cf;
+  background:#edf9f2;
+  color:#146e45;
+}
+.customer-cloud-doc-status.override{
+  border-color:#ecd48d;
+  background:#fff7de;
+  color:#805b08;
+}
+.customer-no-br-check{
+  margin-top:10px;
+  padding:8px 9px;
+  border:1px dashed #d8c37d;
+  border-radius:9px;
+  background:#fffaf0;
+  font-size:10px;
+  font-weight:850;
+  color:#72560f;
+}
+.customer-br-override{
+  margin-top:8px;
+  padding:9px;
+  border:1px solid #e5d39b;
+  border-radius:10px;
+  background:#fffaf0;
+}
+
+/* Password field + eye */
+.password-eye-wrap-v1024{
+  position:relative;
+  width:100%;
+}
+.password-eye-wrap-v1024>input{
+  padding-right:42px!important;
+}
+.password-eye-btn-v1024{
+  position:absolute;
+  right:7px;
+  top:50%;
+  transform:translateY(-50%);
+  width:30px;
+  height:30px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  cursor:pointer;
+  font-size:15px;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.password-eye-btn-v1024:hover{
+  background:#edf5f6;
+}
+
+.secure-password-card-v1024{
+  width:min(430px,94vw);
+}
+.secure-password-error-v1024{
+  min-height:18px;
+  margin-top:7px;
+  color:#bd3030;
+  font-size:10px;
+  font-weight:800;
+}
+
+.customer-assigned-user-v1024{
+  margin-top:3px;
+  color:#516b74;
+}
+
+html[data-theme="dark"] .customer-cloud-doc-card{
+  background:#17272d;
+  border-color:#30464d;
+}
+html[data-theme="dark"] .customer-cloud-doc-status{
+  background:#142229;
+  border-color:#30434a;
+  color:#9cb0b6;
+}
+html[data-theme="dark"] .customer-cloud-doc-status.ready{
+  background:#173033;
+  border-color:#2a5a5d;
+  color:#91d7d8;
+}
+html[data-theme="dark"] .customer-cloud-doc-status.saved{
+  background:#173126;
+  border-color:#28583f;
+  color:#92d5ac;
+}
+html[data-theme="dark"] .customer-cloud-doc-status.override,
+html[data-theme="dark"] .customer-no-br-check,
+html[data-theme="dark"] .customer-br-override{
+  background:#302b19;
+  border-color:#635b30;
+  color:#e6cd7f;
+}
+html[data-theme="dark"] .password-eye-btn-v1024{
+  color:#c9d8db;
+}
+html[data-theme="dark"] .password-eye-btn-v1024:hover{
+  background:#25373d;
+}
+html[data-theme="dark"] .customer-assigned-user-v1024{
+  color:#99adb3;
+}
+
+@media(max-width:650px){
+  .customer-cloud-doc-head{
+    flex-direction:column;
+    align-items:stretch;
+  }
+}
+
