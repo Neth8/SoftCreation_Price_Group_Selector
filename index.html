@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.21 - Customer Item Price History -->
+<!-- SoftCreation v1.0.22 - Expandable Customer Item Master -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.21</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.22</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.21</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.22</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -245,26 +245,10 @@
 
 </div>
 
-            <div class="section">Label Price Calculator — Excel Formula</div>
-            <div class="price-calc">
-              <div class="price-calc-head"><div><b>Custom Label Roll Price</b><div class="hint">Material, size, ups and pieces per roll determine the exact Excel-based prices.</div></div><span class="hint">All prices include 18% VAT</span></div>
-              <div class="price-inputs">
-                <div class="field"><label>Material</label><select id="calcMaterial"><option>TT</option><option>DT TOP</option><option>PVC</option><option selected>DT ECO</option><option>HIGHSTICK</option></select></div>
-                <div class="field"><label>Width (mm)</label><input id="calcWidth" type="number" min="0.01" step="0.01" value="38"></div>
-                <div class="field"><label>Height (mm)</label><input id="calcHeight" type="number" min="0.01" step="0.01" value="25"></div>
-                <div class="field"><label>Ups</label><input id="calcUps" type="number" min="1" step="1" value="1"></div>
-                <div class="field"><label>Pieces / Roll</label><input id="calcPcs" type="number" min="1" step="1" value="1000"></div>
-              </div>
-              <div id="calcResults" class="price-results"></div>
-              <div class="master-actions"><div class="field" style="max-width:180px"><label>Custom Margin %</label><input id="customMargin" type="number" min="0.01" max="99" step="0.01" placeholder="e.g. 12.5"></div><button class="btn amber sm" type="button" onclick="applyCustomMargin()">Add Custom Margin Price</button></div>
-              <div id="calcWarning" class="calc-warning"></div>
-              <div class="price-summary"><span class="cost">Excel cost / roll: <b id="calcCost">0.00</b> • Selected: <b id="calcSelected">None</b></span><label class="field" style="min-width:100px"><span class="hint">Quotation Qty</span><input id="calcQty" type="number" min="1" step="1" value="1"></label><button class="btn primary sm" type="button" onclick="addCalculatedLabel('cash')">Add as Cash</button><button class="btn navy sm" type="button" onclick="addCalculatedLabel('credit')">Add as Credit</button></div>
-              <div id="customerPriceSuggestion"></div><div class="master-actions"><button class="btn ghost sm" type="button" onclick="saveCalculatedToMaster()">Save / Update Label Master</button><button class="btn ghost sm" type="button" onclick="saveCalculatedForCustomer()">Save Price for Selected Customer</button></div>
-            </div>
 <div class="section">Items</div>
 
 <div class="hint" style="grid-column:1/-1;margin-top:-3px;margin-bottom:5px">
-  Select a calculated price above or add an existing Item Master product.
+  Select a previous customer item below, or create a new item with the Label Price Calculator under the items table.
 </div>
 
 
@@ -389,9 +373,41 @@
     </div>
     <button id="customerAllPriceHistoryBtn" class="btn ghost sm" type="button" onclick="openCustomerAllPriceHistoryV1021()" disabled>Customer Price History</button>
   </div>
-  <div class="item-tools"><select id="masterItemPick" onchange="customerItemPickChangedV1021()"></select><input id="quickQty" type="number" min="1" value="1" placeholder="Qty"/><input id="quickPrice" type="number" step="0.01" placeholder="Customer price / override"/><button id="customerItemHistoryBtn" class="btn ghost sm" type="button" onclick="openSelectedCustomerItemHistoryV1021()" disabled>History</button><button class="btn primary sm" onclick="addMasterLine()">Add Label</button><button class="btn ghost sm" onclick="openDevicePicker()">Add Device</button></div>
+  <select id="masterItemPick" onchange="customerItemPickChangedV1021()" hidden></select>
+  <button id="customerItemHistoryBtn" type="button" onclick="openSelectedCustomerItemHistoryV1021()" hidden disabled></button>
+
+  <div id="customerItemMasterList" class="customer-item-master-list">
+    <div class="customer-item-master-empty">Select a customer to load previous items and prices.</div>
+  </div>
+
+  <div class="customer-item-action-row">
+    <div class="field customer-item-qty-field"><label>Quantity</label><input id="quickQty" type="number" min="1" value="1" placeholder="Qty"/></div>
+    <div class="field customer-item-price-field"><label>Selected / Manual Price</label><input id="quickPrice" type="number" step="0.01" placeholder="Select an item above"/></div>
+    <button class="btn primary sm" type="button" onclick="addMasterLine()">Add Selected Label</button>
+    <button class="btn ghost sm" type="button" onclick="openDevicePicker()">Add Device</button>
+  </div>
+
               <div style="overflow:auto"><table class="line-table"><thead><tr><th>Use</th><th>Description</th><th>Size</th><th>Material</th><th>Layout</th><th>Pcs/Roll</th><th>Qty</th><th>Unit</th><th>Price</th><th>Amount</th><th></th></tr></thead><tbody id="lineBody"></tbody></table></div>
+
+            <div class="section">Label Price Calculator — Excel Formula</div>
+            <div class="price-calc">
+              <div class="price-calc-head"><div><b>Custom Label Roll Price</b><div class="hint">Material, size, ups and pieces per roll determine the exact Excel-based prices.</div></div><span class="hint">All prices include 18% VAT</span></div>
+              <div class="price-inputs">
+                <div class="field"><label>Material</label><select id="calcMaterial"><option>TT</option><option>DT TOP</option><option>PVC</option><option selected>DT ECO</option><option>HIGHSTICK</option></select></div>
+                <div class="field"><label>Width (mm)</label><input id="calcWidth" type="number" min="0.01" step="0.01" value="38"></div>
+                <div class="field"><label>Height (mm)</label><input id="calcHeight" type="number" min="0.01" step="0.01" value="25"></div>
+                <div class="field"><label>Ups</label><input id="calcUps" type="number" min="1" step="1" value="1"></div>
+                <div class="field"><label>Pieces / Roll</label><input id="calcPcs" type="number" min="1" step="1" value="1000"></div>
+              </div>
+              <div id="calcResults" class="price-results"></div>
+              <div class="master-actions"><div class="field" style="max-width:180px"><label>Custom Margin %</label><input id="customMargin" type="number" min="0.01" max="99" step="0.01" placeholder="e.g. 12.5"></div><button class="btn amber sm" type="button" onclick="applyCustomMargin()">Add Custom Margin Price</button></div>
+              <div id="calcWarning" class="calc-warning"></div>
+              <div class="price-summary"><span class="cost">Excel cost / roll: <b id="calcCost">0.00</b> • Selected: <b id="calcSelected">None</b></span><label class="field" style="min-width:100px"><span class="hint">Quotation Qty</span><input id="calcQty" type="number" min="1" step="1" value="1"></label><button class="btn primary sm" type="button" onclick="addCalculatedLabel('cash')">Add as Cash</button><button class="btn navy sm" type="button" onclick="addCalculatedLabel('credit')">Add as Credit</button></div>
+              <div id="customerPriceSuggestion"></div>
+            </div>
+
               <div class="sumline"><span>Net / Base: <b id="netTotal">0.00</b></span><span>VAT: <b id="vatTotal">0.00</b></span><span>Total: <strong id="grandTotal">0.00</strong></span></div>
+
             </div>
 
             <div class="section">Terms & Notes</div>
@@ -11171,38 +11187,8 @@ window.toggleBpSeparateDeliveryButton = function(){
   };
   window.addCalculatedLabel=addCalculatedLabel;
 
-  /* Save / Update Label Master also links the calculated item/price to the
-     selected customer, as requested. */
-  const scBaseSaveCalculatedToMasterV1021=saveCalculatedToMaster;
-  saveCalculatedToMaster=function(){
-    calculateLabelPrice();
-    if(!lastLabelCalc)return scBaseSaveCalculatedToMasterV1021.apply(this,arguments);
-    const key=labelKey(lastLabelCalc);
-    const before=state.items.find(i=>i.labelKey===key||labelKey(i)===key)?.lastUpdated||'';
-    scPriceContextV1021='calculator-master';
-    try{
-      const result=scBaseSaveCalculatedToMasterV1021.apply(this,arguments);
-      const item=state.items.find(i=>i.labelKey===key||labelKey(i)===key);
-      if(item&&item.lastUpdated!==before&&scCustomerV1021()){
-        const tier=lastLabelCalc?.prices.find(t=>t.id===selectedCalcTier);
-        if(tier){
-          scRecordCustomerPriceV1021(item,tier.price,$('payMode')?.value||'credit',tier.name,{source:'calculator-master',note:'Saved from Label Price Calculator to Label Master'});
-          saveState();
-        }
-      }
-      scRefreshCustomerItemPickerV1021(item?.id||'');
-      return result;
-    }finally{scPriceContextV1021=''}
-  };
-  window.saveCalculatedToMaster=saveCalculatedToMaster;
-
-  const scBaseSaveCalculatedForCustomerV1021=saveCalculatedForCustomer;
-  saveCalculatedForCustomer=function(){
-    scPriceContextV1021='calculator-customer';
-    try{return scBaseSaveCalculatedForCustomerV1021.apply(this,arguments)}
-    finally{scPriceContextV1021='';scRefreshCustomerItemPickerV1021()}
-  };
-  window.saveCalculatedForCustomer=saveCalculatedForCustomer;
+  /* Standalone calculator Save-to-Master / Save-to-Customer controls were removed in v1.0.22.
+     Adding a calculated label to the quotation remains the single save path for Item Master + customer price history. */
 
   /* Manual price in the quick Customer Item Master row. */
   const scBaseAddMasterLineV1021=addMasterLine;
@@ -11432,6 +11418,266 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   scRefreshCustomerItemPickerV1021();
 
+})();
+</script>
+
+
+<script>
+/* =========================================================
+   v1.0.22 — EXPANDABLE CUSTOMER ITEM MASTER
+   ---------------------------------------------------------
+   - No standalone calculator save buttons.
+   - Customer Item Master is an inline list.
+   - Arrow expands each item's complete price-change history.
+   - Current or historical price can be selected directly.
+   - Existing quick manual-price override and quotation table
+     history tracking remain unchanged.
+   ========================================================= */
+(function(){
+  'use strict';
+
+  let scExpandedCustomerItemV1022='';
+
+  function scCustomerV1022(id=''){
+    return state.customers.find(c=>c.id===(id||$('customerSelect')?.value));
+  }
+
+  function scItemKeyV1022(item){
+    if(!item)return '';
+    try{return item.labelKey||labelKey(item)}catch(_){return item.labelKey||item.id||''}
+  }
+
+  function scHistoryForItemV1022(customer,item){
+    if(!customer||!item)return [];
+    const key=scItemKeyV1022(item);
+    return (customer.priceHistory||[]).filter(h=>(h.itemId&&h.itemId===item.id)||(h.key&&h.key===key));
+  }
+
+  function scResolveHistoryItemV1022(h){
+    if(!h)return null;
+    if(h.itemId){
+      const byId=state.items.find(i=>i.id===h.itemId);
+      if(byId)return byId;
+    }
+    if(h.key)return state.items.find(i=>scItemKeyV1022(i)===h.key)||null;
+    return null;
+  }
+
+  function scCustomerItemsV1022(customer){
+    if(!customer)return [];
+    const result=[];
+    const seen=new Set();
+    const add=item=>{
+      if(!item||seen.has(item.id))return;
+      seen.add(item.id);
+      result.push(item);
+    };
+    (customer.priceHistory||[]).forEach(h=>add(scResolveHistoryItemV1022(h)));
+    Object.keys(customer.specialPrices||{}).forEach(id=>add(state.items.find(i=>i.id===id)));
+    return result;
+  }
+
+  function scHistoryDateV1022(h){
+    const raw=h?.changedAt||h?.date||'';
+    if(!raw)return '-';
+    try{
+      if(String(raw).length<=10)return fmtDate(String(raw).slice(0,10));
+      return new Date(raw).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    }catch(_){return String(raw)}
+  }
+
+  function scSourceLabelV1022(source){
+    const map={
+      'calculator':'Calculator',
+      'calculator-add':'Calculator → Quotation',
+      'calculator-customer':'Calculator → Customer Price',
+      'calculator-master':'Calculator → Label Master',
+      'manual-quick-price':'Manual Price',
+      'manual-quotation-line':'Quotation Price Edit',
+      'history-reuse':'Previous Price Reused',
+      'legacy':'Saved Price'
+    };
+    return map[source]||source||'Saved Price';
+  }
+
+  function scItemLabelV1022(item){
+    return [item?.size,item?.material,item?.layout,item?.pcs?item.pcs+' pcs':''].filter(Boolean).join(' / ');
+  }
+
+  function scHistoryChangeV1022(list,index){
+    const h=list[index],older=list[index+1];
+    if(!h)return '';
+    const explicit=h.oldPrice!==null&&h.oldPrice!==undefined&&Number.isFinite(Number(h.oldPrice))?Number(h.oldPrice):null;
+    const fallback=older&&Number.isFinite(Number(older.price))?Number(older.price):null;
+    const old=explicit!==null?explicit:fallback;
+    return old===null?`Saved at LKR ${money(h.price)}`:`LKR ${money(old)} → LKR ${money(h.price)}`;
+  }
+
+  function scRenderCustomerItemMasterV1022(){
+    const host=$('customerItemMasterList');
+    if(!host)return;
+
+    const customer=scCustomerV1022();
+    const device=$('quoteCategory')?.value==='device';
+    const pi=$('docType')?.value==='PI';
+
+    host.style.display=(device||pi)?'none':'';
+    const actions=document.querySelector('.customer-item-action-row');
+    if(actions)actions.style.display=(device||pi)?'none':'';
+
+    if(device||pi)return;
+
+    if(!customer){
+      host.innerHTML='<div class="customer-item-master-empty">Select a customer to load previous items and prices.</div>';
+      return;
+    }
+
+    const items=scCustomerItemsV1022(customer);
+    if(!items.length){
+      host.innerHTML='<div class="customer-item-master-empty"><b>No previous label items for this customer.</b><span>Use the Label Price Calculator below the items table to create the first item.</span></div>';
+      return;
+    }
+
+    const selectedId=$('masterItemPick')?.value||'';
+    const mode=$('payMode')?.value||customer.paymentMode||'credit';
+
+    host.innerHTML=items.map(item=>{
+      const list=scHistoryForItemV1022(customer,item);
+      const expanded=scExpandedCustomerItemV1022===item.id;
+      const selected=selectedId===item.id;
+      const current=currentPricingForItem(item,customer.id,mode);
+      const latest=list[0];
+      return `<div class="customer-item-master-card ${selected?'selected':''}" data-item-id="${esc(item.id)}">
+        <div class="customer-item-master-row">
+          <button class="customer-item-expand ${expanded?'open':''}" type="button" onclick="toggleCustomerItemHistoryV1022('${item.id}')" aria-label="${expanded?'Collapse':'Expand'} price history">›</button>
+          <button class="customer-item-main" type="button" onclick="selectCustomerItemInlineV1022('${item.id}')">
+            <span class="customer-item-name">${esc(scItemLabelV1022(item))}</span>
+            <span class="customer-item-sub">${esc(item.desc||'ELP')}${latest?.tier?` • ${esc(latest.tier)}`:''}</span>
+          </button>
+          <div class="customer-item-current">
+            <span>Current ${esc(String(mode).toUpperCase())}</span>
+            <b>LKR ${money(current)}</b>
+            <small>${list.length} change${list.length===1?'':'s'}</small>
+          </div>
+          <button class="btn ${selected?'green':'primary'} sm customer-item-select" type="button" onclick="selectCustomerItemInlineV1022('${item.id}')">${selected?'Selected':'Select'}</button>
+        </div>
+        <div class="customer-item-inline-history ${expanded?'show':''}">
+          ${list.length?list.map((h,index)=>`<div class="customer-item-history-entry">
+            <div class="customer-item-history-copy">
+              <b>${esc(scHistoryChangeV1022(list,index))}</b>
+              <span>${esc((h.mode||'').toUpperCase())}${h.tier?` • ${esc(h.tier)}`:''} • ${esc(scSourceLabelV1022(h.source||'legacy'))}</span>
+              <small>${esc(scHistoryDateV1022(h))} • ${esc(h.user||h.username||'Legacy')}${h.documentSerial?` • ${esc(h.documentSerial)}`:''}</small>
+            </div>
+            <div class="customer-item-history-use">
+              <b>LKR ${money(h.price)}</b>
+              <button class="btn ghost sm" type="button" onclick="useCustomerItemHistoryInlineV1022('${item.id}','${h.id}')">Use</button>
+            </div>
+          </div>`).join(''):'<div class="customer-item-history-empty">No price changes recorded for this item.</div>'}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  window.toggleCustomerItemHistoryV1022=function(itemId){
+    scExpandedCustomerItemV1022=scExpandedCustomerItemV1022===itemId?'':itemId;
+    scRenderCustomerItemMasterV1022();
+  };
+
+  window.selectCustomerItemInlineV1022=function(itemId){
+    const item=state.items.find(i=>i.id===itemId),customer=scCustomerV1022();
+    if(!item||!customer)return;
+    const pick=$('masterItemPick');
+    if(pick)pick.value=item.id;
+    if(typeof window.customerItemPickChangedV1021==='function')window.customerItemPickChangedV1021(false);
+    const quick=$('quickPrice');
+    if(quick){delete quick.dataset.historyId;delete quick.dataset.historyItemId;}
+    scRenderCustomerItemMasterV1022();
+  };
+
+  window.useCustomerItemHistoryInlineV1022=function(itemId,historyId){
+    const customer=scCustomerV1022(),item=state.items.find(i=>i.id===itemId);
+    const h=(customer?.priceHistory||[]).find(x=>x.id===historyId);
+    if(!customer||!item||!h)return;
+    const pick=$('masterItemPick'),quick=$('quickPrice');
+    if(pick)pick.value=item.id;
+    if(quick){
+      quick.value=Number(h.price||0).toFixed(2);
+      quick.dataset.autoPrice='0';
+      quick.dataset.historyId=h.id;
+      quick.dataset.historyItemId=item.id;
+    }
+    const text=$('customerItemProfileText');
+    if(text)text.textContent=`Previous price selected • ${scItemLabelV1022(item)} • LKR ${money(h.price)} • ${scHistoryDateV1022(h)}`;
+    scRenderCustomerItemMasterV1022();
+  };
+
+  /* Historical price selection should be recorded as HISTORY REUSE rather
+     than a generic manual override when it is added to the quotation. */
+  const scBaseAddMasterLineV1022=addMasterLine;
+  addMasterLine=function(){
+    const quick=$('quickPrice');
+    const historyId=quick?.dataset.historyId||'';
+    const historyItemId=quick?.dataset.historyItemId||'';
+    if(!historyId){
+      const result=scBaseAddMasterLineV1022.apply(this,arguments);
+      scRenderCustomerItemMasterV1022();
+      return result;
+    }
+
+    const customer=scCustomerV1022();
+    const item=state.items.find(i=>i.id===historyItemId)||state.items.find(i=>i.id===$('masterItemPick')?.value);
+    const h=(customer?.priceHistory||[]).find(x=>x.id===historyId);
+    if(!customer||!item||!h)return scBaseAddMasterLineV1022.apply(this,arguments);
+
+    const previousAuto=quick.dataset.autoPrice;
+    quick.dataset.autoPrice='1'; /* suppress v1.0.21 generic manual-history wrapper */
+    try{
+      const result=scBaseAddMasterLineV1022.apply(this,arguments);
+      updateCustomerPriceHistory(item,Number(h.price),$('payMode')?.value||customer.paymentMode||'credit',h.tier||item.lastTier||'',{
+        source:'history-reuse',
+        note:`Previous customer price reused from ${scHistoryDateV1022(h)}`,
+        documentId:state.current?.id||'',
+        documentSerial:state.current?.serial||''
+      });
+      saveState();
+      return result;
+    }finally{
+      quick.dataset.autoPrice=previousAuto||'0';
+      delete quick.dataset.historyId;
+      delete quick.dataset.historyItemId;
+      scRenderCustomerItemMasterV1022();
+    }
+  };
+  window.addMasterLine=addMasterLine;
+
+  /* Re-render inline Customer Item Master whenever the existing v1.0.21
+     picker/customer/document flow refreshes. */
+  const scBaseCustomerPickChangedV1022=window.customerItemPickChangedV1021;
+  window.customerItemPickChangedV1021=function(){
+    const result=scBaseCustomerPickChangedV1022?.apply(this,arguments);
+    scRenderCustomerItemMasterV1022();
+    return result;
+  };
+
+  [['refreshCustomerPick','refreshCustomerPick'],['fillCustomer','fillCustomer'],['syncPricesToCustomer','syncPricesToCustomer'],['newDocument','newDocument'],['openDocument','openDocument'],['resetEditor','resetEditor'],['updateEditorVisibility','updateEditorVisibility'],['addCalculatedLabel','addCalculatedLabel']].forEach(([name])=>{
+    const base=window[name];
+    if(typeof base!=='function')return;
+    window[name]=function(){
+      const result=base.apply(this,arguments);
+      Promise.resolve(result).finally(()=>scRenderCustomerItemMasterV1022());
+      return result;
+    };
+    try{eval(`${name}=window[name]`)}catch(_){ }
+  });
+
+  if($('quickPrice')){
+    $('quickPrice').addEventListener('input',()=>{
+      delete $('quickPrice').dataset.historyId;
+      delete $('quickPrice').dataset.historyItemId;
+    });
+  }
+
+  scRenderCustomerItemMasterV1022();
 })();
 </script>
 
