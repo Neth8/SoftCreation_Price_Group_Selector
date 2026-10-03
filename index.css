@@ -2767,3 +2767,92 @@ html[data-theme="dark"]
   background:#258e8e;
   border-color:#39aaa8;
 }
+
+/* =====================================================================
+   SoftCreation Performance Patch V1 — list pagination
+   ===================================================================== */
+.sc-pagination{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:11px 2px 2px;
+  margin-top:8px;
+  border-top:1px solid var(--line,#dbe6e9);
+  font-size:10.5px;
+  color:var(--muted,#6f7c8e);
+}
+.sc-pagination-summary{white-space:nowrap}
+.sc-pagination-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.sc-pagination-actions label{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-weight:800;
+}
+.sc-pagination-actions select{
+  min-width:66px;
+  border:1px solid #cfdde2;
+  border-radius:8px;
+  background:#fff;
+  color:#274250;
+  padding:6px 8px;
+  outline:none;
+}
+.sc-page-number{
+  min-width:86px;
+  text-align:center;
+  color:#49606a;
+  font-weight:750;
+}
+.sc-pagination .btn:disabled{
+  opacity:.4;
+  cursor:not-allowed;
+  transform:none!important;
+}
+
+/* Reduce off-screen paint/layout cost for long non-document result areas. */
+#customerList,
+#itemList,
+#deviceList,
+#quoteList,
+#piList,
+#branchRequestList,
+#poList,
+#soList91{
+  contain:layout style;
+}
+
+html[data-theme="dark"] .sc-pagination{
+  border-top-color:#33474d;
+  color:#91a5ac;
+}
+html[data-theme="dark"] .sc-pagination-actions select{
+  background:#15282e;
+  border-color:#365058;
+  color:#dce8eb;
+}
+html[data-theme="dark"] .sc-page-number{
+  color:#a9bcc2;
+}
+
+@media(max-width:650px){
+  .sc-pagination{
+    align-items:stretch;
+  }
+  .sc-pagination-summary{
+    width:100%;
+  }
+  .sc-pagination-actions{
+    width:100%;
+    justify-content:space-between;
+  }
+}
+
