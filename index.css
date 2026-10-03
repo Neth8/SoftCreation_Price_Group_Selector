@@ -3187,7 +3187,7 @@ html[data-theme="dark"] .customer-price-history-index{
 
 
 /* =========================================================
-   v1.0.22 — EXPANDABLE CUSTOMER ITEM MASTER
+   v1.0.23 — CUSTOMER ITEM MASTER DROPDOWN
    ========================================================= */
 .customer-item-master-list{
   display:flex;
@@ -3335,3 +3335,93 @@ html[data-theme="dark"] .customer-item-history-copy small{color:#91a6ac}
   .customer-item-history-use{justify-content:space-between}
   .customer-item-action-row{grid-template-columns:1fr}
 }
+
+/* =========================================================
+   v1.0.23 — CUSTOMER ITEM MASTER DROPDOWN
+   ========================================================= */
+.customer-item-picker-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  margin:9px 0 8px;
+}
+.customer-item-picker-wrap>label{
+  font-size:11px;
+  font-weight:900;
+  color:#4b5d70;
+}
+.customer-item-picker-wrap select{
+  width:100%;
+  border:1px solid #bfd7da;
+  border-radius:11px;
+  background:#fff;
+  color:#17343d;
+  padding:10px 11px;
+  outline:none;
+  font-size:11px;
+  font-weight:800;
+}
+.customer-item-picker-wrap select:focus{
+  border-color:#079c9f;
+  box-shadow:0 0 0 3px rgba(7,156,159,.12);
+}
+.customer-item-picker-wrap select:disabled{
+  opacity:.68;
+  cursor:not-allowed;
+  background:#f4f7f8;
+}
+.customer-item-picker-hint{
+  font-size:9px;
+  line-height:1.4;
+  color:#74858c;
+}
+.customer-item-master-list{
+  margin-top:6px;
+}
+.customer-item-main-static{
+  cursor:default;
+}
+.customer-item-selected-tag{
+  justify-self:end;
+  background:#e6f7ef;
+  color:#126e46;
+  border:1px solid #bfe4d0;
+  font-size:8px;
+}
+.customer-item-master-row-selected{
+  grid-template-columns:34px minmax(0,1fr) 150px 78px;
+}
+
+html[data-theme="dark"] .customer-item-picker-wrap>label{
+  color:#b8c9ce;
+}
+html[data-theme="dark"] .customer-item-picker-wrap select{
+  background:#18292f;
+  border-color:#375057;
+  color:#e7f0f2;
+}
+html[data-theme="dark"] .customer-item-picker-wrap select:disabled{
+  background:#142229;
+  color:#83989e;
+}
+html[data-theme="dark"] .customer-item-picker-hint{
+  color:#8fa4aa;
+}
+html[data-theme="dark"] .customer-item-selected-tag{
+  background:#18362a;
+  border-color:#285b40;
+  color:#8ed6ad;
+}
+
+@media(max-width:760px){
+  .customer-item-master-row-selected{
+    grid-template-columns:34px minmax(0,1fr);
+  }
+  .customer-item-master-row-selected .customer-item-current,
+  .customer-item-master-row-selected .customer-item-selected-tag{
+    grid-column:2;
+    justify-self:start;
+    align-items:flex-start;
+  }
+}
+

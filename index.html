@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.22 - Expandable Customer Item Master -->
+<!-- SoftCreation v1.0.23 - Customer Item Master Dropdown -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.22</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.23</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.22</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.23</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -373,11 +373,17 @@
     </div>
     <button id="customerAllPriceHistoryBtn" class="btn ghost sm" type="button" onclick="openCustomerAllPriceHistoryV1021()" disabled>Customer Price History</button>
   </div>
-  <select id="masterItemPick" onchange="customerItemPickChangedV1021()" hidden></select>
+  <div id="customerItemPickerWrap" class="customer-item-picker-wrap">
+    <label for="masterItemPick">Customer Item Master</label>
+    <select id="masterItemPick" onchange="customerItemPickChangedV1021()">
+      <option value="">-- Select customer first --</option>
+    </select>
+    <div class="customer-item-picker-hint">Only items previously used by the selected customer are shown here. Select one to view its current price and price-change history.</div>
+  </div>
   <button id="customerItemHistoryBtn" type="button" onclick="openSelectedCustomerItemHistoryV1021()" hidden disabled></button>
 
   <div id="customerItemMasterList" class="customer-item-master-list">
-    <div class="customer-item-master-empty">Select a customer to load previous items and prices.</div>
+    <div class="customer-item-master-empty">Select a customer, then choose an item from Customer Item Master.</div>
   </div>
 
   <div class="customer-item-action-row">
@@ -11424,69 +11430,56 @@ window.toggleBpSeparateDeliveryButton = function(){
 
 <script>
 /* =========================================================
-   v1.0.22 — EXPANDABLE CUSTOMER ITEM MASTER
+   v1.0.23 — CUSTOMER ITEM MASTER DROPDOWN
    ---------------------------------------------------------
-   - No standalone calculator save buttons.
-   - Customer Item Master is an inline list.
-   - Arrow expands each item's complete price-change history.
-   - Current or historical price can be selected directly.
-   - Existing quick manual-price override and quotation table
-     history tracking remain unchanged.
+   - Customer items are selected from one compact dropdown.
+   - The page no longer grows when a customer has many items.
+   - The selected item keeps the existing New Document card.
+   - Arrow expands only that item's full price-change history.
+   - Current or historical price can still be used.
+   - Label Price Calculator remains below the items table.
    ========================================================= */
 (function(){
   'use strict';
 
-  let scExpandedCustomerItemV1022='';
+  let scExpandedCustomerItemV1023='';
 
-  function scCustomerV1022(id=''){
+  function scCustomerV1023(id=''){
     return state.customers.find(c=>c.id===(id||$('customerSelect')?.value));
   }
 
-  function scItemKeyV1022(item){
+  function scItemKeyV1023(item){
     if(!item)return '';
     try{return item.labelKey||labelKey(item)}catch(_){return item.labelKey||item.id||''}
   }
 
-  function scHistoryForItemV1022(customer,item){
+  function scHistoryForItemV1023(customer,item){
     if(!customer||!item)return [];
-    const key=scItemKeyV1022(item);
-    return (customer.priceHistory||[]).filter(h=>(h.itemId&&h.itemId===item.id)||(h.key&&h.key===key));
+    const key=scItemKeyV1023(item);
+    return (customer.priceHistory||[]).filter(h=>
+      (h.itemId&&h.itemId===item.id) ||
+      (h.key&&h.key===key)
+    );
   }
 
-  function scResolveHistoryItemV1022(h){
-    if(!h)return null;
-    if(h.itemId){
-      const byId=state.items.find(i=>i.id===h.itemId);
-      if(byId)return byId;
-    }
-    if(h.key)return state.items.find(i=>scItemKeyV1022(i)===h.key)||null;
-    return null;
-  }
-
-  function scCustomerItemsV1022(customer){
-    if(!customer)return [];
-    const result=[];
-    const seen=new Set();
-    const add=item=>{
-      if(!item||seen.has(item.id))return;
-      seen.add(item.id);
-      result.push(item);
-    };
-    (customer.priceHistory||[]).forEach(h=>add(scResolveHistoryItemV1022(h)));
-    Object.keys(customer.specialPrices||{}).forEach(id=>add(state.items.find(i=>i.id===id)));
-    return result;
-  }
-
-  function scHistoryDateV1022(h){
+  function scHistoryDateV1023(h){
     const raw=h?.changedAt||h?.date||'';
     if(!raw)return '-';
     try{
       if(String(raw).length<=10)return fmtDate(String(raw).slice(0,10));
-      return new Date(raw).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    }catch(_){return String(raw)}
+      return new Date(raw).toLocaleString('en-GB',{
+        day:'2-digit',
+        month:'short',
+        year:'numeric',
+        hour:'2-digit',
+        minute:'2-digit'
+      });
+    }catch(_){
+      return String(raw);
+    }
   }
 
-  function scSourceLabelV1022(source){
+  function scSourceLabelV1023(source){
     const map={
       'calculator':'Calculator',
       'calculator-add':'Calculator → Quotation',
@@ -11500,174 +11493,292 @@ window.toggleBpSeparateDeliveryButton = function(){
     return map[source]||source||'Saved Price';
   }
 
-  function scItemLabelV1022(item){
-    return [item?.size,item?.material,item?.layout,item?.pcs?item.pcs+' pcs':''].filter(Boolean).join(' / ');
+  function scItemLabelV1023(item){
+    return [
+      item?.size,
+      item?.material,
+      item?.layout,
+      item?.pcs?item.pcs+' pcs':''
+    ].filter(Boolean).join(' / ');
   }
 
-  function scHistoryChangeV1022(list,index){
-    const h=list[index],older=list[index+1];
+  function scHistoryChangeV1023(list,index){
+    const h=list[index];
+    const older=list[index+1];
     if(!h)return '';
-    const explicit=h.oldPrice!==null&&h.oldPrice!==undefined&&Number.isFinite(Number(h.oldPrice))?Number(h.oldPrice):null;
-    const fallback=older&&Number.isFinite(Number(older.price))?Number(older.price):null;
+
+    const explicit=
+      h.oldPrice!==null &&
+      h.oldPrice!==undefined &&
+      Number.isFinite(Number(h.oldPrice))
+        ? Number(h.oldPrice)
+        : null;
+
+    const fallback=
+      older && Number.isFinite(Number(older.price))
+        ? Number(older.price)
+        : null;
+
     const old=explicit!==null?explicit:fallback;
-    return old===null?`Saved at LKR ${money(h.price)}`:`LKR ${money(old)} → LKR ${money(h.price)}`;
+
+    return old===null
+      ? `Saved at LKR ${money(h.price)}`
+      : `LKR ${money(old)} → LKR ${money(h.price)}`;
   }
 
-  function scRenderCustomerItemMasterV1022(){
+  function scSetPickerVisibilityV1023(){
+    const wrap=$('customerItemPickerWrap');
+    const host=$('customerItemMasterList');
+    const actions=document.querySelector('.customer-item-action-row');
+    const device=$('quoteCategory')?.value==='device';
+    const pi=$('docType')?.value==='PI';
+    const hide=device||pi;
+
+    if(wrap)wrap.style.display=hide?'none':'';
+    if(host)host.style.display=hide?'none':'';
+    if(actions)actions.style.display=hide?'none':'';
+
+    return hide;
+  }
+
+  function scRenderCustomerItemSelectedV1023(){
     const host=$('customerItemMasterList');
     if(!host)return;
 
-    const customer=scCustomerV1022();
-    const device=$('quoteCategory')?.value==='device';
-    const pi=$('docType')?.value==='PI';
+    if(scSetPickerVisibilityV1023())return;
 
-    host.style.display=(device||pi)?'none':'';
-    const actions=document.querySelector('.customer-item-action-row');
-    if(actions)actions.style.display=(device||pi)?'none':'';
-
-    if(device||pi)return;
+    const customer=scCustomerV1023();
 
     if(!customer){
-      host.innerHTML='<div class="customer-item-master-empty">Select a customer to load previous items and prices.</div>';
+      host.innerHTML=
+        '<div class="customer-item-master-empty">Select a customer to load previous items and prices.</div>';
       return;
     }
 
-    const items=scCustomerItemsV1022(customer);
-    if(!items.length){
-      host.innerHTML='<div class="customer-item-master-empty"><b>No previous label items for this customer.</b><span>Use the Label Price Calculator below the items table to create the first item.</span></div>';
+    const pick=$('masterItemPick');
+    const item=state.items.find(i=>i.id===pick?.value);
+
+    if(!item){
+      const hasOptions=(pick?.options?.length||0)>1 && !pick?.disabled;
+
+      host.innerHTML=hasOptions
+        ? '<div class="customer-item-master-empty"><b>Select an item from the Customer Item Master dropdown.</b><span>The selected item will appear here with its current price and expandable price history.</span></div>'
+        : '<div class="customer-item-master-empty"><b>No previous label items for this customer.</b><span>Use the Label Price Calculator below the items table to create the first item.</span></div>';
+
       return;
     }
 
-    const selectedId=$('masterItemPick')?.value||'';
     const mode=$('payMode')?.value||customer.paymentMode||'credit';
+    const list=scHistoryForItemV1023(customer,item);
+    const current=currentPricingForItem(item,customer.id,mode);
+    const latest=list[0];
+    const expanded=scExpandedCustomerItemV1023===item.id;
 
-    host.innerHTML=items.map(item=>{
-      const list=scHistoryForItemV1022(customer,item);
-      const expanded=scExpandedCustomerItemV1022===item.id;
-      const selected=selectedId===item.id;
-      const current=currentPricingForItem(item,customer.id,mode);
-      const latest=list[0];
-      return `<div class="customer-item-master-card ${selected?'selected':''}" data-item-id="${esc(item.id)}">
-        <div class="customer-item-master-row">
-          <button class="customer-item-expand ${expanded?'open':''}" type="button" onclick="toggleCustomerItemHistoryV1022('${item.id}')" aria-label="${expanded?'Collapse':'Expand'} price history">›</button>
-          <button class="customer-item-main" type="button" onclick="selectCustomerItemInlineV1022('${item.id}')">
-            <span class="customer-item-name">${esc(scItemLabelV1022(item))}</span>
-            <span class="customer-item-sub">${esc(item.desc||'ELP')}${latest?.tier?` • ${esc(latest.tier)}`:''}</span>
-          </button>
-          <div class="customer-item-current">
-            <span>Current ${esc(String(mode).toUpperCase())}</span>
-            <b>LKR ${money(current)}</b>
-            <small>${list.length} change${list.length===1?'':'s'}</small>
-          </div>
-          <button class="btn ${selected?'green':'primary'} sm customer-item-select" type="button" onclick="selectCustomerItemInlineV1022('${item.id}')">${selected?'Selected':'Select'}</button>
+    host.innerHTML=`<div class="customer-item-master-card selected" data-item-id="${esc(item.id)}">
+      <div class="customer-item-master-row customer-item-master-row-selected">
+        <button
+          class="customer-item-expand ${expanded?'open':''}"
+          type="button"
+          onclick="toggleCustomerItemHistoryV1023('${item.id}')"
+          aria-label="${expanded?'Collapse':'Expand'} price history"
+          title="${expanded?'Hide':'Show'} price history"
+        >›</button>
+
+        <div class="customer-item-main customer-item-main-static">
+          <span class="customer-item-name">${esc(scItemLabelV1023(item))}</span>
+          <span class="customer-item-sub">${esc(item.desc||'ELP')}${latest?.tier?` • ${esc(latest.tier)}`:''}</span>
         </div>
-        <div class="customer-item-inline-history ${expanded?'show':''}">
-          ${list.length?list.map((h,index)=>`<div class="customer-item-history-entry">
-            <div class="customer-item-history-copy">
-              <b>${esc(scHistoryChangeV1022(list,index))}</b>
-              <span>${esc((h.mode||'').toUpperCase())}${h.tier?` • ${esc(h.tier)}`:''} • ${esc(scSourceLabelV1022(h.source||'legacy'))}</span>
-              <small>${esc(scHistoryDateV1022(h))} • ${esc(h.user||h.username||'Legacy')}${h.documentSerial?` • ${esc(h.documentSerial)}`:''}</small>
-            </div>
-            <div class="customer-item-history-use">
-              <b>LKR ${money(h.price)}</b>
-              <button class="btn ghost sm" type="button" onclick="useCustomerItemHistoryInlineV1022('${item.id}','${h.id}')">Use</button>
-            </div>
-          </div>`).join(''):'<div class="customer-item-history-empty">No price changes recorded for this item.</div>'}
+
+        <div class="customer-item-current">
+          <span>Current ${esc(String(mode).toUpperCase())}</span>
+          <b>LKR ${money(current)}</b>
+          <small>${list.length} change${list.length===1?'':'s'}</small>
         </div>
-      </div>`;
-    }).join('');
+
+        <span class="tag customer-item-selected-tag">SELECTED</span>
+      </div>
+
+      <div class="customer-item-inline-history ${expanded?'show':''}">
+        ${list.length
+          ? list.map((h,index)=>`<div class="customer-item-history-entry">
+              <div class="customer-item-history-copy">
+                <b>${esc(scHistoryChangeV1023(list,index))}</b>
+                <span>${esc((h.mode||'').toUpperCase())}${h.tier?` • ${esc(h.tier)}`:''} • ${esc(scSourceLabelV1023(h.source||'legacy'))}</span>
+                <small>${esc(scHistoryDateV1023(h))} • ${esc(h.user||h.username||'Legacy')}${h.documentSerial?` • ${esc(h.documentSerial)}`:''}</small>
+              </div>
+              <div class="customer-item-history-use">
+                <b>LKR ${money(h.price)}</b>
+                <button
+                  class="btn ghost sm"
+                  type="button"
+                  onclick="useCustomerItemHistoryV1023('${item.id}','${h.id}')"
+                >Use</button>
+              </div>
+            </div>`).join('')
+          : '<div class="customer-item-history-empty">No price changes recorded for this item.</div>'
+        }
+      </div>
+    </div>`;
   }
 
-  window.toggleCustomerItemHistoryV1022=function(itemId){
-    scExpandedCustomerItemV1022=scExpandedCustomerItemV1022===itemId?'':itemId;
-    scRenderCustomerItemMasterV1022();
+  window.toggleCustomerItemHistoryV1023=function(itemId){
+    scExpandedCustomerItemV1023=
+      scExpandedCustomerItemV1023===itemId
+        ? ''
+        : itemId;
+
+    scRenderCustomerItemSelectedV1023();
   };
 
-  window.selectCustomerItemInlineV1022=function(itemId){
-    const item=state.items.find(i=>i.id===itemId),customer=scCustomerV1022();
-    if(!item||!customer)return;
-    const pick=$('masterItemPick');
-    if(pick)pick.value=item.id;
-    if(typeof window.customerItemPickChangedV1021==='function')window.customerItemPickChangedV1021(false);
-    const quick=$('quickPrice');
-    if(quick){delete quick.dataset.historyId;delete quick.dataset.historyItemId;}
-    scRenderCustomerItemMasterV1022();
-  };
-
-  window.useCustomerItemHistoryInlineV1022=function(itemId,historyId){
-    const customer=scCustomerV1022(),item=state.items.find(i=>i.id===itemId);
+  window.useCustomerItemHistoryV1023=function(itemId,historyId){
+    const customer=scCustomerV1023();
+    const item=state.items.find(i=>i.id===itemId);
     const h=(customer?.priceHistory||[]).find(x=>x.id===historyId);
+
     if(!customer||!item||!h)return;
-    const pick=$('masterItemPick'),quick=$('quickPrice');
+
+    const pick=$('masterItemPick');
+    const quick=$('quickPrice');
+
     if(pick)pick.value=item.id;
+
     if(quick){
       quick.value=Number(h.price||0).toFixed(2);
       quick.dataset.autoPrice='0';
       quick.dataset.historyId=h.id;
       quick.dataset.historyItemId=item.id;
     }
+
     const text=$('customerItemProfileText');
-    if(text)text.textContent=`Previous price selected • ${scItemLabelV1022(item)} • LKR ${money(h.price)} • ${scHistoryDateV1022(h)}`;
-    scRenderCustomerItemMasterV1022();
+    if(text){
+      text.textContent=
+        `Previous price selected • ${scItemLabelV1023(item)} • `+
+        `LKR ${money(h.price)} • ${scHistoryDateV1023(h)}`;
+    }
+
+    scRenderCustomerItemSelectedV1023();
   };
 
-  /* Historical price selection should be recorded as HISTORY REUSE rather
-     than a generic manual override when it is added to the quotation. */
-  const scBaseAddMasterLineV1022=addMasterLine;
+  /*
+    Preserve history-reuse audit behaviour when adding a historical
+    customer price into the quotation.
+  */
+  const scBaseAddMasterLineV1023=addMasterLine;
+
   addMasterLine=function(){
     const quick=$('quickPrice');
     const historyId=quick?.dataset.historyId||'';
     const historyItemId=quick?.dataset.historyItemId||'';
+
     if(!historyId){
-      const result=scBaseAddMasterLineV1022.apply(this,arguments);
-      scRenderCustomerItemMasterV1022();
+      const result=scBaseAddMasterLineV1023.apply(this,arguments);
+      scRenderCustomerItemSelectedV1023();
       return result;
     }
 
-    const customer=scCustomerV1022();
-    const item=state.items.find(i=>i.id===historyItemId)||state.items.find(i=>i.id===$('masterItemPick')?.value);
+    const customer=scCustomerV1023();
+    const item=
+      state.items.find(i=>i.id===historyItemId) ||
+      state.items.find(i=>i.id===$('masterItemPick')?.value);
+
     const h=(customer?.priceHistory||[]).find(x=>x.id===historyId);
-    if(!customer||!item||!h)return scBaseAddMasterLineV1022.apply(this,arguments);
+
+    if(!customer||!item||!h){
+      return scBaseAddMasterLineV1023.apply(this,arguments);
+    }
 
     const previousAuto=quick.dataset.autoPrice;
-    quick.dataset.autoPrice='1'; /* suppress v1.0.21 generic manual-history wrapper */
+    quick.dataset.autoPrice='1';
+
     try{
-      const result=scBaseAddMasterLineV1022.apply(this,arguments);
-      updateCustomerPriceHistory(item,Number(h.price),$('payMode')?.value||customer.paymentMode||'credit',h.tier||item.lastTier||'',{
-        source:'history-reuse',
-        note:`Previous customer price reused from ${scHistoryDateV1022(h)}`,
-        documentId:state.current?.id||'',
-        documentSerial:state.current?.serial||''
-      });
+      const result=scBaseAddMasterLineV1023.apply(this,arguments);
+
+      updateCustomerPriceHistory(
+        item,
+        Number(h.price),
+        $('payMode')?.value||customer.paymentMode||'credit',
+        h.tier||item.lastTier||'',
+        {
+          source:'history-reuse',
+          note:`Previous customer price reused from ${scHistoryDateV1023(h)}`,
+          documentId:state.current?.id||'',
+          documentSerial:state.current?.serial||''
+        }
+      );
+
       saveState();
       return result;
+
     }finally{
       quick.dataset.autoPrice=previousAuto||'0';
       delete quick.dataset.historyId;
       delete quick.dataset.historyItemId;
-      scRenderCustomerItemMasterV1022();
+      scRenderCustomerItemSelectedV1023();
     }
   };
+
   window.addMasterLine=addMasterLine;
 
-  /* Re-render inline Customer Item Master whenever the existing v1.0.21
-     picker/customer/document flow refreshes. */
-  const scBaseCustomerPickChangedV1022=window.customerItemPickChangedV1021;
+  /*
+    Existing v1.0.21 picker still owns customer-specific dropdown
+    population and current-price loading. This wrapper only refreshes
+    the compact selected-item card.
+  */
+  const scBaseCustomerPickChangedV1023=window.customerItemPickChangedV1021;
+
   window.customerItemPickChangedV1021=function(){
-    const result=scBaseCustomerPickChangedV1022?.apply(this,arguments);
-    scRenderCustomerItemMasterV1022();
+    const previous=$('masterItemPick')?.value||'';
+
+    const result=
+      scBaseCustomerPickChangedV1023
+        ?.apply(this,arguments);
+
+    const now=$('masterItemPick')?.value||'';
+
+    if(now!==previous){
+      scExpandedCustomerItemV1023='';
+    }
+
+    const quick=$('quickPrice');
+    if(quick){
+      delete quick.dataset.historyId;
+      delete quick.dataset.historyItemId;
+    }
+
+    scRenderCustomerItemSelectedV1023();
     return result;
   };
 
-  [['refreshCustomerPick','refreshCustomerPick'],['fillCustomer','fillCustomer'],['syncPricesToCustomer','syncPricesToCustomer'],['newDocument','newDocument'],['openDocument','openDocument'],['resetEditor','resetEditor'],['updateEditorVisibility','updateEditorVisibility'],['addCalculatedLabel','addCalculatedLabel']].forEach(([name])=>{
+  /*
+    Re-render after customer/document/calculator actions while keeping
+    the customer picker populated by the existing core functions.
+  */
+  [
+    'refreshCustomerPick',
+    'fillCustomer',
+    'syncPricesToCustomer',
+    'newDocument',
+    'openDocument',
+    'resetEditor',
+    'updateEditorVisibility',
+    'addCalculatedLabel'
+  ].forEach(name=>{
     const base=window[name];
     if(typeof base!=='function')return;
+
     window[name]=function(){
       const result=base.apply(this,arguments);
-      Promise.resolve(result).finally(()=>scRenderCustomerItemMasterV1022());
+
+      Promise
+        .resolve(result)
+        .finally(()=>scRenderCustomerItemSelectedV1023());
+
       return result;
     };
-    try{eval(`${name}=window[name]`)}catch(_){ }
+
+    try{
+      eval(`${name}=window[name]`);
+    }catch(_){}
   });
 
   if($('quickPrice')){
@@ -11677,7 +11788,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     });
   }
 
-  scRenderCustomerItemMasterV1022();
+  scRenderCustomerItemSelectedV1023();
 })();
 </script>
 
