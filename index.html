@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.18 - Immediate Supabase Device Image Upload + Progress -->
+<!-- SoftCreation v1.0.19 - A4 Quotation Preview + Single-Page PDF Stability -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.18</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.19</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.18</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.19</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -1234,6 +1234,88 @@ function buildDocHTML(doc,forPrint=false){
   </div>
   <div class="docfoot"><b>${q?'Thank you for the opportunity to quote.':'Thank you for your order.'}</b><span>${esc(q?state.settings.quoteFooter:state.settings.piFooter)}</span></div>`;
 }
+/* v1.0.19 - Keep quotation/PI preview locked to one physical A4 page.
+   The old .paper rule used min-height only, so a longer quotation could make
+   the paper itself grow. That stretched the letterhead in the viewer and the
+   browser print fallback could create a second page. */
+const SC_A4_WIDTH_V1019=794;
+const SC_A4_HEIGHT_V1019=1123;
+
+function resetPaperFitV1019(paper){
+  if(!paper)return;
+  const body=paper.querySelector('.docbody');
+  if(!body)return;
+  body.style.transform='';
+  body.style.transformOrigin='';
+  body.style.right='';
+  body.style.width='';
+  body.removeAttribute('data-paper-fit');
+}
+
+function fitPaperToSinglePageV1019(paper){
+  if(!paper)return 1;
+  const body=paper.querySelector('.docbody');
+  if(!body)return 1;
+  resetPaperFitV1019(paper);
+
+  const paperHeight=paper.clientHeight||SC_A4_HEIGHT_V1019;
+  const baseWidth=body.getBoundingClientRect().width||678;
+  const bodyTop=body.offsetTop||parseFloat(getComputedStyle(body).top)||0;
+  let bodyLimit=paperHeight;
+  const settlement=paper.querySelector('.pi-settlement-footer');
+  const foot=paper.querySelector('.docfoot');
+  if(settlement&&settlement.offsetTop>bodyTop)bodyLimit=Math.min(bodyLimit,settlement.offsetTop-8);
+  if(foot&&foot.offsetTop>bodyTop)bodyLimit=Math.min(bodyLimit,foot.offsetTop-8);
+
+  const available=Math.max(80,bodyLimit-bodyTop);
+  let required=Math.max(body.scrollHeight,body.clientHeight);
+  if(required<=available+1){
+    body.setAttribute('data-paper-fit','1.000');
+    return 1;
+  }
+
+  let scale=Math.min(1,available/required);
+  for(let n=0;n<6;n++){
+    scale=Math.max(0.2,Math.min(1,scale));
+    body.style.transformOrigin='top left';
+    body.style.right='auto';
+    body.style.width=`${baseWidth/scale}px`;
+    body.style.transform=`scale(${scale})`;
+    required=Math.max(body.scrollHeight,body.clientHeight);
+    const next=Math.min(1,available/required);
+    if(Math.abs(next-scale)<0.002){scale=next;break}
+    scale=next;
+  }
+
+  scale=Math.max(0.2,Math.min(1,scale));
+  body.style.right='auto';
+  body.style.width=`${baseWidth/scale}px`;
+  body.style.transformOrigin='top left';
+  body.style.transform=`scale(${scale})`;
+  body.setAttribute('data-paper-fit',scale.toFixed(3));
+  return scale;
+}
+
+async function waitForPaperAssetsV1019(paper){
+  if(!paper)return;
+  const imgs=[...paper.querySelectorAll('img')];
+  await Promise.all(imgs.map(img=>new Promise(resolve=>{
+    if(img.complete){resolve();return}
+    let done=false;
+    const finish=()=>{if(done)return;done=true;resolve()};
+    img.addEventListener('load',finish,{once:true});
+    img.addEventListener('error',finish,{once:true});
+    setTimeout(finish,1800);
+  })));
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+}
+
+async function stabilizePaperV1019(paper){
+  if(!paper)return 1;
+  await waitForPaperAssetsV1019(paper);
+  return fitPaperToSinglePageV1019(paper);
+}
+
 function renderCurrent(){
   if(!state.current){
     if($('paper'))$('paper').innerHTML='<div style="position:absolute;left:58px;right:58px;top:250px;padding:18px;border:1px dashed #9fc8ca;border-radius:12px;color:#60717d;background:rgba(255,255,255,.88)"><b style="color:#078f92">Start a New Document</b><br><span style="font-size:11px">Click New Document to create a quotation, then select a customer and add items.</span></div>';
@@ -1244,7 +1326,11 @@ function renderCurrent(){
     state.current={...state.current,...d};
     $('serialBadge').textContent=d.serial;
     $('paper').innerHTML=buildDocHTML(d);
-    if(d.type==='PI')renderQR(d);
+    if(d.type==='PI'){
+      Promise.resolve(renderQR(d)).finally(()=>stabilizePaperV1019($('paper')));
+    }else{
+      stabilizePaperV1019($('paper'));
+    }
   }catch(err){
     console.error('Preview failed',err);
     $('paper').innerHTML='<div style="position:absolute;left:58px;right:58px;top:250px;padding:18px;border:1px solid #e7b6b6;border-radius:12px;color:#8d3030;background:#fff7f7"><b>Preview error</b><br><span style="font-size:11px">Please refresh the document. If this continues, check the browser console.</span></div>';
@@ -1653,8 +1739,8 @@ async function createPaperForCapture(doc){
   if(doc.type==='PI'){
     const qr=paper.querySelector(`[id="qr_${doc.id}"]`);
     if(qr)await renderQRIn(qr,doc);
-    await new Promise(r=>setTimeout(r,120));
   }
+  await stabilizePaperV1019(paper);
   return {host,paper}
 }
 async function downloadDocPDF(doc){
@@ -1682,6 +1768,8 @@ async function downloadDocPDF(doc){
     const pdf=new jsPDF({orientation:'p',unit:'mm',format:'a4',compress:true});
     try{pdf.setDisplayMode(1.0,'continuous','UseNone')}catch(e){}
     pdf.addImage(img,'PNG',0,0,210,297,'previewExact','FAST');
+    /* This quotation/PI generator is intentionally single-page A4. */
+    while(pdf.getNumberOfPages()>1)pdf.deletePage(pdf.getNumberOfPages());
     pdf.save((doc.serial||'document').replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
     toast('PDF generated exactly from preview');
   }catch(err){
@@ -1700,15 +1788,17 @@ async function downloadSavedPDF(id){
   const d=state.docs.find(x=>x.id===id);if(!d)return;
   await downloadDocPDF(JSON.parse(JSON.stringify(d)));
 }
-function printSavedDocument(doc){
+async function printSavedDocument(doc){
   if(!doc)return;
   $('printHost').innerHTML=`<div class="paper">${buildDocHTML(doc,true)}</div>`;
   $('printHost').style.display='block';
+  const paper=$('printHost').querySelector('.paper');
   if(doc.type==='PI'){
     const h=$('printHost').querySelector(`[id="qr_${doc.id}"]`);
-    if(h)renderQRIn(h,doc);
+    if(h)await renderQRIn(h,doc);
   }
-  setTimeout(()=>{window.print();$('printHost').style.display='none'},350);
+  await stabilizePaperV1019(paper);
+  setTimeout(()=>{window.print();$('printHost').style.display='none'},120);
 }
 async function renderQRIn(holder,doc){if(!holder)return;const ok=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',()=>window.QRCode);if(!ok)return;holder.innerHTML='';const raw=b64Unicode(productionPayload(doc)),txt=state.settings.prodUrl?state.settings.prodUrl.replace(/#.*$/,'')+'#scprod='+encodeURIComponent(raw):'SC-PROD:'+raw;new QRCode(holder,{text:txt,width:70,height:70,correctLevel:QRCode.CorrectLevel.M})}
 function printCurrent(){const d=collectCurrent();if(!d)return;printSavedDocument(d)}
@@ -1723,7 +1813,10 @@ function viewDocument(id){
   $('viewerPaper').innerHTML=buildDocHTML(d,true);
   if(d.type==='PI'){
     const h=$('viewerPaper').querySelector(`[id="qr_${d.id}"]`);
-    if(h)renderQRIn(h,d);
+    if(h)Promise.resolve(renderQRIn(h,d)).finally(()=>stabilizePaperV1019($('viewerPaper')));
+    else stabilizePaperV1019($('viewerPaper'));
+  }else{
+    stabilizePaperV1019($('viewerPaper'));
   }
   $('viewerEditBtn').style.display='inline-block';
   $('viewerDeleteBtn').style.display='inline-block';
