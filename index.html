@@ -9970,39 +9970,101 @@ window.toggleBpSeparateDeliveryButton = function(){
      Fast document list table: same UI/actions, O(1) relationship lookup.
      --------------------------------------------------------------- */
   const fastDocTable=function(arr,isQ){
-    if(!arr.length)return '<div class="empty">No documents found.</div>';
+    if(!arr.length)return `<div class="empty">${isQ?'No quotations found.':'No documents found.'}</div>`;
 
+    /*
+      IMPORTANT:
+      Pagination renders only the visible page slice, but quotation revision
+      relationships must be calculated from the COMPLETE visible document set.
+      This preserves the V7.9 revision/history behaviour while keeping the
+      performance pagination.
+    */
     const full=P.docContext||state.docs||[];
     const byId=P.docById||new Map(full.map(d=>[d.id,d]));
+
     const piBySource=P.piBySource||(()=>{
       const m=new Map();
       full.forEach(d=>{
-        if(d.type==='PI'&&d.sourceQuoteId&&!m.has(d.sourceQuoteId))m.set(d.sourceQuoteId,d);
+        if(d.type==='PI'&&d.sourceQuoteId&&!m.has(d.sourceQuoteId)){
+          m.set(d.sourceQuoteId,d);
+        }
       });
       return m;
     })();
 
+    const quoteChains=new Map();
+    full.forEach(d=>{
+      if(d.type!=='Q')return;
+      const key=d.core||d.id;
+      if(!quoteChains.has(key))quoteChains.set(key,[]);
+      quoteChains.get(key).push(d);
+    });
+    quoteChains.forEach(chain=>{
+      chain.sort((a,b)=>(Number(a.rev||0)-Number(b.rev||0)) || (Number(a.created||0)-Number(b.created||0)));
+    });
+
     return `<table class="table"><thead><tr><th>Document</th><th>Customer</th><th>PO / Ref</th><th>Mode</th><th>Total</th><th>Status / Link</th><th>Actions</th></tr></thead><tbody>${arr.map(d=>{
-      const t=docTotals(d),
-        replacement=d.replacedBy?byId.get(d.replacedBy):null,
-        source=d.sourceQuoteId?byId.get(d.sourceQuoteId):null,
-        generatedPI=isQ?piBySource.get(d.id):null;
+      const t=docTotals(d);
+      const replacement=d.replacedBy?byId.get(d.replacedBy):null;
+      const source=d.sourceQuoteId?byId.get(d.sourceQuoteId):null;
+      const generatedPI=isQ?piBySource.get(d.id):null;
 
       let status='';
-      if(d.replacedBy){
-        status=`<span class="tag replaced">REPLACED</span><div class="small">Use ${esc(replacement?.serial||'new revision')}</div>`;
-      }else if(isQ&&generatedPI){
-        status=`<span class="tag pi-generated">PI GENERATED</span><div class="small">${esc(generatedPI.serial)}</div>`;
-      }else if(source){
+      let actions='';
+
+      if(isQ){
+        const chain=quoteChains.get(d.core||d.id)||[d];
+        const locked=!!d.replacedBy;
+
+        if(locked){
+          status=`<span class="tag replaced">REPLACED / LOCKED</span>
+            <div class="small">Current: ${esc(replacement?.serial||chain[chain.length-1]?.serial||'new revision')}</div>`;
+        }else if(generatedPI){
+          status=`<span class="tag pi-generated">PI GENERATED</span>
+            <div class="small">${esc(generatedPI.serial)}</div>`;
+        }else{
+          status=`<span class="tag">ACTIVE${d.rev?` • R${Number(d.rev)}`:''}</span>`;
+        }
+
+        if(chain.length>1){
+          status+=`<div style="margin-top:5px">
+            <button class="btn ghost sm" onclick="openRevisionHistory('${d.id}')">History (${chain.length})</button>
+          </div>`;
+        }
+
+        actions=locked
+          ? `<button class="btn ghost sm" onclick="viewDocument('${d.id}')">View</button>`
+          : `<button class="btn ghost sm" onclick="viewDocument('${d.id}')">Open</button>
+             <button class="btn green sm" onclick="downloadSavedPDF('${d.id}')">PDF</button>
+             <button class="btn amber sm" onclick="reviseQuote('${d.id}')">Revise</button>
+             <button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button>
+             <button class="btn red sm" onclick="requestDeleteDoc('${d.id}')">×</button>`;
+
+        return `<tr class="${locked?'locked-row':''}">
+          <td>
+            <b>${esc(d.serial)}</b>
+            <div class="small">${fmtDate(d.date)} • ${esc(d.category||'label')}</div>
+            <div class="audit-badge">By: ${esc(d.createdBy||d.createdByUser||'Legacy')}</div>
+            ${d.revisionNote?`<div class="small">Revision: ${esc(d.revisionNote)}</div>`:''}
+          </td>
+          <td><b>${esc(d.customer?.name||'')}</b><div class="small">${esc(d.customer?.phone||'')}</div></td>
+          <td>${esc(d.poRef||'-')}</td>
+          <td><span class="tag ${d.payMode==='cash'?'cash':'credit'}">${esc((d.payMode||'credit').toUpperCase())}</span>${d.vatMode==='vat18'?'<div class="small">VAT Breakdown</div>':''}</td>
+          <td><b>LKR ${money(t.gross)}</b></td>
+          <td>${status}</td>
+          <td>${actions}</td>
+        </tr>`;
+      }
+
+      if(source){
         status=`<span class="tag">FROM QUOTE</span><div class="small">${esc(source.serial)}</div>`;
       }else{
         status='<span class="tag">ACTIVE</span>';
       }
 
-      const pdfBtn=`<button class="btn green sm" onclick="downloadSavedPDF('${d.id}')">PDF</button>`;
-      const qActions=isQ&&!d.replacedBy
-        ? `<button class="btn amber sm" onclick="reviseQuote('${d.id}')">Revise</button><button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button>`
-        : '';
+      actions=`<button class="btn ghost sm" onclick="viewDocument('${d.id}')">Open</button>
+        <button class="btn green sm" onclick="downloadSavedPDF('${d.id}')">PDF</button>
+        <button class="btn red sm" onclick="requestDeleteDoc('${d.id}')">×</button>`;
 
       return `<tr>
         <td><b>${esc(d.serial)}</b><div class="small">${fmtDate(d.date)} • ${esc(d.category||'label')}</div><div class="audit-badge">By: ${esc(d.createdBy||d.createdByUser||'Legacy')}</div></td>
@@ -10011,12 +10073,7 @@ window.toggleBpSeparateDeliveryButton = function(){
         <td><span class="tag ${d.payMode==='cash'?'cash':'credit'}">${esc((d.payMode||'credit').toUpperCase())}</span>${d.vatMode==='vat18'?'<div class="small">VAT Breakdown</div>':''}</td>
         <td><b>LKR ${money(t.gross)}</b></td>
         <td>${status}</td>
-        <td>
-          <button class="btn ghost sm" onclick="viewDocument('${d.id}')">Open</button>
-          ${pdfBtn}
-          ${qActions}
-          <button class="btn red sm" onclick="requestDeleteDoc('${d.id}')">×</button>
-        </td>
+        <td>${actions}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
   };
