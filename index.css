@@ -3100,3 +3100,87 @@ html[data-theme="dark"] .sc-page-number{
     page-break-after:auto;
   }
 }
+
+
+/* =========================================================
+   v1.0.21 — CUSTOMER-SPECIFIC ITEM MASTER / PRICE HISTORY
+   ========================================================= */
+.customer-item-profile{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:0 0 9px;
+  padding:10px 12px;
+  border:1px solid #bcdedf;
+  border-radius:11px;
+  background:linear-gradient(135deg,#f2fbfb,#fff);
+}
+.customer-item-profile-copy{min-width:0;display:flex;flex-direction:column;gap:2px}
+.customer-item-profile-copy b{font-size:11px;color:#087f83}
+.customer-item-profile-copy span{font-size:9.5px;color:#637780;line-height:1.35}
+.customer-price-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #dce8ea}
+.customer-price-modal-head>div:first-child{display:flex;flex-direction:column;gap:3px}
+.customer-price-modal-head>div:first-child b{font-size:16px;color:#17343d}
+.customer-price-modal-head>div:first-child span{font-size:10px;color:#697d85}
+.customer-price-count{font-size:10px;font-weight:900;color:#087f83;background:#eaf7f7;border-radius:999px;padding:6px 9px;white-space:nowrap}
+.customer-price-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.customer-price-item-card{border:1px solid #d4e5e7;border-radius:12px;background:#fff;padding:11px}
+.customer-price-item-title{display:flex;flex-direction:column;gap:2px}
+.customer-price-item-title b{font-size:12px;color:#17343d}
+.customer-price-item-title span{font-size:9px;color:#74858c}
+.customer-price-item-value{display:flex;align-items:end;justify-content:space-between;gap:10px;margin-top:9px;padding:8px 9px;border-radius:9px;background:#f3fafa}
+.customer-price-item-value span{font-size:8.5px;font-weight:900;color:#668087;text-transform:uppercase}
+.customer-price-item-value b{font-size:14px;color:#087f83}
+.customer-price-item-meta{font-size:9px;color:#71838a;margin-top:6px}
+.customer-price-current{display:grid;grid-template-columns:1fr auto;gap:3px 12px;align-items:center;margin-bottom:11px;padding:10px 12px;border:1px solid #bcdedf;border-radius:11px;background:#f3fbfb}
+.customer-price-current span{font-size:9px;font-weight:900;color:#637a82;text-transform:uppercase}
+.customer-price-current b{font-size:17px;color:#087f83;grid-row:1/3;grid-column:2}
+.customer-price-current small{font-size:9px;color:#71838a}
+.customer-price-history-list{display:flex;flex-direction:column;gap:7px}
+.customer-price-history-row{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid #dbe8ea;border-radius:11px;padding:9px;background:#fff}
+.customer-price-history-index{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:#edf8f8;color:#087f83;font-size:9px;font-weight:1000}
+.customer-price-history-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.customer-price-history-main>b{font-size:11px;color:#1c343c}
+.customer-price-history-main>span{font-size:9px;color:#087f83;font-weight:800}
+.customer-price-history-main>small{font-size:8.5px;color:#71838a;line-height:1.4}
+.customer-price-history-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;max-width:260px}
+.customer-price-history-actions>b{color:#17343d;font-size:12px;min-width:90px;text-align:right}
+
+html[data-theme="dark"] .customer-item-profile,
+html[data-theme="dark"] .customer-price-item-card,
+html[data-theme="dark"] .customer-price-history-row{
+  background:#18292f!important;
+  border-color:#31484f!important;
+}
+html[data-theme="dark"] .customer-item-profile-copy span,
+html[data-theme="dark"] .customer-price-item-title span,
+html[data-theme="dark"] .customer-price-item-meta,
+html[data-theme="dark"] .customer-price-history-main>small{
+  color:#91a7ae!important;
+}
+html[data-theme="dark"] .customer-price-item-title b,
+html[data-theme="dark"] .customer-price-history-main>b,
+html[data-theme="dark"] .customer-price-history-actions>b{
+  color:#e4edef!important;
+}
+html[data-theme="dark"] .customer-price-item-value,
+html[data-theme="dark"] .customer-price-current,
+html[data-theme="dark"] .customer-price-history-index{
+  background:#14252b!important;
+  border-color:#30474e!important;
+}
+
+@media(max-width:900px){
+  .customer-price-summary-grid{grid-template-columns:1fr}
+  .customer-price-history-row{grid-template-columns:34px minmax(0,1fr)}
+  .customer-price-history-actions{grid-column:2;justify-content:flex-start;max-width:none}
+  .customer-price-history-actions>b{text-align:left}
+}
+@media(max-width:650px){
+  .customer-item-profile{align-items:flex-start;flex-direction:column}
+  .customer-price-modal-head{align-items:flex-start;flex-direction:column}
+  .customer-price-history-row{grid-template-columns:1fr}
+  .customer-price-history-index{display:none}
+  .customer-price-history-actions{grid-column:auto}
+}
