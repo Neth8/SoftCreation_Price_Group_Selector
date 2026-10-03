@@ -10339,14 +10339,15 @@ window.toggleBpSeparateDeliveryButton = function(){
 
 <script>
 /* =========================================================
-   v1.0.19 — PROFESSIONAL MULTI-PAGE QUOTATION RENDERING
+   v1.0.20 — CLEAN CONTINUATION PAGE QUOTATION RENDERING
    ---------------------------------------------------------
    Purpose:
    - Preserve the original quotation font sizes and spacing.
    - When content exceeds one A4 page, create real additional
      A4 pages instead of shrinking the first page.
-   - Repeat the quotation header/customer block and footer on
-     every continuation page.
+   - Keep the quotation title/customer block on page 1 only.
+   - Continuation pages keep the same letterhead/footer but do
+     not repeat quotation/customer header details.
    - Repeat table headings when item rows continue.
    - Keep Preview and generated PDF page breaks identical.
    - Existing PI rendering/business logic remains unchanged.
@@ -10404,21 +10405,16 @@ window.toggleBpSeparateDeliveryButton = function(){
     const sourceHead=scDirectChildByClassV1019(sourceBody,'dochead');
     const sourceCustomer=scDirectChildByClassV1019(sourceBody,'customerbox');
 
-    if(sourceHead){
-      const head=sourceHead.cloneNode(true);
-      if(pageIndex>0){
-        const type=head.querySelector('.doctype');
-        if(type){
-          const continued=document.createElement('span');
-          continued.className='sc-continuation-mark';
-          continued.textContent='CONTINUED';
-          type.appendChild(continued);
-        }
-      }
-      body.appendChild(head);
+    /*
+      Page 1 keeps the normal quotation header/customer details.
+      Page 2+ intentionally omit this whole block so continuation
+      pages begin directly with the remaining quotation content.
+      The A4 letterhead background and document footer still repeat.
+    */
+    if(pageIndex===0){
+      if(sourceHead)body.appendChild(sourceHead.cloneNode(true));
+      if(sourceCustomer)body.appendChild(sourceCustomer.cloneNode(true));
     }
-
-    if(sourceCustomer)body.appendChild(sourceCustomer.cloneNode(true));
 
     body.dataset.scBaseChildren=String(body.children.length);
     paper.appendChild(body);
