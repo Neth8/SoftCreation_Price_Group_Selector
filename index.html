@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.31 - Separate Customer Allocation + Approved Item Qty UX Fix -->
+<!-- SoftCreation v1.0.32 - Approved Items Pagination + SO PO Attachment + Realtime Portal Status -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.31</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.32</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.31</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.32</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -6086,6 +6086,7 @@ async function spgsStartSalesOrdersRealtime(){
       }
       spgsWriteLocal();
       try{if($('salesorders')?.classList.contains('active')&&window.renderSalesOrders91)window.renderSalesOrders91()}catch(e){console.warn('Sales Orders realtime render failed',e)}
+      try{window.bpSoRealtimeRefreshV1032?.('sales-order')}catch(e){console.warn('Portal Sales Order realtime render failed',e)}
     }).subscribe(status=>console.log('Sales Orders realtime status:',status));
 }
 
@@ -6105,6 +6106,7 @@ async function spgsStartFulfilmentRealtime(){
       }
       spgsWriteLocal();
       try{if($('dealerfulfilment')?.classList.contains('active')&&window.renderDealerFulfilment)window.renderDealerFulfilment()}catch(e){console.warn('Order Fulfilment realtime render failed',e)}
+      try{window.bpSoRealtimeRefreshV1032?.('fulfilment')}catch(e){console.warn('Portal fulfilment realtime render failed',e)}
     }).subscribe(status=>console.log('Order Fulfilment realtime status:',status));
 }
 
@@ -13345,6 +13347,10 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   const MODE_KEY_PREFIX='sc_branchportal_mode_v1030_';
   const SO_PAGE_SIZE=5;
+  const SO_ITEM_PAGE_SIZE_V1032=5;
+  const SO_PO_BUCKET_V1032='sales-order-po-files';
+  const SO_PO_PROJECT_URL_V1032='https://qyxgamverzdmhtvezbft.supabase.co';
+  const SO_PO_MAX_BYTES_V1032=10*1024*1024;
   const DIRECT='Direct delivery to dealer customers';
   const MIXED='Mixed delivery';
 
@@ -13353,6 +13359,9 @@ window.toggleBpSeparateDeliveryButton = function(){
   let soDeliveries=[];
   let soItemCache=[];
   let soPage=1;
+  let soItemPageV1032=1;
+  let soPOFilePendingV1032=null;
+  let soRealtimeTimerV1032=0;
   let lastSOEligibleCustomerId='';
 
   /* -------------------------------------------------------
@@ -13659,12 +13668,13 @@ window.toggleBpSeparateDeliveryButton = function(){
           </div>
           <div class="field full">
             <label>Search Previous Items</label>
-            <input id="bpSoItemSearchV1030" type="search" placeholder="Search size, material, item, PI number..." oninput="bpSoRenderEligibleItemsV1030()">
+            <input id="bpSoItemSearchV1030" type="search" placeholder="Search size, material, item, PI number..." oninput="bpSoItemSearchChangedV1032()">
           </div>
         </div>
 
         <div id="bpSoEligibleSummaryV1030" class="bp-so-source-summary-v1030"></div>
         <div id="bpSoEligibleItemsV1030" class="bp-so-eligible-items-v1030"></div>
+        <div id="bpSoEligiblePagerV1032" class="bp-so-item-pager-v1032"></div>
       </div>
     `);
 
@@ -13693,6 +13703,33 @@ window.toggleBpSeparateDeliveryButton = function(){
           <div class="field full">
             <label>Customer PO / Reference</label>
             <input id="bpSoRefV1030" placeholder="Optional customer PO / reference">
+
+            <div class="bp-so-po-attach-v1032">
+              <input
+                id="bpSoPOFileV1032"
+                type="file"
+                hidden
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onchange="bpSoPOFileChangedV1032(this)"
+              >
+
+              <button
+                class="btn ghost sm"
+                type="button"
+                onclick="$('bpSoPOFileV1032').click()"
+              >
+                + Attach PO / Order File
+              </button>
+
+              <div id="bpSoPOFileStatusV1032" class="bp-so-po-file-status-v1032">
+                No file attached.
+              </div>
+
+              <div id="bpSoPOFileActionsV1032" class="bp-so-po-file-actions-v1032" style="display:none">
+                <button class="btn ghost sm" type="button" onclick="bpSoViewPendingPOV1032()">View Selected</button>
+                <button class="btn red sm" type="button" onclick="bpSoRemovePendingPOV1032()">Remove</button>
+              </div>
+            </div>
           </div>
           <div class="field full">
             <label>Stores / Production Note</label>
@@ -13718,7 +13755,7 @@ window.toggleBpSeparateDeliveryButton = function(){
         </div>
 
         <div class="actions">
-          <button class="btn green" type="button" onclick="bpSoSubmitV1030()">Submit Sales Order</button>
+          <button id="bpSoSubmitBtnV1032" class="btn green" type="button" onclick="bpSoSubmitV1030()">Submit Sales Order</button>
           <button class="btn ghost" type="button" onclick="bpSoClearV1030()">Clear</button>
         </div>
       </div>
@@ -13815,6 +13852,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
 
     lastSOEligibleCustomerId=$('bpSoCustomerV1030')?.value||'';
+    soItemPageV1032=1;
     soDeliveries=[];
     ensureDeliveryBaseV1030();
     bpSoRenderEligibleItemsV1030();
@@ -13864,6 +13902,16 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
   }
 
+  window.bpSoItemSearchChangedV1032=function(){
+    soItemPageV1032=1;
+    bpSoRenderEligibleItemsV1030();
+  };
+
+  window.bpSoSetItemPageV1032=function(page){
+    soItemPageV1032=Math.max(1,Number(page)||1);
+    bpSoRenderEligibleItemsV1030();
+  };
+
   window.bpSoRenderEligibleItemsV1030=function(){
     renderSOCustomerOptionsV1030();
 
@@ -13881,29 +13929,52 @@ window.toggleBpSeparateDeliveryButton = function(){
       );
     }
 
-    soItemCache=items;
+    const totalItems=items.length;
+    const pages=Math.max(1,Math.ceil(totalItems/SO_ITEM_PAGE_SIZE_V1032));
+
+    if(soItemPageV1032>pages)soItemPageV1032=pages;
+    if(soItemPageV1032<1)soItemPageV1032=1;
+
+    const start=(soItemPageV1032-1)*SO_ITEM_PAGE_SIZE_V1032;
+    const pageItems=items.slice(start,start+SO_ITEM_PAGE_SIZE_V1032);
+
+    /*
+      Add-button indexes intentionally point only to the current page.
+      This keeps the DOM small and makes Qty / Add controls immediately
+      reachable without an inner scrolling panel.
+    */
+    soItemCache=pageItems;
 
     const sourceCount=new Set(items.map(x=>x.sourcePIId)).size;
     const summary=$('bpSoEligibleSummaryV1030');
+
     if(summary){
       summary.innerHTML=customerId
-        ? `<b>${items.length}</b> repeat item${items.length===1?'':'s'} from <b>${sourceCount}</b> converted PI${sourceCount===1?'':'s'}.`
+        ? (
+            totalItems
+              ? `<b>${totalItems}</b> repeat item${totalItems===1?'':'s'} from <b>${sourceCount}</b> converted PI${sourceCount===1?'':'s'} • Showing <b>${start+1}-${Math.min(start+pageItems.length,totalItems)}</b>.`
+              : 'No matching previously approved items.'
+          )
         : 'No eligible customer selected.';
     }
 
     const box=$('bpSoEligibleItemsV1030');
+    const pager=$('bpSoEligiblePagerV1032');
+
     if(!box)return;
 
-    box.innerHTML=items.length
-      ? items.map((x,i)=>`
+    box.innerHTML=pageItems.length
+      ? pageItems.map((x,i)=>`
           <div class="bp-so-eligible-item-v1030">
             <div class="bp-so-item-main-v1030">
               <b>${esc([x.desc,x.size,x.material,x.layout,x.pcs?x.pcs+' pcs':''].filter(Boolean).join(' • '))}</b>
+
               <div class="small">
                 Approved from ${esc(x.sourcePISerial)}
                 ${x.sourcePIDate?` • ${esc(x.sourcePIDate)}`:''}
                 ${x.sourceQuoteSerial?` • Quote ${esc(x.sourceQuoteSerial)}`:''}
               </div>
+
               <div class="bp-so-approved-price-v1030">
                 LKR ${money(x.price)} / ${esc(x.unit||'Unit')}
                 <span>${esc(x.priceTier||'Approved PI Price')}</span>
@@ -13940,11 +14011,47 @@ window.toggleBpSeparateDeliveryButton = function(){
                 >+</button>
               </div>
 
-              <button class="btn primary sm" type="button" onclick="bpSoAddItemV1030(${i})">+ Add</button>
+              <button
+                class="btn primary sm bp-so-add-visible-v1032"
+                type="button"
+                onclick="bpSoAddItemV1030(${i})"
+              >
+                + Add Item
+              </button>
             </div>
           </div>
         `).join('')
       : '<div class="empty">No previously approved items found for this customer. Only quotation → PI history belonging to this portal user is shown.</div>';
+
+    if(pager){
+      pager.innerHTML=totalItems>SO_ITEM_PAGE_SIZE_V1032
+        ? `
+          <span>Items ${start+1}-${Math.min(start+pageItems.length,totalItems)} of ${totalItems}</span>
+
+          <div>
+            <button
+              class="btn ghost sm"
+              type="button"
+              onclick="bpSoSetItemPageV1032(${soItemPageV1032-1})"
+              ${soItemPageV1032<=1?'disabled':''}
+            >
+              ← Previous
+            </button>
+
+            <span>Page <b>${soItemPageV1032}</b> / ${pages}</span>
+
+            <button
+              class="btn ghost sm"
+              type="button"
+              onclick="bpSoSetItemPageV1032(${soItemPageV1032+1})"
+              ${soItemPageV1032>=pages?'disabled':''}
+            >
+              Next →
+            </button>
+          </div>
+        `
+        : '';
+    }
   };
 
   window.bpSoCleanAddQtyV1031=function(input){
@@ -14091,6 +14198,266 @@ window.toggleBpSeparateDeliveryButton = function(){
       $('bpSoTotalV1030').textContent=`LKR ${money(orderTotalV1030())}`;
     }
   }
+
+  /* -------------------------------------------------------
+     v1.0.32 — Sales Order PO / order-file attachment
+     Private Supabase Storage bucket: sales-order-po-files
+     ------------------------------------------------------- */
+  function soPOBrowserKeyV1032(){
+    const key=(localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
+    if(!key){
+      throw new Error('Supabase browser key is not configured on this device.');
+    }
+    return key;
+  }
+
+  function soPOHeadersV1032(extra={}){
+    const key=soPOBrowserKeyV1032();
+    const headers={apikey:key,...extra};
+
+    if(key.startsWith('eyJ')){
+      headers.Authorization=`Bearer ${key}`;
+    }
+
+    return headers;
+  }
+
+  function soPOSafePartV1032(value='file'){
+    return String(value||'file')
+      .replace(/[^\w.-]+/g,'_')
+      .replace(/^_+|_+$/g,'')
+      ||'file';
+  }
+
+  function soPOExtV1032(file){
+    return String(file?.name||'')
+      .split('.')
+      .pop()
+      .toLowerCase();
+  }
+
+  function validateSOPOFileV1032(file){
+    if(!file)return;
+
+    if(file.size>SO_PO_MAX_BYTES_V1032){
+      throw new Error('PO / order file must be 10 MB or smaller.');
+    }
+
+    const allowed=[
+      'pdf','jpg','jpeg','png','webp',
+      'doc','docx','xls','xlsx'
+    ];
+
+    const ext=soPOExtV1032(file);
+
+    if(!allowed.includes(ext)){
+      throw new Error('PO / order file must be PDF, JPG, PNG, WEBP, DOC, DOCX, XLS or XLSX.');
+    }
+  }
+
+  function soPOEncodedPathV1032(path=''){
+    return String(path)
+      .split('/')
+      .filter(Boolean)
+      .map(encodeURIComponent)
+      .join('/');
+  }
+
+  function soPOStoragePathV1032(soId,file){
+    const ext=soPOExtV1032(file)||'bin';
+    const name=soPOSafePartV1032(
+      String(file?.name||`customer_po.${ext}`)
+        .replace(/\.[^.]+$/,'')
+    );
+
+    const nonce=(crypto?.randomUUID?.()||uid('pofile'))
+      .replace(/[^a-zA-Z0-9_-]/g,'');
+
+    return `sales-orders/${soPOSafePartV1032(soId)}/${Date.now()}_${nonce}_${name}.${ext}`;
+  }
+
+  async function uploadSOPOFileV1032(soId,file){
+    validateSOPOFileV1032(file);
+
+    const path=soPOStoragePathV1032(soId,file);
+    const url=
+      `${SO_PO_PROJECT_URL_V1032}/storage/v1/object/`+
+      `${SO_PO_BUCKET_V1032}/`+
+      `${soPOEncodedPathV1032(path)}`;
+
+    const response=await fetch(url,{
+      method:'POST',
+      headers:soPOHeadersV1032({
+        'Content-Type':file.type||'application/octet-stream',
+        'cache-control':'max-age=3600',
+        'x-upsert':'false'
+      }),
+      body:file
+    });
+
+    if(!response.ok){
+      let detail='';
+      try{detail=await response.text()}catch(_){}
+
+      throw new Error(
+        `PO file upload failed (${response.status})`+
+        `${detail?`: ${detail}`:''}. `+
+        `Run sales_order_po_files_policy.sql once in Supabase if this bucket has not been created.`
+      );
+    }
+
+    return {
+      storage:'supabase',
+      bucket:SO_PO_BUCKET_V1032,
+      path,
+      fileName:file.name||'Customer PO',
+      mime:file.type||'',
+      bytes:Number(file.size||0),
+      uploadedAt:new Date().toISOString(),
+      uploadedBy:currentUser?.display||currentUser?.username||''
+    };
+  }
+
+  async function fetchSOPOBlobV1032(asset){
+    if(!asset?.path){
+      throw new Error('PO attachment path is missing.');
+    }
+
+    const url=
+      `${SO_PO_PROJECT_URL_V1032}/storage/v1/object/`+
+      `${asset.bucket||SO_PO_BUCKET_V1032}/`+
+      `${soPOEncodedPathV1032(asset.path)}`;
+
+    const response=await fetch(url,{
+      headers:soPOHeadersV1032()
+    });
+
+    if(!response.ok){
+      let detail='';
+      try{detail=await response.text()}catch(_){}
+
+      throw new Error(
+        `Could not open PO attachment (${response.status})`+
+        `${detail?`: ${detail}`:''}`
+      );
+    }
+
+    return response.blob();
+  }
+
+  function renderPendingSOPOV1032(){
+    const status=$('bpSoPOFileStatusV1032');
+    const actions=$('bpSoPOFileActionsV1032');
+
+    if(!status||!actions)return;
+
+    if(!soPOFilePendingV1032){
+      status.textContent='No file attached.';
+      status.className='bp-so-po-file-status-v1032';
+      actions.style.display='none';
+      return;
+    }
+
+    status.textContent=
+      `${soPOFilePendingV1032.name} • `+
+      `${Math.max(1,Math.round(soPOFilePendingV1032.size/1024))} KB • Ready to upload with Sales Order`;
+
+    status.className='bp-so-po-file-status-v1032 ready';
+    actions.style.display='flex';
+  }
+
+  window.bpSoPOFileChangedV1032=function(input){
+    const file=input?.files?.[0]||null;
+
+    if(!file){
+      soPOFilePendingV1032=null;
+      renderPendingSOPOV1032();
+      return;
+    }
+
+    try{
+      validateSOPOFileV1032(file);
+      soPOFilePendingV1032=file;
+      renderPendingSOPOV1032();
+    }catch(err){
+      input.value='';
+      soPOFilePendingV1032=null;
+      renderPendingSOPOV1032();
+      toast(err?.message||'Invalid PO file');
+    }
+  };
+
+  window.bpSoViewPendingPOV1032=function(){
+    const file=soPOFilePendingV1032;
+    if(!file)return toast('No PO file selected');
+
+    const url=URL.createObjectURL(file);
+    const ext=soPOExtV1032(file);
+
+    if(['pdf','jpg','jpeg','png','webp'].includes(ext)){
+      window.open(url,'_blank','noopener');
+      setTimeout(()=>URL.revokeObjectURL(url),10*60*1000);
+    }else{
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=file.name||'customer_po_file';
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+    }
+  };
+
+  window.bpSoRemovePendingPOV1032=function(){
+    soPOFilePendingV1032=null;
+
+    if($('bpSoPOFileV1032')){
+      $('bpSoPOFileV1032').value='';
+    }
+
+    renderPendingSOPOV1032();
+  };
+
+  window.bpSoViewPOAttachmentV1032=async function(soId){
+    const so=(state.salesOrders||[]).find(x=>x.id===soId);
+    if(!so)return;
+
+    if(currentUser?.role!=='admin' && so.ownerUser!==currentUser?.username){
+      return toast('This PO attachment is not available to this user');
+    }
+
+    const asset=so.poAttachment;
+    if(!asset)return toast('No PO attachment saved for this Sales Order');
+
+    const popup=window.open('about:blank','_blank');
+
+    try{
+      const blob=await fetchSOPOBlobV1032(asset);
+      const url=URL.createObjectURL(blob);
+      const ext=String(asset.fileName||'').split('.').pop().toLowerCase();
+
+      if(['pdf','jpg','jpeg','png','webp'].includes(ext)){
+        if(popup){
+          popup.location=url;
+        }else{
+          window.open(url,'_blank','noopener');
+        }
+
+        setTimeout(()=>URL.revokeObjectURL(url),10*60*1000);
+      }else{
+        if(popup)popup.close();
+
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=asset.fileName||'customer_po_file';
+        a.click();
+
+        setTimeout(()=>URL.revokeObjectURL(url),5000);
+      }
+    }catch(err){
+      if(popup)popup.close();
+      console.error(err);
+      toast(err?.message||'Could not open PO attachment');
+    }
+  };
 
   /* -------------------------------------------------------
      Multiple delivery customers + item allocation
@@ -14448,6 +14815,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       dealerName:so.customerName,
       dealerPhone:so.customerPhone,
       poRef:so.customerRef||'',
+      poAttachment:so.poAttachment||null,
       method:so.method,
       instructions:so.note||'',
       ownerUser:so.ownerUser,
@@ -14512,7 +14880,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     return plan;
   }
 
-  window.bpSoSubmitV1030=function(){
+  window.bpSoSubmitV1030=async function(){
     const customer=selectedSOCustomerV1030();
     if(!customer)return toast('Select an eligible customer');
 
@@ -14530,162 +14898,297 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     if(warn)warn.innerHTML='';
 
-    /* Revalidate every price source immediately before saving. */
-    const validItems=eligibleItemsV1030(customer.id);
-    const validPIIds=new Set(convertedPISourcesV1030()
-      .filter(pi=>pi.customerId===customer.id)
-      .map(pi=>pi.id)
+    const validPIIds=new Set(
+      convertedPISourcesV1030()
+        .filter(pi=>pi.customerId===customer.id)
+        .map(pi=>pi.id)
     );
 
     if(soCart.some(l=>!validPIIds.has(l.sourcePIId))){
       return toast('An approved PI source is no longer available. Refresh the Sales Order and try again.');
     }
 
-    const sourcePIIds=[...new Set(soCart.map(l=>l.sourcePIId))];
-    const sourcePISerials=[...new Set(soCart.map(l=>l.sourcePISerial).filter(Boolean))];
+    const submitBtn=$('bpSoSubmitBtnV1032');
+    const submitText=submitBtn?.textContent||'Submit Sales Order';
 
-    const activeDeliveries=soDeliveries
-      .map((d,di)=>{
-        const allocations=soCart.map((line,lineIndex)=>({
-          lineKey:line.cartKey,
-          lineIndex,
-          qty:Number(d.allocations?.[line.cartKey]||0)
-        })).filter(a=>a.qty>0);
+    if(submitBtn){
+      submitBtn.disabled=true;
+      submitBtn.textContent=soPOFilePendingV1032
+        ? 'Uploading PO & Saving...'
+        : 'Saving Sales Order...';
+    }
 
-        return {
-          id:d.id,
-          sequence:di+1,
-          primary:di===0,
-          name:String(d.name||'').trim(),
-          line1:String(d.line1||'').trim(),
-          line2:String(d.line2||'').trim(),
-          contact1:String(d.contact1||'').trim(),
-          contact2:String(d.contact2||'').trim(),
-          allocations
-        };
-      })
-      .filter(d=>d.allocations.length);
+    try{
+      const sourcePIIds=[
+        ...new Set(
+          soCart.map(l=>l.sourcePIId)
+        )
+      ];
 
-    const first=activeDeliveries[0];
-    const now=new Date().toISOString();
+      const sourcePISerials=[
+        ...new Set(
+          soCart
+            .map(l=>l.sourcePISerial)
+            .filter(Boolean)
+        )
+      ];
 
-    const so={
-      id:uid('so'),
-      soNo:nextSONoV1030(),
-      date:$('bpSoDateV1030')?.value||today(),
-      needDate:$('bpSoNeedDateV1030')?.value||'',
-      customerRef:$('bpSoRefV1030')?.value.trim()||'',
-      customerId:customer.id,
-      customerName:customer.name,
-      customerPhone:customer.phone||'',
+      const activeDeliveries=
+        soDeliveries
+          .map((d,di)=>{
+            const allocations=
+              soCart
+                .map((line,lineIndex)=>({
+                  lineKey:line.cartKey,
+                  lineIndex,
+                  qty:Number(
+                    d.allocations?.[
+                      line.cartKey
+                    ]||0
+                  )
+                }))
+                .filter(a=>a.qty>0);
 
-      sourcePIId:sourcePIIds[0]||'',
-      sourcePISerial:
-        sourcePISerials.length===1
-          ? sourcePISerials[0]
-          : `${sourcePISerials.length} Approved PIs`,
-      sourcePIIds,
-      sourcePISerials,
+            return {
+              id:d.id,
+              sequence:di+1,
+              primary:di===0,
+              name:String(d.name||'').trim(),
+              line1:String(d.line1||'').trim(),
+              line2:String(d.line2||'').trim(),
+              contact1:String(d.contact1||'').trim(),
+              contact2:String(d.contact2||'').trim(),
+              allocations
+            };
+          })
+          .filter(d=>d.allocations.length);
 
-      method:activeDeliveries.length>1?MIXED:DIRECT,
+      const first=activeDeliveries[0];
+      const now=new Date().toISOString();
+      const soId=uid('so');
 
-      shipTo:{
-        name:first?.name||customer.name,
-        phone:first?.contact1||customer.phone||'',
-        phone2:first?.contact2||'',
-        address:[first?.line1,first?.line2].filter(Boolean).join(', '),
-        map:''
-      },
+      let poAttachment=null;
 
-      deliveries:activeDeliveries,
-
-      note:$('bpSoNoteV1030')?.value.trim()||'',
-
-      lines:soCart.map(l=>({
-        kind:l.kind||'label',
-        itemId:l.itemId||'',
-        desc:l.desc||'ELP',
-        size:l.size||'',
-        material:l.material||'',
-        layout:l.layout||'',
-        pcs:l.pcs||'',
-        unit:l.unit||'Rolls',
-        qty:Number(l.qty||0),
-        price:Number(l.price||0),
-        priceTier:l.priceTier||'Approved PI Price',
-        use:true,
-        sourcePIId:l.sourcePIId,
-        sourcePISerial:l.sourcePISerial,
-        sourceQuoteId:l.sourceQuoteId||'',
-        sourceQuoteSerial:l.sourceQuoteSerial||''
-      })),
-
-      total:orderTotalV1030(),
-
-      ownerUser:currentUser?.username||'',
-      ownerDisplay:currentUser?.display||currentUser?.username||'',
-
-      portalSource:'Approved Prices',
-      portalSalesOrder:true,
-
-      erpStatus:'Pending ERP Sync',
-      erpSONo:'',
-      erpMessage:'',
-
-      createdAt:now,
-      updatedAt:now,
-      history:[
-        {
-          action:'Created from Approved Prices Portal',
-          by:currentUser?.display||currentUser?.username||'',
-          username:currentUser?.username||'',
-          at:now
+      if(soPOFilePendingV1032){
+        if($('bpSoPOFileStatusV1032')){
+          $('bpSoPOFileStatusV1032').textContent=
+            'Uploading PO / order file to Supabase...';
+          $('bpSoPOFileStatusV1032').className=
+            'bp-so-po-file-status-v1032 uploading';
         }
-      ]
-    };
 
-    state.salesOrders=state.salesOrders||[];
-    state.salesOrders.unshift(so);
+        poAttachment=
+          await uploadSOPOFileV1032(
+            soId,
+            soPOFilePendingV1032
+          );
+      }
 
-    const plan=createPortalFulfilmentV1030(so);
-    so.fulfilmentPlanId=plan.id;
+      const so={
+        id:soId,
+        soNo:nextSONoV1030(),
+        date:$('bpSoDateV1030')?.value||today(),
+        needDate:$('bpSoNeedDateV1030')?.value||'',
+        customerRef:$('bpSoRefV1030')?.value.trim()||'',
+        poAttachment,
 
-    audit(
-      'CREATE_PORTAL_SALES_ORDER',
-      `${so.soNo} • ${so.customerName} • ${so.lines.length} item(s) • ${activeDeliveries.length} delivery customer(s)`
-    );
+        customerId:customer.id,
+        customerName:customer.name,
+        customerPhone:customer.phone||'',
 
-    saveState();
+        sourcePIId:sourcePIIds[0]||'',
+        sourcePISerial:
+          sourcePISerials.length===1
+            ? sourcePISerials[0]
+            : `${sourcePISerials.length} Approved PIs`,
+        sourcePIIds,
+        sourcePISerials,
 
-    soCart=[];
-    soDeliveries=[];
-    soPage=1;
+        method:
+          activeDeliveries.length>1
+            ? MIXED
+            : DIRECT,
 
-    ['bpSoNeedDateV1030','bpSoRefV1030','bpSoNoteV1030'].forEach(id=>{
-      if($(id))$(id).value='';
-    });
-    if($('bpSoDateV1030'))$('bpSoDateV1030').value=today();
+        shipTo:{
+          name:first?.name||customer.name,
+          phone:first?.contact1||customer.phone||'',
+          phone2:first?.contact2||'',
+          address:
+            [first?.line1,first?.line2]
+              .filter(Boolean)
+              .join(', '),
+          map:''
+        },
 
-    ensureDeliveryBaseV1030();
+        deliveries:activeDeliveries,
 
-    bpSoRefreshV1030();
+        note:
+          $('bpSoNoteV1030')
+            ?.value
+            .trim()
+          ||'',
 
-    try{renderSalesOrders91?.()}catch(_){}
-    try{renderDealerFulfilment?.()}catch(_){}
+        lines:
+          soCart.map(l=>({
+            kind:l.kind||'label',
+            itemId:l.itemId||'',
+            desc:l.desc||'ELP',
+            size:l.size||'',
+            material:l.material||'',
+            layout:l.layout||'',
+            pcs:l.pcs||'',
+            unit:l.unit||'Rolls',
+            qty:Number(l.qty||0),
+            price:Number(l.price||0),
+            priceTier:l.priceTier||'Approved PI Price',
+            use:true,
+            sourcePIId:l.sourcePIId,
+            sourcePISerial:l.sourcePISerial,
+            sourceQuoteId:l.sourceQuoteId||'',
+            sourceQuoteSerial:l.sourceQuoteSerial||''
+          })),
 
-    toast(`${so.soNo} submitted and linked to Order Fulfilment`);
+        total:orderTotalV1030(),
+
+        ownerUser:
+          currentUser?.username||'',
+
+        ownerDisplay:
+          currentUser?.display||
+          currentUser?.username||
+          '',
+
+        portalSource:'Approved Prices',
+        portalSalesOrder:true,
+
+        erpStatus:'Pending ERP Sync',
+        erpSONo:'',
+        erpMessage:'',
+
+        createdAt:now,
+        updatedAt:now,
+
+        history:[
+          {
+            action:'Created from Approved Prices Portal',
+            by:
+              currentUser?.display||
+              currentUser?.username||
+              '',
+            username:
+              currentUser?.username||
+              '',
+            at:now
+          }
+        ]
+      };
+
+      state.salesOrders=
+        state.salesOrders||[];
+
+      state.salesOrders.unshift(so);
+
+      const plan=
+        createPortalFulfilmentV1030(so);
+
+      so.fulfilmentPlanId=plan.id;
+
+      audit(
+        'CREATE_PORTAL_SALES_ORDER',
+        `${so.soNo} • ${so.customerName} • ${so.lines.length} item(s) • ${activeDeliveries.length} delivery customer(s)`
+      );
+
+      if(poAttachment){
+        audit(
+          'SALES_ORDER_PO_ATTACHMENT',
+          `${so.soNo} • ${poAttachment.fileName}`
+        );
+      }
+
+      saveState();
+
+      soCart=[];
+      soDeliveries=[];
+      soPage=1;
+      soItemPageV1032=1;
+      soPOFilePendingV1032=null;
+
+      [
+        'bpSoNeedDateV1030',
+        'bpSoRefV1030',
+        'bpSoNoteV1030'
+      ].forEach(id=>{
+        if($(id))$(id).value='';
+      });
+
+      if($('bpSoPOFileV1032')){
+        $('bpSoPOFileV1032').value='';
+      }
+
+      renderPendingSOPOV1032();
+
+      if($('bpSoDateV1030')){
+        $('bpSoDateV1030').value=today();
+      }
+
+      ensureDeliveryBaseV1030();
+      bpSoRefreshV1030();
+
+      try{
+        renderSalesOrders91?.();
+      }catch(_){}
+
+      try{
+        renderDealerFulfilment?.();
+      }catch(_){}
+
+      toast(
+        `${so.soNo} submitted and linked to Order Fulfilment`
+      );
+
+    }catch(err){
+      console.error(
+        'Portal Sales Order submit failed',
+        err
+      );
+
+      if($('bpSoPOFileStatusV1032')&&soPOFilePendingV1032){
+        $('bpSoPOFileStatusV1032').textContent=
+          `Upload failed: ${err?.message||'Unknown error'}`;
+        $('bpSoPOFileStatusV1032').className=
+          'bp-so-po-file-status-v1032 error';
+      }
+
+      toast(
+        err?.message||
+        'Sales Order could not be submitted'
+      );
+
+    }finally{
+      if(submitBtn){
+        submitBtn.disabled=false;
+        submitBtn.textContent=submitText;
+      }
+    }
   };
 
   window.bpSoClearV1030=function(){
-    if(soCart.length && !confirm('Clear the current Sales Order items and delivery allocations?'))return;
+    if((soCart.length||soPOFilePendingV1032) && !confirm('Clear the current Sales Order items, PO attachment and delivery allocations?'))return;
 
     soCart=[];
     soDeliveries=[];
+    soItemPageV1032=1;
+    soPOFilePendingV1032=null;
 
     ['bpSoNeedDateV1030','bpSoRefV1030','bpSoNoteV1030'].forEach(id=>{
       if($(id))$(id).value='';
     });
 
+    if($('bpSoPOFileV1032')){
+      $('bpSoPOFileV1032').value='';
+    }
+
+    renderPendingSOPOV1032();
     ensureDeliveryBaseV1030();
     bpSoRefreshV1030();
   };
@@ -14708,15 +15211,93 @@ window.toggleBpSeparateDeliveryButton = function(){
       );
   }
 
+  function portalSOStatusInfoV1032(so){
+    const p=
+      (state.dealerFulfilments||[])
+        .find(x=>
+          x.id===so.fulfilmentPlanId ||
+          x.sourceSOId===so.id
+        );
+
+    const consignments=p?.consignments||[];
+    const statuses=
+      consignments
+        .map(c=>String(c.status||''))
+        .filter(Boolean);
+
+    let label='Order Received';
+    let cls='received';
+
+    if(statuses.length && statuses.every(x=>x==='Delivered')){
+      label='Delivered';
+      cls='delivered';
+
+    }else if(statuses.some(x=>['Delivery Failed','Returned','Cancelled'].includes(x))){
+      label='Delivery Issue';
+      cls='issue';
+
+    }else if(statuses.some(x=>x==='In Transit')){
+      label='In Transit';
+      cls='transit';
+
+    }else if(statuses.some(x=>x==='Handed to Courier')){
+      label='Handed to Courier';
+      cls='transit';
+
+    }else if(statuses.some(x=>x==='Ready for Dispatch')){
+      label='Ready for Dispatch';
+      cls='ready';
+
+    }else if(statuses.some(x=>x==='Awaiting Instructions')){
+      label='Awaiting Instructions';
+      cls='awaiting';
+
+    }else if(p && !statuses.length){
+      label='Awaiting Fulfilment';
+      cls='awaiting';
+
+    }else if(so.erpStatus==='Sync Error'){
+      label='ERP Sync Issue';
+      cls='issue';
+    }
+
+    const updateCandidates=[
+      so._spgsUpdatedAt,
+      so.updatedAt,
+      p?._spgsUpdatedAt,
+      p?.updatedAt,
+      ...consignments.map(c=>c.updatedAt)
+    ]
+      .filter(Boolean)
+      .map(x=>Date.parse(x)||0);
+
+    const lastUpdated=
+      updateCandidates.length
+        ? Math.max(...updateCandidates)
+        : 0;
+
+    return {
+      label,
+      cls,
+      plan:p||null,
+      consignments,
+      lastUpdated
+    };
+  }
+
   function portalSOStatusV1030(so){
-    const p=(state.dealerFulfilments||[]).find(x=>x.id===so.fulfilmentPlanId || x.sourceSOId===so.id);
-    const statuses=(p?.consignments||[]).map(c=>c.status||'');
+    return portalSOStatusInfoV1032(so).label;
+  }
 
-    if(statuses.length && statuses.every(x=>x==='Delivered'))return 'Delivered';
-    if(statuses.some(x=>['Handed to Courier','In Transit'].includes(x)))return 'In Transit';
-    if(statuses.some(x=>x==='Ready for Dispatch'))return 'Ready for Dispatch';
+  function portalSOTrackingSummaryV1032(so){
+    const info=portalSOStatusInfoV1032(so);
 
-    return so.erpStatus||'Pending ERP Sync';
+    return info.consignments
+      .filter(c=>c.courier||c.tracking)
+      .slice(0,2)
+      .map(c=>
+        `${c.courier||'Courier'}${c.tracking?` • ${c.tracking}`:''}`
+      );
   }
 
   window.bpSoSetPageV1030=function(page){
@@ -14731,43 +15312,133 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!box)return;
 
     const all=mySalesOrdersV1030();
-    const pages=Math.max(1,Math.ceil(all.length/SO_PAGE_SIZE));
+    const pages=Math.max(
+      1,
+      Math.ceil(all.length/SO_PAGE_SIZE)
+    );
 
     if(soPage>pages)soPage=pages;
     if(soPage<1)soPage=1;
 
-    const start=(soPage-1)*SO_PAGE_SIZE;
-    const rows=all.slice(start,start+SO_PAGE_SIZE);
+    const start=
+      (soPage-1)*SO_PAGE_SIZE;
+
+    const rows=
+      all.slice(
+        start,
+        start+SO_PAGE_SIZE
+      );
 
     box.innerHTML=rows.length
       ? `
         <div class="bp-so-history-list-v1030">
-          ${rows.map(so=>`
-            <div class="portal-item bp-so-history-row-v1030">
-              <div>
-                <b>${esc(so.soNo||'Sales Order')}</b>
-                <div class="small">
-                  ${esc(so.date||'')}
-                  • ${esc(so.customerName||'')}
-                  • ${Number(so.lines?.length||0)} item${Number(so.lines?.length||0)===1?'':'s'}
+          ${rows.map(so=>{
+            const status=
+              portalSOStatusInfoV1032(so);
+
+            const tracking=
+              portalSOTrackingSummaryV1032(so);
+
+            const updated=
+              status.lastUpdated
+                ? new Date(status.lastUpdated).toLocaleString('en-GB')
+                : '';
+
+            return `
+              <div class="bp-so-history-card-v1032">
+
+                <div class="bp-so-status-banner-v1032 ${status.cls}">
+                  <div>
+                    <span>ORDER STATUS</span>
+                    <b>${esc(status.label)}</b>
+                  </div>
+
+                  <small>
+                    ${updated?`Updated ${esc(updated)}`:'Live fulfilment status'}
+                  </small>
                 </div>
-                <div class="small">
-                  LKR ${money(so.total||0)}
-                  • ${esc(portalSOStatusV1030(so))}
-                  ${so.erpSONo?` • ERP ${esc(so.erpSONo)}`:''}
+
+                <div class="portal-item bp-so-history-row-v1030">
+                  <div>
+                    <b>${esc(so.soNo||'Sales Order')}</b>
+
+                    <div class="small">
+                      ${esc(so.date||'')}
+                      • ${esc(so.customerName||'')}
+                      • ${Number(so.lines?.length||0)} item${Number(so.lines?.length||0)===1?'':'s'}
+                    </div>
+
+                    <div class="small">
+                      <b>LKR ${money(so.total||0)}</b>
+                      ${so.erpSONo?` • ERP ${esc(so.erpSONo)}`:''}
+                      ${so.customerRef?` • PO/Ref ${esc(so.customerRef)}`:''}
+                    </div>
+
+                    ${
+                      tracking.length
+                        ? `
+                          <div class="bp-so-live-tracking-v1032">
+                            ${tracking.map(x=>`<span>${esc(x)}</span>`).join('')}
+                          </div>
+                        `
+                        : ''
+                    }
+
+                    ${
+                      so.poAttachment
+                        ? `
+                          <div class="bp-so-po-saved-v1032">
+                            📎 ${esc(so.poAttachment.fileName||'PO attachment')}
+                          </div>
+                        `
+                        : ''
+                    }
+                  </div>
+
+                  <div class="bp-so-history-actions-v1032">
+                    ${
+                      so.poAttachment
+                        ? `<button class="btn ghost sm" type="button" onclick="bpSoViewPOAttachmentV1032('${so.id}')">PO File</button>`
+                        : ''
+                    }
+
+                    <button class="btn ghost sm" type="button" onclick="bpSoViewOrderV1030('${so.id}')">View</button>
+                  </div>
                 </div>
               </div>
-              <button class="btn ghost sm" type="button" onclick="bpSoViewOrderV1030('${so.id}')">View</button>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
 
         <div class="bp-so-pager-v1030">
-          <span>Showing ${start+1}-${Math.min(start+rows.length,all.length)} of ${all.length}</span>
+          <span>
+            Showing
+            ${start+1}-${Math.min(start+rows.length,all.length)}
+            of ${all.length}
+          </span>
+
           <div>
-            <button class="btn ghost sm" type="button" onclick="bpSoSetPageV1030(${soPage-1})" ${soPage<=1?'disabled':''}>← Previous</button>
-            <span>Page <b>${soPage}</b> / ${pages}</span>
-            <button class="btn ghost sm" type="button" onclick="bpSoSetPageV1030(${soPage+1})" ${soPage>=pages?'disabled':''}>Next →</button>
+            <button
+              class="btn ghost sm"
+              type="button"
+              onclick="bpSoSetPageV1030(${soPage-1})"
+              ${soPage<=1?'disabled':''}
+            >
+              ← Previous
+            </button>
+
+            <span>
+              Page <b>${soPage}</b> / ${pages}
+            </span>
+
+            <button
+              class="btn ghost sm"
+              type="button"
+              onclick="bpSoSetPageV1030(${soPage+1})"
+              ${soPage>=pages?'disabled':''}
+            >
+              Next →
+            </button>
           </div>
         </div>
       `
@@ -14775,72 +15446,348 @@ window.toggleBpSeparateDeliveryButton = function(){
   }
 
   window.bpSoViewOrderV1030=function(id){
-    const so=(state.salesOrders||[]).find(x=>x.id===id);
+    const so=
+      (state.salesOrders||[])
+        .find(x=>x.id===id);
+
     if(!so)return;
 
-    if(currentUser?.role!=='admin' && so.ownerUser!==currentUser?.username){
-      return toast('This Sales Order is not available to this user');
+    if(
+      currentUser?.role!=='admin' &&
+      so.ownerUser!==currentUser?.username
+    ){
+      return toast(
+        'This Sales Order is not available to this user'
+      );
     }
 
-    $('bpSoViewTitleV1030').textContent=so.soNo||'Sales Order';
-    $('bpSoViewMetaV1030').textContent=
-      `${so.date||''} • ${so.customerName||''} • ${portalSOStatusV1030(so)}`;
+    const status=
+      portalSOStatusInfoV1032(so);
 
-    const p=(state.dealerFulfilments||[]).find(x=>x.id===so.fulfilmentPlanId || x.sourceSOId===so.id);
-    const deliveries=so.deliveries||[];
+    const p=status.plan;
+    const consignments=
+      p?.consignments||[];
+
+    const deliveries=
+      so.deliveries||[];
+
+    $('bpSoViewTitleV1030').textContent=
+      so.soNo||'Sales Order';
+
+    $('bpSoViewMetaV1030').textContent=
+      `${so.date||''} • ${so.customerName||''} • ${status.label}`;
+
+    const modal=$('bpSoViewModalV1030');
+    if(modal){
+      modal.dataset.soIdV1032=so.id;
+    }
+
+    const deliveryRows=
+      Math.max(
+        deliveries.length,
+        consignments.length
+      );
+
+    const liveDeliveries=
+      Array.from(
+        {length:deliveryRows},
+        (_,i)=>{
+          const d=deliveries[i]||{};
+          const c=consignments[i]||null;
+
+          return {
+            sequence:
+              d.sequence||
+              i+1,
+
+            name:
+              c?.recipient||
+              d.name||
+              '',
+
+            address:
+              c?.address||
+              [d.line1,d.line2]
+                .filter(Boolean)
+                .join(', '),
+
+            contact1:
+              c?.phone||
+              d.contact1||
+              '',
+
+            contact2:
+              c?.phone2||
+              d.contact2||
+              '',
+
+            allocations:
+              (c?.allocations?.length
+                ? c.allocations
+                : d.allocations
+              )||[],
+
+            consignment:c
+          };
+        }
+      );
 
     $('bpSoViewBodyV1030').innerHTML=`
+
+      <div class="bp-so-status-banner-v1032 ${status.cls} bp-so-status-large-v1032">
+        <div>
+          <span>LIVE ORDER STATUS</span>
+          <b>${esc(status.label)}</b>
+        </div>
+
+        <small>
+          ${
+            status.lastUpdated
+              ? `Updated ${esc(new Date(status.lastUpdated).toLocaleString('en-GB'))}`
+              : 'Waiting for fulfilment update'
+          }
+        </small>
+      </div>
+
+      <div class="bp-so-view-summary-v1032">
+
+        <div>
+          <span>Customer PO / Reference</span>
+          <b>${esc(so.customerRef||'-')}</b>
+        </div>
+
+        <div>
+          <span>ERP Status</span>
+          <b>${esc(so.erpStatus||'-')}</b>
+          ${so.erpSONo?`<small>ERP SO: ${esc(so.erpSONo)}</small>`:''}
+        </div>
+
+        <div>
+          <span>PO / Order File</span>
+          ${
+            so.poAttachment
+              ? `
+                <b>${esc(so.poAttachment.fileName||'Attached file')}</b>
+                <button class="btn ghost sm" type="button" onclick="bpSoViewPOAttachmentV1032('${so.id}')">
+                  Open / Download
+                </button>
+              `
+              : '<b>Not attached</b>'
+          }
+        </div>
+
+      </div>
+
       <div class="section">Items</div>
-      <table class="table">
-        <thead><tr><th>Item</th><th>Source PI</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead>
-        <tbody>
-          ${(so.lines||[]).map(l=>`
+
+      <div style="overflow:auto">
+        <table class="table">
+          <thead>
             <tr>
-              <td><b>${esc([l.desc,l.size,l.material,l.layout,l.pcs?l.pcs+' pcs':''].filter(Boolean).join(' • '))}</b></td>
-              <td>${esc(l.sourcePISerial||so.sourcePISerial||'-')}</td>
-              <td>${money(l.qty)} ${esc(l.unit||'')}</td>
-              <td>LKR ${money(l.price)}</td>
-              <td><b>LKR ${money(Number(l.qty||0)*Number(l.price||0))}</b></td>
+              <th>Item</th>
+              <th>Source PI</th>
+              <th>Qty</th>
+              <th>Unit Price</th>
+              <th>Amount</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            ${(so.lines||[]).map(l=>`
+              <tr>
+                <td>
+                  <b>
+                    ${esc(
+                      [
+                        l.desc,
+                        l.size,
+                        l.material,
+                        l.layout,
+                        l.pcs?l.pcs+' pcs':''
+                      ]
+                      .filter(Boolean)
+                      .join(' • ')
+                    )}
+                  </b>
+                </td>
+
+                <td>
+                  ${esc(l.sourcePISerial||so.sourcePISerial||'-')}
+                </td>
+
+                <td>
+                  ${money(l.qty)}
+                  ${esc(l.unit||'')}
+                </td>
+
+                <td>
+                  LKR ${money(l.price)}
+                </td>
+
+                <td>
+                  <b>
+                    LKR
+                    ${money(
+                      Number(l.qty||0)*
+                      Number(l.price||0)
+                    )}
+                  </b>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
 
       <div class="sumline">
         <span>Sales Order Total</span>
         <strong>LKR ${money(so.total||0)}</strong>
       </div>
 
-      <div class="section">Delivery Customers</div>
+      <div class="section">
+        Delivery Customers — Live Courier / Tracking
+      </div>
+
       <div class="bp-so-view-deliveries-v1030">
-        ${(deliveries.length?deliveries:(p?.consignments||[]).map((c,i)=>({
-          sequence:i+1,
-          name:c.recipient,
-          line1:c.address,
-          line2:'',
-          contact1:c.phone,
-          contact2:c.phone2||'',
-          allocations:(c.allocations||[]).map(a=>({
-            lineIndex:a.lineIndex,
-            qty:a.qty
-          }))
-        }))).map((d,i)=>`
-          <div class="bp-so-view-delivery-v1030">
-            <b>Delivery Customer ${d.sequence||i+1} • ${esc(d.name||'')}</b>
-            <div>${esc([d.line1,d.line2].filter(Boolean).join(', '))}</div>
-            <div class="small">${esc(d.contact1||'')}${d.contact2?` • ${esc(d.contact2)}`:''}</div>
-            <div class="small" style="margin-top:6px">
-              ${(d.allocations||[]).map(a=>{
-                const l=(so.lines||[])[Number(a.lineIndex)];
-                return l?`${esc([l.desc,l.size].filter(Boolean).join(' '))}: <b>${money(a.qty)} ${esc(l.unit||'')}</b>`:'';
-              }).filter(Boolean).join('<br>')}
-            </div>
-          </div>
-        `).join('')||'<div class="empty">No delivery allocation saved.</div>'}
+
+        ${
+          liveDeliveries.map((d,i)=>{
+            const c=d.consignment;
+
+            const allocationHtml=
+              (d.allocations||[])
+                .map(a=>{
+                  const l=
+                    (so.lines||[])[
+                      Number(a.lineIndex)
+                    ];
+
+                  return l
+                    ? `
+                      ${esc(
+                        [l.desc,l.size]
+                          .filter(Boolean)
+                          .join(' ')
+                      )}:
+                      <b>
+                        ${money(a.qty)}
+                        ${esc(l.unit||'')}
+                      </b>
+                    `
+                    : '';
+                })
+                .filter(Boolean)
+                .join('<br>');
+
+            const consignmentClass=
+              !c
+                ? 'awaiting'
+                : c.status==='Delivered'
+                  ? 'delivered'
+                  : ['Delivery Failed','Returned','Cancelled'].includes(c.status)
+                    ? 'issue'
+                    : ['Handed to Courier','In Transit'].includes(c.status)
+                      ? 'transit'
+                      : c.status==='Ready for Dispatch'
+                        ? 'ready'
+                        : 'awaiting';
+
+            return `
+              <div class="bp-so-view-delivery-v1030 bp-so-live-delivery-v1032">
+
+                <div class="bp-so-delivery-live-head-v1032">
+                  <div>
+                    <b>
+                      Delivery Customer
+                      ${d.sequence||i+1}
+                      • ${esc(d.name||'')}
+                    </b>
+
+                    ${
+                      c?.consignmentNo
+                        ? `<span>${esc(c.consignmentNo)}</span>`
+                        : ''
+                    }
+                  </div>
+
+                  <span class="bp-so-mini-status-v1032 ${consignmentClass}">
+                    ${esc(c?.status||'Awaiting Instructions')}
+                  </span>
+                </div>
+
+                <div>
+                  ${esc(d.address||'')}
+                </div>
+
+                <div class="small">
+                  ${esc(d.contact1||'')}
+                  ${
+                    d.contact2
+                      ? ` • ${esc(d.contact2)}`
+                      : ''
+                  }
+                </div>
+
+                <div class="bp-so-live-courier-grid-v1032">
+
+                  <div>
+                    <span>Courier / Driver</span>
+                    <b>${esc(c?.courier||'-')}</b>
+                  </div>
+
+                  <div>
+                    <span>Tracking / Reference</span>
+                    <b>${esc(c?.tracking||'-')}</b>
+                  </div>
+
+                  <div>
+                    <span>Dispatch Date</span>
+                    <b>${esc(c?.dispatchDate||'-')}</b>
+                  </div>
+
+                  <div>
+                    <span>Expected Delivery</span>
+                    <b>${esc(c?.expectedDate||'-')}</b>
+                  </div>
+
+                  <div>
+                    <span>Delivered Date</span>
+                    <b>${esc(c?.deliveredDate||'-')}</b>
+                  </div>
+
+                  <div>
+                    <span>Received By</span>
+                    <b>${esc(c?.receiver||'-')}</b>
+                  </div>
+
+                </div>
+
+                ${
+                  c?.note
+                    ? `
+                      <div class="bp-so-live-note-v1032">
+                        <b>Courier / Delivery Note:</b>
+                        ${esc(c.note)}
+                      </div>
+                    `
+                    : ''
+                }
+
+                <div class="small bp-so-live-allocation-v1032">
+                  ${allocationHtml||'No item allocation saved.'}
+                </div>
+
+              </div>
+            `;
+          }).join('')
+          ||
+          '<div class="empty">No delivery allocation saved.</div>'
+        }
+
       </div>
     `;
 
-    $('bpSoViewModalV1030').classList.add('show');
+    modal?.classList.add('show');
   };
 
   function bpSoRefreshV1030(){
@@ -14857,6 +15804,45 @@ window.toggleBpSeparateDeliveryButton = function(){
   }
 
   window.bpSoRefreshV1030=bpSoRefreshV1030;
+
+  window.bpSoRealtimeRefreshV1032=function(source=''){
+    if(soRealtimeTimerV1032){
+      clearTimeout(soRealtimeTimerV1032);
+    }
+
+    soRealtimeTimerV1032=setTimeout(()=>{
+      soRealtimeTimerV1032=0;
+
+      if(
+        !$('branchportal')?.classList.contains('active') ||
+        portalMode!=='sales'
+      ){
+        return;
+      }
+
+      renderMySalesOrdersV1030();
+
+      const modal=$('bpSoViewModalV1030');
+      const openId=modal?.dataset?.soIdV1032||'';
+
+      if(
+        openId &&
+        modal?.classList.contains('show')
+      ){
+        const stillExists=
+          (state.salesOrders||[])
+            .some(x=>x.id===openId);
+
+        if(stillExists){
+          bpSoViewOrderV1030(openId);
+        }else{
+          closeModal('bpSoViewModalV1030');
+        }
+      }
+    },60);
+  };
+
+  renderPendingSOPOV1032();
 
   /* -------------------------------------------------------
      Dropdown performance
