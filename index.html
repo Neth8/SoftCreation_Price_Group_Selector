@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.24 - Customer Compliance Docs + User Assignment + Secure Password UI -->
+<!-- SoftCreation v1.0.26 - Ribbon/Device New Document Fix + BR Required Only for PI -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.24</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.26</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.24</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.26</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -197,6 +197,7 @@
 
             <div class="section">Customer</div>
             <div class="field full"><label>Customer</label><div style="display:flex;gap:6px"><select id="customerSelect" style="flex:1"></select><button class="btn ghost sm" onclick="openCustomerModal()">+ New / Edit</button></div></div>
+            <div id="piBrRequirementNotice" class="pi-br-requirement-notice" style="display:none"></div>
             <div class="field"><label>Contact Number</label><input id="customerPhone"/></div><div class="field"><label>Email</label><input id="customerEmail"/></div>
             <div class="field full"><label>Billing Address</label><textarea id="customerAddress"></textarea></div>
             <div class="field full"><label>Delivery Address</label><textarea id="deliveryAddress" placeholder="Leave blank to use billing address"></textarea></div>
@@ -386,7 +387,7 @@
     <div class="customer-item-master-empty">Select a customer, then choose an item from Customer Item Master.</div>
   </div>
 
-  <div class="customer-item-action-row">
+  <div class="customer-item-action-row item-tools">
     <div class="field customer-item-qty-field"><label>Quantity</label><input id="quickQty" type="number" min="1" value="1" placeholder="Qty"/></div>
     <div class="field customer-item-price-field"><label>Selected / Manual Price</label><input id="quickPrice" type="number" step="0.01" placeholder="Select an item above"/></div>
     <button class="btn primary sm" type="button" onclick="addMasterLine()">Add Selected Label</button>
@@ -730,24 +731,24 @@
   <div class="field full customer-cloud-doc-card" id="custBrDocCard">
     <div class="customer-cloud-doc-head">
       <div>
-        <label>BR Certificate <span class="required-dot">*</span></label>
-        <div class="hint">Upload the Business Registration certificate to Supabase. If the customer has no BR, use the administrator override below.</div>
+        <label>BR Certificate</label>
+        <div class="hint">Optional when creating or updating the customer. A saved BR certificate is required before a Pro Forma Invoice can be created or saved for this customer.</div>
       </div>
       <button class="btn ghost sm" id="custBrViewBtn" type="button" onclick="viewCustomerCloudDocumentV1024('br')" style="display:none">View Saved</button>
     </div>
     <input id="custBrCloudFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"/>
-    <div id="custBrDocStatus" class="customer-cloud-doc-status">BR certificate required.</div>
+    <div id="custBrDocStatus" class="customer-cloud-doc-status ready">No BR certificate uploaded yet. Customer can be saved, but Pro Forma Invoice will be blocked until the BR is uploaded and saved.</div>
 
     <label class="checkline customer-no-br-check">
       <input id="custNoBr" type="checkbox" onchange="updateCustomerBrOverrideUIV1024()">
-      Customer does not have a BR certificate
+      Customer does not currently have a BR certificate
     </label>
 
-    <div id="custBrOverrideWrap" class="customer-br-override" style="display:none">
+    <div id="custBrOverrideWrap" class="customer-br-override" style="display:none" hidden aria-hidden="true">
       <div class="field">
-        <label>Administrator Password <span class="required-dot">*</span></label>
-        <input id="custBrAdminPassword" type="password" autocomplete="off" placeholder="Admin approval required for No BR"/>
-        <div class="hint">The approving administrator and time are recorded in the customer audit data.</div>
+        <label>Administrator Password</label>
+        <input id="custBrAdminPassword" type="password" autocomplete="off"/>
+        <div class="hint">Legacy field retained for backward compatibility. BR is now enforced when creating/saving a Pro Forma Invoice.</div>
       </div>
     </div>
   </div>
@@ -1125,7 +1126,7 @@ function resetEditor(showDash=true){
   if(showDash)showView('dashboard')
 }
 function clearAttachments(){tempFiles={po:null,quote:null,chat:null,custVat:null,custImage:null};['poFile','quoteFile','chatFile'].forEach(id=>$(id).value='');['poPreview','quotePreview','chatPreview'].forEach(id=>$(id).innerHTML='')}
-function updateEditorVisibility(){const type=$('docType').value,cat=$('quoteCategory')?.value||'label',pi=type==='PI';$('convertBtn').style.display=type==='Q'?'inline-block':'none';$('piDispatchRow').style.display=pi?'flex':'none';$('poRefField').style.display=pi?'flex':'none';document.querySelector('.price-calc').style.display=!pi&&cat==='label'?'block':'none';document.querySelector('.item-tools').style.display=pi?'none':'grid';$('quoteCategory').disabled=pi;$('editorTitle').textContent=type==='Q'?(cat==='device'?'Device Quotation Entry':'Label Quotation Entry'):'Pro Forma Invoice Entry — Prices Locked';document.querySelectorAll('#lineBody input,#lineBody select').forEach(x=>x.disabled=pi);if(state.current){state.current.type=type;state.current.category=cat;state.current.serial=serialFor(type,state.current.core,state.current.rev||0);$('serialBadge').textContent=state.current.serial}}
+function updateEditorVisibility(){const type=$('docType').value,cat=$('quoteCategory')?.value||'label',pi=type==='PI';$('convertBtn').style.display=type==='Q'?'inline-block':'none';$('piDispatchRow').style.display=pi?'flex':'none';$('poRefField').style.display=pi?'flex':'none';const calc=document.querySelector('.price-calc');if(calc)calc.style.display=!pi&&cat==='label'?'block':'none';const tools=document.querySelector('.item-tools');if(tools)tools.style.display=pi?'none':'grid';$('quoteCategory').disabled=pi;$('editorTitle').textContent=type==='Q'?(cat==='device'?'Device Quotation Entry':'Label Quotation Entry'):'Pro Forma Invoice Entry — Prices Locked';document.querySelectorAll('#lineBody input,#lineBody select').forEach(x=>x.disabled=pi);if(state.current){state.current.type=type;state.current.category=cat;state.current.serial=serialFor(type,state.current.core,state.current.rev||0);$('serialBadge').textContent=state.current.serial}}
 
 function addMasterLine(){const id=$('masterItemPick').value;if(!id)return toast('Select an item from Item Master');const item=state.items.find(x=>x.id===id),qty=Number($('quickQty').value||1),override=$('quickPrice').value;const price=override!==''?Number(override):currentPricingForItem(item,$('customerSelect').value,$('payMode').value);appendLine({itemId:item.id,desc:item.desc,size:item.size,material:item.material,layout:item.layout,pcs:item.pcs,qty,unit:item.unit||'Rolls',price,packing:item.packing||'',use:true,costSnapshot:item.costSnapshot?JSON.parse(JSON.stringify(item.costSnapshot)):null})}
 function addBlankLine(){appendLine({itemId:'',desc:'',size:'',material:'',layout:'',pcs:'',qty:1,unit:'Rolls',price:0,packing:'',use:true})}
@@ -2398,7 +2399,7 @@ $('custAddress').value =
 }
 function addSpecialPriceRow(iid='',cash='',credit=''){const d=document.createElement('div');d.className='special-row';d.innerHTML=`<select class="spItem"><option value="">Select Item</option>${state.items.map(i=>`<option value="${i.id}" ${i.id===iid?'selected':''}>${esc([i.size,i.material,i.layout].filter(Boolean).join(' / '))}</option>`).join('')}</select><input class="spCash" type="number" step="0.01" placeholder="Cash" value="${cash??''}"><input class="spCredit" type="number" step="0.01" placeholder="Credit" value="${credit??''}"><button class="btn red sm" onclick="this.parentElement.remove()">×</button>`;$('specialPriceRows').appendChild(d)}
 async function saveCustomer(){
-  if(!customerMinimumReady())return toast('Customer Name + Contact Number or Email is required');
+  if(!customerMinimumReady())return customerSaveErrorV1025('Customer Name + Contact Number or Email is required.','custName');
   const id=$('custId').value||uid('cust'),old=state.customers.find(c=>c.id===id)||{},sp={};
   if($('custId').value&&!protectedEdit('save customer changes'))return;
   document.querySelectorAll('.special-row').forEach(r=>{const iid=r.querySelector('.spItem').value;if(iid)sp[iid]={cash:r.querySelector('.spCash').value,credit:r.querySelector('.spCredit').value}});
@@ -2804,7 +2805,7 @@ function enhanceV5UI(){
  const settings=document.querySelector('#settings');settings.insertAdjacentHTML('beforebegin',`<section id="categories" class="view"><div class="panel"><div class="panel-title">Price Category Master <button class="btn ghost sm" onclick="openCategoryModal()">+ Add Category</button></div><div class="panel-body"><div class="notice">Category edits affect future prices only. Saved quotation prices and costs remain frozen.</div><table class="table"><thead><tr><th>Name</th><th>Margin</th><th>Cost Basis</th><th>Applies To</th><th>Status</th><th></th></tr></thead><tbody id="categoryList"></tbody></table></div></div></section><section id="products" class="view"><div class="panel"><div class="panel-title">Ribbon & Paper Roll Master <button class="btn ghost sm" onclick="openProductModal()">+ Add Product</button></div><div class="panel-body"><input id="productSearch" placeholder="Search ribbon / paper" oninput="renderProducts()"><div id="productList" class="device-grid" style="margin-top:12px"></div></div></div></section>`);
  document.body.insertAdjacentHTML('beforeend',`<div id="categoryModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Price Category</b><button class="closex" onclick="closeModal('categoryModal')">×</button></div><div class="modal-body"><input id="catId" type="hidden"><div class="grid"><div class="field"><label>Name</label><input id="catName"></div><div class="field"><label>Margin %</label><input id="catMargin" type="number" step="0.0001"></div><div class="field"><label>Cost Basis</label><select id="catBase"><option value="full">Full Excel Cost</option><option value="scale">Scale Excel Cost</option></select></div><div class="field"><label><input id="catApproval" type="checkbox"> Manager approval required</label></div><div class="field full"><label>Item Types</label><label><input id="cat_label" type="checkbox"> Label</label> <label><input id="cat_device" type="checkbox"> Device</label> <label><input id="cat_product" type="checkbox"> Ribbon/Paper</label></div><div class="field"><label><input id="catActive" type="checkbox"> Active</label></div></div><div class="actions"><button class="btn primary" onclick="saveCategory()">Save</button><button class="btn red" onclick="deleteCategory()">Delete</button></div></div></div></div>
  <div id="productModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Ribbon / Paper Roll Master</b><button class="closex" onclick="closeModal('productModal')">×</button></div><div class="modal-body"><input id="prodId" type="hidden"><div class="grid"><div class="field"><label>Type</label><select id="prodType" onchange="productTypeUI()"><option value="ribbon">Ribbon</option><option value="paper">Paper Roll</option></select></div><div class="field"><label>Width (mm)</label><input id="prodWidth" type="number"></div></div><div id="ribbonFields" class="grid"><div class="field"><label>Length (m)</label><input id="prodLength" type="number"></div><div class="field"><label>Ribbon Material</label><input id="prodMaterial" placeholder="Premium Wax"></div><div class="field"><label>Color</label><input id="prodColor" value="Black"></div></div><div id="paperFields" class="grid"><div class="field"><label>Diameter (mm)</label><input id="prodDiameter" type="number"></div><div class="field"><label>Paper Type</label><select id="prodPaperType"><option>Thermal</option><option>Non Thermal</option></select></div><div class="field"><label>Coating</label><select id="prodCoating"><option>Normal</option><option>Top Coated</option></select></div></div><div class="grid"><div class="field"><label>Unit Cost</label><input id="prodCost" type="number" step="0.01"></div><div class="field"><label>Base Sale Price</label><input id="prodPrice" type="number" step="0.01"></div><div class="field"><label>Supplier</label><input id="prodSupplier"></div><div class="field full"><label>Price Categories (max 3)</label><div id="prodCategories"></div></div></div><div class="actions"><button class="btn primary" onclick="saveProduct()">Save</button><button class="btn red" onclick="deleteProduct()">Delete</button></div></div></div></div><div id="productPickerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Add Ribbon / Paper Roll</b><button class="closex" onclick="closeModal('productPickerModal')">×</button></div><div id="productPickerList" class="modal-body"></div></div></div><div id="savedPricesModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Customer Saved Label Prices</b><button class="closex" onclick="closeModal('savedPricesModal')">×</button></div><div id="savedPricesBody" class="modal-body"></div></div></div>`);
- const it=document.querySelector('.item-tools');if(it){const b=document.createElement('button');b.className='btn ghost';b.textContent='Ribbon / Paper';b.onclick=openProductPicker;it.appendChild(b)}
+ const it=document.querySelector('.item-tools');if(it&&![...it.querySelectorAll('button')].some(x=>/Ribbon\s*\/\s*Paper/i.test(x.textContent||''))){const b=document.createElement('button');b.className='btn ghost sm';b.type='button';b.textContent='Add Ribbon / Paper';b.onclick=openProductPicker;it.appendChild(b)}
  const cm=$('customerModal').querySelector('.modal-body');cm.insertAdjacentHTML('beforeend','<div class="section">PRICE CATEGORIES</div><div id="custCategoryChoices" class="grid"></div><div class="actions"><button class="btn ghost" type="button" onclick="viewCustomerSavedPrices()">View Saved Sizes & Prices</button></div>');
  const dg=$('deviceModal').querySelector('.grid');dg.insertAdjacentHTML('beforeend','<div class="field"><label>Supplier</label><input id="devSupplier"></div><div class="field"><label>Warranty Period</label><input id="devWarranty" placeholder="12 months"></div><div class="field full"><label>Price Categories (max 3)</label><div id="devCategories"></div></div>');
  const pd=$('profitDelivery').closest('.field');pd.style.display='none';pd.insertAdjacentHTML('afterend','<div class="field"><label>Delivery Mode</label><select id="deliveryMode" onchange="renderProfitReport()"><option value="charge">Charge Customer</option><option value="free">Free / Company Absorbed</option><option value="pickup">Pickup / Not Applicable</option></select></div><div class="field"><label>Distance from Kurunegala (km)</label><input id="deliveryKm" type="number" step="0.1" oninput="renderProfitReport()"></div><div class="field"><label>Rate per km (LKR)</label><input id="deliveryRate" type="number" step="0.01" value="25" oninput="renderProfitReport()"></div><div class="field"><label>Amount Charged to Customer</label><input id="deliveryCharge" type="number" step="0.01" oninput="renderProfitReport()"></div><div class="field full"><div class="notice">Use the customer Google Maps link to check route distance from Kurunegala, then enter km here. Automatic distance requires a Google Maps API key when hosted.</div></div>');
@@ -11577,13 +11578,27 @@ window.toggleBpSeparateDeliveryButton = function(){
     const actions=document.querySelector('.customer-item-action-row');
     const device=$('quoteCategory')?.value==='device';
     const pi=$('docType')?.value==='PI';
-    const hide=device||pi;
+    const hidePicker=device||pi;
 
-    if(wrap)wrap.style.display=hide?'none':'';
-    if(host)host.style.display=hide?'none':'';
-    if(actions)actions.style.display=hide?'none':'';
+    if(wrap)wrap.style.display=hidePicker?'none':'';
+    if(host)host.style.display=hidePicker?'none':'';
 
-    return hide;
+    if(actions){
+      /* PI: no item additions. Device quotation: keep only Add Device. */
+      actions.style.display=pi?'none':'grid';
+
+      actions.querySelectorAll('.field').forEach(field=>{
+        field.style.display=device?'none':'';
+      });
+
+      actions.querySelectorAll('button').forEach(btn=>{
+        const text=String(btn.textContent||'');
+        const isDeviceButton=/Add Device/i.test(text);
+        btn.style.display=device?(isDeviceButton?'':'none'):'';
+      });
+    }
+
+    return hidePicker;
   }
 
   function scRenderCustomerItemSelectedV1023(){
@@ -12378,19 +12393,14 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
 
     if($('custBrDocStatus')){
-      if(c?.brNoCertificate){
-        const approver=c.brOverrideApprovedByDisplay||c.brOverrideApprovedByUser||'Administrator';
-        $('custBrDocStatus').textContent=
-          `No BR approved by ${approver}`+
-          `${c.brOverrideApprovedAt?` • ${new Date(c.brOverrideApprovedAt).toLocaleString('en-GB')}`:''}`;
-        $('custBrDocStatus').className='customer-cloud-doc-status override';
+      if(brAsset){
+        $('custBrDocStatus').textContent=docStatusTextV1024(brAsset,'BR certificate');
+        $('custBrDocStatus').className='customer-cloud-doc-status saved';
       }else{
-        $('custBrDocStatus').textContent=
-          brAsset
-            ? docStatusTextV1024(brAsset,'BR certificate')
-            : 'BR certificate required.';
-        $('custBrDocStatus').className=
-          'customer-cloud-doc-status'+(brAsset?' saved':'');
+        $('custBrDocStatus').textContent=c?.brNoCertificate
+          ? 'No BR is currently available for this customer. Customer Master can still be saved, but Pro Forma Invoice is blocked until a BR certificate is uploaded and saved.'
+          : 'No BR certificate uploaded yet. Customer Master can be saved, but Pro Forma Invoice is blocked until a BR certificate is uploaded and saved.';
+        $('custBrDocStatus').className='customer-cloud-doc-status override';
       }
     }
 
@@ -12455,28 +12465,26 @@ window.toggleBpSeparateDeliveryButton = function(){
   window.updateCustomerBrOverrideUIV1024=function(){
     const noBr=!!$('custNoBr')?.checked;
 
+    /* BR is optional in Customer Master. Keep upload available at all times. */
     if($('custBrCloudFile')){
-      $('custBrCloudFile').disabled=noBr;
-      if(noBr)$('custBrCloudFile').value='';
+      $('custBrCloudFile').disabled=false;
     }
 
     if($('custBrOverrideWrap')){
-      $('custBrOverrideWrap').style.display=noBr?'block':'none';
+      $('custBrOverrideWrap').style.display='none';
     }
 
-    if(!noBr&&$('custBrAdminPassword')){
+    if($('custBrAdminPassword')){
       $('custBrAdminPassword').value='';
     }
 
     const c=currentCustomerFromModalV1024();
 
     if($('custBrDocStatus')&&!c?.brDocument){
-      $('custBrDocStatus').textContent=
-        noBr
-          ? 'Administrator approval is required to save this customer without BR.'
-          : 'BR certificate required.';
-      $('custBrDocStatus').className=
-        'customer-cloud-doc-status'+(noBr?' override':'');
+      $('custBrDocStatus').textContent=noBr
+        ? 'Customer marked as currently having no BR. Customer can be saved, but Pro Forma Invoice will be blocked until a BR certificate is uploaded and saved.'
+        : 'No BR certificate uploaded yet. Customer can be saved, but Pro Forma Invoice will be blocked until a BR certificate is uploaded and saved.';
+      $('custBrDocStatus').className='customer-cloud-doc-status override';
     }
   };
 
@@ -12502,9 +12510,9 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     const html=`
       <div class="field" id="custAssignedSystemUserFieldV1024">
-        <label>Assigned System User / Freelancer <span class="required-dot">*</span></label>
+        <label>Introduced By <span class="required-dot">*</span></label>
         <select id="custAssignedSystemUser"></select>
-        <div class="hint">Assign the system account responsible for this customer. This is also used by the existing customer ownership / visibility flow.</div>
+        <div class="hint">Select the system user / freelancer who introduced or manages this customer. This assignment also controls the existing customer ownership / visibility flow.</div>
       </div>
     `;
 
@@ -12629,7 +12637,8 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     try{
       validateCustomerDocFileV1024(f);
-      $('custBrDocStatus').textContent=`Selected: ${f.name} • uploads to Supabase when Customer is saved.`;
+      if($('custNoBr'))$('custNoBr').checked=false;
+      $('custBrDocStatus').textContent=`Selected: ${f.name} • click Save Customer to upload and save the BR before creating a Pro Forma Invoice.`;
       $('custBrDocStatus').className='customer-cloud-doc-status ready';
     }catch(err){
       $('custBrCloudFile').value='';
@@ -12657,7 +12666,7 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     const assignedUsername=$('custAssignedSystemUser')?.value||'';
     if(!assignedUsername){
-      return toast('Select the responsible System User / Freelancer');
+      return customerSaveErrorV1025('Select the Introduced By system user / freelancer.','custAssignedSystemUser');
     }
 
     const assignedUser=(state.users||[]).find(u=>
@@ -12666,25 +12675,14 @@ window.toggleBpSeparateDeliveryButton = function(){
     );
 
     if(!assignedUser){
-      return toast('Selected system user is unavailable');
+      return customerSaveErrorV1025('Selected Introduced By system user is unavailable.','custAssignedSystemUser');
     }
 
-    const noBr=!!$('custNoBr')?.checked;
+    const requestedNoBr=!!$('custNoBr')?.checked;
     const vatFile=$('custVatCloudFile')?.files?.[0]||null;
     const brFile=$('custBrCloudFile')?.files?.[0]||null;
 
-    let brApprover=null;
-
-    if(noBr){
-      const password=$('custBrAdminPassword')?.value||'';
-      brApprover=adminForPasswordV1024(password);
-
-      if(!brApprover){
-        return toast('Valid administrator password is required for No BR approval');
-      }
-    }else if(!brFile&&!old.brDocument){
-      return toast('Upload the BR Certificate, or select "Customer does not have a BR certificate" and enter an Admin password');
-    }
+    /* v1.0.26: BR is optional in Customer Master. It is enforced at PI time. */
 
     const saveBtn=$('saveCustBtn');
     const oldText=saveBtn?.textContent||'Save Customer';
@@ -12704,11 +12702,13 @@ window.toggleBpSeparateDeliveryButton = function(){
         vatDocument=await uploadCustomerDocV1024(id,'vat',vatFile);
       }
 
-      if(brFile&&!noBr){
+      if(brFile){
         $('custBrDocStatus').textContent='Uploading BR certificate to Supabase...';
         $('custBrDocStatus').className='customer-cloud-doc-status ready';
         brDocument=await uploadCustomerDocV1024(id,'br',brFile);
       }
+
+      const noBr=!brDocument&&requestedNoBr;
 
       const priceCategoryIds=
         [...document.querySelectorAll('input[name="custCat"]:checked')]
@@ -12746,9 +12746,9 @@ window.toggleBpSeparateDeliveryButton = function(){
         brDocument,
 
         brNoCertificate:noBr,
-        brOverrideApprovedByUser:noBr?brApprover.username:'',
-        brOverrideApprovedByDisplay:noBr?(brApprover.display||brApprover.username):'',
-        brOverrideApprovedAt:noBr?new Date().toISOString():'',
+        brOverrideApprovedByUser:'',
+        brOverrideApprovedByDisplay:'',
+        brOverrideApprovedAt:'',
 
         priceCategoryIds,
 
@@ -12793,14 +12793,14 @@ window.toggleBpSeparateDeliveryButton = function(){
         audit('CUSTOMER_VAT_CERTIFICATE_UPLOAD',`${c.name} • ${vatDocument.fileName}`);
       }
 
-      if(brFile&&!noBr){
+      if(brFile){
         audit('CUSTOMER_BR_CERTIFICATE_UPLOAD',`${c.name} • ${brDocument.fileName}`);
       }
 
-      if(noBr){
+      if(!brDocument){
         audit(
-          'CUSTOMER_NO_BR_OVERRIDE',
-          `${c.name} • Approved by ${c.brOverrideApprovedByDisplay}`
+          'CUSTOMER_SAVED_WITHOUT_BR',
+          `${c.name} • Pro Forma Invoice blocked until BR is uploaded and saved`
         );
       }
 
@@ -12829,7 +12829,12 @@ window.toggleBpSeparateDeliveryButton = function(){
       }
 
       calculateLabelPrice();
-      toast('Customer saved');
+      clearCustomerSaveErrorV1025();
+      if(c.brDocument){
+        toast('Customer saved');
+      }else{
+        toast('Customer saved — BR not added. Upload and Save Customer with the BR before creating a Pro Forma Invoice.');
+      }
 
     }catch(err){
       console.error('Customer save failed',err);
@@ -12897,10 +12902,388 @@ window.toggleBpSeparateDeliveryButton = function(){
   };
   try{updateCustomerSaveState=window.updateCustomerSaveState}catch(_){}
 
+  /* -------------------------------------------------------
+     v1.0.25 — Customer update UX / referral assignment fix
+     ------------------------------------------------------- */
+
+  window.clearCustomerSaveErrorV1025=function(){
+    const box=$('custSaveErrorV1025');
+    if(!box)return;
+    box.textContent='';
+    box.style.display='none';
+  };
+
+  window.customerSaveErrorV1025=function(message,focusId=''){
+    let box=$('custSaveErrorV1025');
+
+    if(!box){
+      const actions=$('saveCustBtn')?.closest('.actions');
+      if(actions){
+        actions.insertAdjacentHTML(
+          'beforebegin',
+          '<div id="custSaveErrorV1025" class="customer-save-error-v1025" style="display:none"></div>'
+        );
+        box=$('custSaveErrorV1025');
+      }
+    }
+
+    if(box){
+      box.textContent=message;
+      box.style.display='block';
+      box.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+
+    /*
+      Modal sits above the legacy toast layer, so also raise the toast
+      via CSS and keep this inline error visible inside the modal.
+    */
+    toast(message);
+
+    const target=focusId?$(focusId):null;
+    if(target){
+      setTimeout(()=>{
+        try{
+          target.focus({preventScroll:true});
+        }catch(_){
+          target.focus?.();
+        }
+      },120);
+    }
+
+    return false;
+  };
+
+  function configureCustomerReferralUIV1025(){
+    ensureCustomerAssignedUserFieldV1024();
+
+    const assigned=$('custAssignedSystemUser');
+    if(assigned?.closest('.field')){
+      assigned.closest('.field').style.display='';
+    }
+
+    /*
+      The old Introducer Master / commission controls are retained in DOM
+      only for legacy records and commission history. They are no longer
+      the visible "Introduced By" field. The visible field is now the
+      System User / Freelancer dropdown requested for customer ownership.
+    */
+    ['custIntroducer','custIntroType','custIntroRate','custIntroBasis','custIntroHint']
+      .forEach(id=>{
+        const el=$(id);
+        const field=el?.closest('.field');
+        if(field)field.style.display='none';
+      });
+  }
+
+  const populateCustomerAssignedUserV1025=populateCustomerAssignedUserV1024;
+  populateCustomerAssignedUserV1024=function(customer=null){
+    populateCustomerAssignedUserV1025(customer);
+
+    const sel=$('custAssignedSystemUser');
+    if(sel){
+      /*
+        Existing customers without ownerUser are assigned to the currently
+        logged-in user only as the UI default. The value is persisted only
+        after Save Customer is successfully completed.
+      */
+      const c=customer||currentCustomerFromModalV1024();
+      const selected=
+        c?.ownerUser||
+        c?.referralUsername||
+        currentUser?.username||
+        '';
+
+      if(selected&&[...sel.options].some(o=>o.value===selected)){
+        sel.value=selected;
+      }
+    }
+  };
+
+  const openCustomerModalV1025=openCustomerModal;
+  window.openCustomerModal=function(id=''){
+    const result=openCustomerModalV1025(id);
+    const c=state.customers.find(x=>x.id===id)||null;
+
+    configureCustomerReferralUIV1025();
+    populateCustomerAssignedUserV1024(c);
+    clearCustomerSaveErrorV1025();
+
+    /*
+      Legacy customer with no BR:
+      make the compliance reason obvious immediately instead of allowing a
+      later save attempt to look like it silently failed.
+    */
+    if(c && !c.brDocument && !c.brNoCertificate){
+      const status=$('custBrDocStatus');
+      if(status){
+        status.textContent=
+          'This customer has no BR certificate on file. Customer details can still be saved, but Pro Forma Invoice creation/saving is blocked until the BR is uploaded and saved.';
+        status.className='customer-cloud-doc-status override';
+      }
+    }
+
+    return result;
+  };
+  try{openCustomerModal=window.openCustomerModal}catch(_){}
+
+  /*
+    The old referral/commission dropdown is now hidden. Preserve its
+    existing value instead of accidentally changing legacy commission data
+    while the new visible Introduced By field updates ownerUser.
+  */
+  const saveCustomerV1025=saveCustomer;
+  window.saveCustomer=async function(){
+    clearCustomerSaveErrorV1025();
+
+    const existingId=$('custId')?.value||'';
+    const old=state.customers.find(c=>c.id===existingId)||null;
+    const legacyIntroducerId=old?.introducerId||'';
+    const legacyIntroRuleType=old?.introRuleType||'default';
+    const legacyIntroRate=old?.introRate??0;
+    const legacyIntroBasis=old?.introBasis||'net';
+
+    const result=await saveCustomerV1025();
+
+    /*
+      Final save function already stores the selected system user into
+      ownerUser / referralUsername. Restore the hidden legacy commission
+      introducer fields so this UI change cannot rewrite old commission
+      assignments.
+    */
+    const savedId=existingId||$('customerSelect')?.value||'';
+    const c=state.customers.find(x=>x.id===savedId);
+
+    if(c && old){
+      let changed=false;
+
+      if(c.introducerId!==legacyIntroducerId){
+        c.introducerId=legacyIntroducerId;
+        changed=true;
+      }
+      if(c.introRuleType!==legacyIntroRuleType){
+        c.introRuleType=legacyIntroRuleType;
+        changed=true;
+      }
+      if(Number(c.introRate||0)!==Number(legacyIntroRate||0)){
+        c.introRate=Number(legacyIntroRate||0);
+        changed=true;
+      }
+      if(c.introBasis!==legacyIntroBasis){
+        c.introBasis=legacyIntroBasis;
+        changed=true;
+      }
+
+      if(changed)saveState();
+    }
+
+    return result;
+  };
+  try{saveCustomer=window.saveCustomer}catch(_){}
+
+  configureCustomerReferralUIV1025();
+
   ensureSecurePasswordModalV1024();
   ensureCustomerAssignedUserFieldV1024();
   enhanceAllPasswordInputsV1024(document);
 
+})();
+</script>
+
+
+<script>
+/* =========================================================
+   v1.0.26 — NEW DOCUMENT ACTIONS + BR GATE FOR PRO FORMA
+   ---------------------------------------------------------
+   - Restores Add Ribbon / Paper in New Document.
+   - Keeps Add Device usable in Device Quotations.
+   - Customer Master can be saved without BR.
+   - A saved BR in Supabase is mandatory before a PI can be
+     created from a quotation or saved as a standalone PI.
+   ========================================================= */
+(function(){
+  'use strict';
+
+  function customerHasSavedBRV1026(customer){
+    const d=customer?.brDocument;
+    return !!(
+      d &&
+      typeof d==='object' &&
+      d.storage==='supabase' &&
+      d.path
+    );
+  }
+
+  function selectedCustomerV1026(id=''){
+    const customerId=id||$('customerSelect')?.value||state.current?.customerId||'';
+    return (state.customers||[]).find(c=>c.id===customerId)||null;
+  }
+
+  function brRequiredMessageV1026(customer,action='create this Pro Forma Invoice'){
+    return `BR CERTIFICATE REQUIRED\n\nCustomer:\n${customer?.name||'Selected Customer'}\n\nA saved Business Registration (BR) certificate is required before you can ${action}.\n\nOpen Customer Master → Edit Customer → select the BR certificate → Save Customer.\n\nAfter the BR upload is saved in Supabase, try the Pro Forma action again.`;
+  }
+
+  window.requireCustomerBRForPIV1026=function(customer,action='create this Pro Forma Invoice'){
+    if(!customer)return true; /* Existing customer-selection validation handles this. */
+    if(customerHasSavedBRV1026(customer))return true;
+
+    const short=`PI blocked — add and save BR for ${customer.name||'this customer'} first`;
+    if(typeof toast==='function')toast(short);
+    alert(brRequiredMessageV1026(customer,action));
+    return false;
+  };
+
+  window.updatePIBRRequirementNoticeV1026=function(){
+    const box=$('piBrRequirementNotice');
+    if(!box)return;
+
+    const isPI=$('docType')?.value==='PI';
+    if(!isPI){
+      box.style.display='none';
+      box.className='pi-br-requirement-notice';
+      box.textContent='';
+      return;
+    }
+
+    const customer=selectedCustomerV1026();
+    box.style.display='block';
+
+    if(!customer){
+      box.className='pi-br-requirement-notice neutral';
+      box.innerHTML='<b>BR requirement:</b> Select a customer. A saved BR certificate is required before this Pro Forma Invoice can be saved.';
+      return;
+    }
+
+    if(customerHasSavedBRV1026(customer)){
+      box.className='pi-br-requirement-notice ok';
+      box.innerHTML=`<b>BR verified:</b> ${esc(customer.name)} has a saved BR certificate. Pro Forma Invoice can proceed.`;
+    }else{
+      box.className='pi-br-requirement-notice blocked';
+      box.innerHTML=`<b>BR required before Pro Forma:</b> ${esc(customer.name)} has no saved BR certificate. Open Customer Master, upload the BR, and <b>Save Customer</b> before creating/saving this PI.`;
+    }
+  };
+
+  /* Customer selection / document mode feedback. */
+  const fillCustomerV1026=window.fillCustomer;
+  if(typeof fillCustomerV1026==='function'){
+    window.fillCustomer=function(){
+      const r=fillCustomerV1026.apply(this,arguments);
+      updatePIBRRequirementNoticeV1026();
+      return r;
+    };
+    try{fillCustomer=window.fillCustomer}catch(_){}
+  }
+
+  const updateEditorVisibilityV1026=window.updateEditorVisibility;
+  if(typeof updateEditorVisibilityV1026==='function'){
+    window.updateEditorVisibility=function(){
+      const r=updateEditorVisibilityV1026.apply(this,arguments);
+      updatePIBRRequirementNoticeV1026();
+      return r;
+    };
+    try{updateEditorVisibility=window.updateEditorVisibility}catch(_){}
+  }
+
+  const newDocumentV1026=window.newDocument;
+  if(typeof newDocumentV1026==='function'){
+    window.newDocument=function(){
+      const r=newDocumentV1026.apply(this,arguments);
+      updatePIBRRequirementNoticeV1026();
+      return r;
+    };
+    try{newDocument=window.newDocument}catch(_){}
+  }
+
+  const openDocumentV1026=window.openDocument;
+  if(typeof openDocumentV1026==='function'){
+    window.openDocument=function(){
+      const r=openDocumentV1026.apply(this,arguments);
+      updatePIBRRequirementNoticeV1026();
+      return r;
+    };
+    try{openDocument=window.openDocument}catch(_){}
+  }
+
+  /* PI button from Quotation List: stop before opening conversion. */
+  const convertQuoteV1026=window.convertQuote;
+  if(typeof convertQuoteV1026==='function'){
+    window.convertQuote=function(id){
+      const q=(state.docs||[]).find(d=>d.id===id&&d.type==='Q');
+      const c=q?(state.customers||[]).find(x=>x.id===q.customerId):null;
+      if(c&&!requireCustomerBRForPIV1026(c,'create a Pro Forma Invoice from this quotation'))return false;
+      return convertQuoteV1026.apply(this,arguments);
+    };
+    try{convertQuote=window.convertQuote}catch(_){}
+  }
+
+  /* Convert button inside an open Quotation. */
+  const convertCurrentToPIV1026=window.convertCurrentToPI;
+  if(typeof convertCurrentToPIV1026==='function'){
+    window.convertCurrentToPI=function(){
+      const q=typeof collectCurrent==='function'?collectCurrent():null;
+      const c=q?(state.customers||[]).find(x=>x.id===q.customerId):null;
+      if(c&&!requireCustomerBRForPIV1026(c,'convert this quotation to a Pro Forma Invoice'))return false;
+      return convertCurrentToPIV1026.apply(this,arguments);
+    };
+    try{convertCurrentToPI=window.convertCurrentToPI}catch(_){}
+  }
+
+  /* Backstop immediately before the PI record is actually created. */
+  const createPIFromSelectionV1026=window.createPIFromSelection;
+  if(typeof createPIFromSelectionV1026==='function'){
+    window.createPIFromSelection=function(){
+      const q=typeof collectCurrent==='function'?collectCurrent():null;
+      const c=q?(state.customers||[]).find(x=>x.id===q.customerId):null;
+      if(c&&!requireCustomerBRForPIV1026(c,'create this Pro Forma Invoice'))return false;
+      return createPIFromSelectionV1026.apply(this,arguments);
+    };
+    try{createPIFromSelection=window.createPIFromSelection}catch(_){}
+  }
+
+  /* Standalone PI / edited PI: saving and Save & Generate PDF both use this. */
+  const persistCurrentDocumentV1026=window.persistCurrentDocument;
+  if(typeof persistCurrentDocumentV1026==='function'){
+    window.persistCurrentDocument=async function(){
+      const d=typeof collectCurrent==='function'?collectCurrent():null;
+      if(d?.type==='PI'&&d.customerId){
+        const c=(state.customers||[]).find(x=>x.id===d.customerId);
+        if(c&&!requireCustomerBRForPIV1026(c,'save this Pro Forma Invoice'))return null;
+      }
+      return persistCurrentDocumentV1026.apply(this,arguments);
+    };
+    try{persistCurrentDocument=window.persistCurrentDocument}catch(_){}
+  }
+
+  /* Final device/ribbon visibility repair for the current New Document layout. */
+  window.refreshNewDocumentItemActionsV1026=function(){
+    const row=document.querySelector('.customer-item-action-row');
+    if(!row)return;
+    const pi=$('docType')?.value==='PI';
+    const device=$('quoteCategory')?.value==='device';
+
+    if(pi){
+      row.style.display='none';
+      return;
+    }
+
+    row.style.display='grid';
+    row.querySelectorAll('.field').forEach(f=>f.style.display=device?'none':'');
+    row.querySelectorAll('button').forEach(btn=>{
+      const text=String(btn.textContent||'');
+      btn.style.display=device?(/Add Device/i.test(text)?'':'none'):'';
+    });
+  };
+
+  const updateEditorVisibilityActionsV1026=window.updateEditorVisibility;
+  window.updateEditorVisibility=function(){
+    const r=updateEditorVisibilityActionsV1026.apply(this,arguments);
+    refreshNewDocumentItemActionsV1026();
+    updatePIBRRequirementNoticeV1026();
+    return r;
+  };
+  try{updateEditorVisibility=window.updateEditorVisibility}catch(_){}
+
+  refreshNewDocumentItemActionsV1026();
+  updatePIBRRequirementNoticeV1026();
 })();
 </script>
 

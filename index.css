@@ -3613,3 +3613,58 @@ html[data-theme="dark"] .customer-save-error-v1025{
   color:#ffc0c0;
 }
 
+/* =========================================================
+   v1.0.26 — NEW DOCUMENT ACTIONS + BR / PI REQUIREMENT
+   ========================================================= */
+.customer-item-action-row.item-tools{
+  grid-template-columns:100px minmax(170px,230px) auto auto auto;
+}
+
+.pi-br-requirement-notice{
+  grid-column:1/-1;
+  border:1px solid #d7e4e8;
+  border-radius:10px;
+  padding:9px 11px;
+  font-size:10px;
+  line-height:1.45;
+  margin-top:-2px;
+}
+.pi-br-requirement-notice.neutral{
+  background:#f2f7f8;
+  border-color:#d6e3e6;
+  color:#516870;
+}
+.pi-br-requirement-notice.ok{
+  background:#edf9f2;
+  border-color:#bfe3cf;
+  color:#146e45;
+}
+.pi-br-requirement-notice.blocked{
+  background:#fff7de;
+  border-color:#e8cf81;
+  color:#7b5909;
+}
+
+html[data-theme="dark"] .pi-br-requirement-notice.neutral{
+  background:#17272d;
+  border-color:#31464d;
+  color:#a6b8bd;
+}
+html[data-theme="dark"] .pi-br-requirement-notice.ok{
+  background:#173126;
+  border-color:#28583f;
+  color:#92d5ac;
+}
+html[data-theme="dark"] .pi-br-requirement-notice.blocked{
+  background:#302b19;
+  border-color:#635b30;
+  color:#e6cd7f;
+}
+
+@media(max-width:900px){
+  .customer-item-action-row.item-tools{grid-template-columns:1fr 1fr}
+}
+@media(max-width:560px){
+  .customer-item-action-row.item-tools{grid-template-columns:1fr}
+}
+
