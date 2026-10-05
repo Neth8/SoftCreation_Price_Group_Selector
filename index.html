@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.32 - Approved Items Pagination + SO PO Attachment + Realtime Portal Status -->
+<!-- SoftCreation v1.0.33 - Products Status Accuracy + Latest Update Sorting + View Jobs Permission -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.32</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.33</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.32</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.33</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -2829,7 +2829,7 @@ downloadProfitReportPDF=async function(){const id=$('profitDoc').value,doc=state
 
 /* V6 user-specific feature and price-category privileges */
 const USER_FEATURES=[
- ['dashboard','Dashboard & Reports'],['create_quote','Create / Edit Quotation'],['save_quote','Save Quotation'],['view_quotes','View Quotations'],['quote_pdf','Quotation PDF'],['convert_pi','Convert Quotation to PI'],['view_pi','View / Save PI'],['customers','Customer Master'],['label_pricing','Label Price Calculator'],['label_master','Label Master'],['device_quote','Device Quotation'],['device_master','Device Master'],['product_quote','Ribbon / Paper Quotation'],['product_master','Ribbon / Paper Master'],['products_view','Products — Live Production Summary'],['purchase_orders_view','Purchase Orders — Supplier Procurement'],['price_categories','Price Category Master'],['admin_profit','Cost & Profit Admin Panel'],['settings','System Settings'],['manage_users','User Management'],['delete_docs','Delete / Revise Documents'],['import_export','Backup Import / Export']
+ ['dashboard','Dashboard & Reports'],['create_quote','Create / Edit Quotation'],['save_quote','Save Quotation'],['view_quotes','View Quotations'],['quote_pdf','Quotation PDF'],['convert_pi','Convert Quotation to PI'],['view_pi','View / Save PI'],['customers','Customer Master'],['label_pricing','Label Price Calculator'],['label_master','Label Master'],['device_quote','Device Quotation'],['device_master','Device Master'],['product_quote','Ribbon / Paper Quotation'],['product_master','Ribbon / Paper Master'],['products_view','Products — Live Production Summary'],['products_view_jobs','Products — View Product Jobs'],['purchase_orders_view','Purchase Orders — Supplier Procurement'],['price_categories','Price Category Master'],['admin_profit','Cost & Profit Admin Panel'],['settings','System Settings'],['manage_users','User Management'],['delete_docs','Delete / Revise Documents'],['import_export','Backup Import / Export']
 ];
 const DEFAULT_SALES_PERMS=['dashboard','create_quote','save_quote','view_quotes','quote_pdf','customers','label_pricing','device_quote','product_quote'];
 function userRecord(){return state.users.find(u=>u.id===currentUser?.id)}
@@ -3420,12 +3420,26 @@ function enhanceProductionWorkflowV8(){
   <div id="receiveModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Stores Receiving & GRN</b><button class="closex" onclick="closeModal('receiveModal')">×</button></div><div class="modal-body"><input id="receiveReqId" type="hidden"><div id="receiveMeta" class="notice"></div><div class="grid"><div class="field"><label>Actual Quantity Received</label><input id="receivedQty" type="number" min="0" oninput="updateVarianceV8()"></div><div class="field"><label>Received Date</label><input id="receivedDate" type="date"></div><div class="field"><label>Counted By</label><input id="countedBy"></div><div class="field"><label>Received From / Driver</label><input id="receivedFrom"></div><div class="field full"><label>Variance Reason (mandatory if count differs)</label><textarea id="varianceReason"></textarea></div><div class="field full"><div id="varianceResult" class="prod-summary-note"></div></div></div><div class="actions"><button class="btn green" onclick="saveGRNV8()">Save GRN</button></div></div></div></div>`);
   ['newUserRole'].forEach(id=>{const s=$(id);if(s&&!s.querySelector('option[value="production"]'))s.insertAdjacentHTML('beforeend','<option value="production">Production</option><option value="stores">Stores</option><option value="finance">Finance</option>')});
 }
-/* V1.0.3 - realtime Products summary derived from Production requests */
-const PRODUCTION_PRODUCT_ONGOING_V103=new Set(['Requested','Approved','Planned','In Production','QC Check']);
+/* V1.0.33 - realtime Products summary derived from Production requests
+   Requested / Ongoing / Finished are mutually exclusive current-status buckets.
+   Pending = Requested + Ongoing. Products sort by latest job activity. */
+const PRODUCTION_PRODUCT_REQUESTED_V103=new Set(['Requested']);
+const PRODUCTION_PRODUCT_ONGOING_V103=new Set(['Approved','Planned','In Production','QC Check']);
 const PRODUCTION_PRODUCT_FINISHED_V103=new Set(['Finished','Dispatched','Received','GRN Closed']);
 function productionProductPartV103(v=''){return String(v??'').trim().toUpperCase().replace(/\s+/g,' ')}
 function productionProductKeyV103(r){return [productionProductPartV103(r.size),productionProductPartV103(r.material),productionProductPartV103(r.layout),Number(r.pcs||0),productionProductPartV103(r.unit||'Rolls')].join('|')}
 function productionProductQtyV103(r,finished=false){const requested=Number(r.requestQty||0);if(finished){const actual=Number(r.finishedQty||0);return actual>0?actual:requested}return requested}
+function productionProductUpdatedAtV103(r){
+  const history=Array.isArray(r?.history)?r.history:[];
+  const historyAt=history.length?history.reduce((latest,h)=>Math.max(latest,Date.parse(h?.at||0)||0),0):0;
+  return Math.max(
+    Date.parse(r?._spgsUpdatedAt||0)||0,
+    Date.parse(r?.updatedAt||0)||0,
+    historyAt,
+    Date.parse(r?.createdAt||0)||0,
+    Date.parse(r?.date||0)||0
+  );
+}
 function productionProductGroupsV103(){
   const groups=new Map();
   (state.productionRequests||[]).forEach(r=>{
@@ -3433,16 +3447,33 @@ function productionProductGroupsV103(){
     const key=productionProductKeyV103(r);
     if(!key.replace(/\|/g,''))return;
     let g=groups.get(key);
-    if(!g){g={key,size:r.size||'-',material:r.material||'-',layout:r.layout||'-',pcs:Number(r.pcs||0),unit:r.unit||'Rolls',desc:r.desc||'ELP',total:0,ongoing:0,finished:0,logistics:0,totalJobs:0,ongoingJobs:0,finishedJobs:0,jobs:[]};groups.set(key,g)}
+    if(!g){g={key,size:r.size||'-',material:r.material||'-',layout:r.layout||'-',pcs:Number(r.pcs||0),unit:r.unit||'Rolls',desc:r.desc||'ELP',total:0,requested:0,ongoing:0,finished:0,logistics:0,totalJobs:0,requestedJobs:0,ongoingJobs:0,finishedJobs:0,latestUpdatedAt:0,jobs:[]};groups.set(key,g)}
     const status=String(r.status||'Requested');
     const req=productionProductQtyV103(r,false);
-    g.total+=req;g.totalJobs+=1;g.jobs.push(r);
-    if(PRODUCTION_PRODUCT_ONGOING_V103.has(status)){g.ongoing+=req;g.ongoingJobs+=1}
-    else if(PRODUCTION_PRODUCT_FINISHED_V103.has(status)){const fq=productionProductQtyV103(r,true);g.finished+=fq;g.finishedJobs+=1;if(['Dispatched','Received','GRN Closed'].includes(status))g.logistics+=fq}
+    g.total+=req;
+    g.totalJobs+=1;
+    g.jobs.push(r);
+    g.latestUpdatedAt=Math.max(g.latestUpdatedAt,productionProductUpdatedAtV103(r));
+    if(PRODUCTION_PRODUCT_REQUESTED_V103.has(status)){
+      g.requested+=req;
+      g.requestedJobs+=1;
+    }else if(PRODUCTION_PRODUCT_ONGOING_V103.has(status)){
+      g.ongoing+=req;
+      g.ongoingJobs+=1;
+    }else if(PRODUCTION_PRODUCT_FINISHED_V103.has(status)){
+      const fq=productionProductQtyV103(r,true);
+      g.finished+=fq;
+      g.finishedJobs+=1;
+      if(['Dispatched','Received','GRN Closed'].includes(status))g.logistics+=fq;
+    }
   });
-  return [...groups.values()].sort((a,b)=>String(a.size).localeCompare(String(b.size),undefined,{numeric:true,sensitivity:'base'})||String(a.material).localeCompare(String(b.material)))
+  return [...groups.values()].sort((a,b)=>
+    Number(b.latestUpdatedAt||0)-Number(a.latestUpdatedAt||0) ||
+    String(a.size).localeCompare(String(b.size),undefined,{numeric:true,sensitivity:'base'}) ||
+    String(a.material).localeCompare(String(b.material))
+  )
 }
-function productionProductTypeV103(status){return PRODUCTION_PRODUCT_ONGOING_V103.has(status)?'ongoing':PRODUCTION_PRODUCT_FINISHED_V103.has(status)?'finished':''}
+function productionProductTypeV103(status){return PRODUCTION_PRODUCT_REQUESTED_V103.has(status)?'requested':PRODUCTION_PRODUCT_ONGOING_V103.has(status)?'ongoing':PRODUCTION_PRODUCT_FINISHED_V103.has(status)?'finished':''}
 function renderProductionProducts(){
   const grid=$('productionProductsGrid');if(!grid)return;
   if(currentUser?.role!=='admin'&&!hasPerm('products_view')){grid.innerHTML='<div class="empty">Products access is not enabled for this user.</div>';return}
@@ -3451,60 +3482,44 @@ function renderProductionProducts(){
   if(materialSelect){const materials=[...new Set(groups.map(g=>g.material).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));const sig=materials.join('|');if(materialSelect.dataset.sig!==sig){materialSelect.innerHTML='<option value="">All materials</option>'+materials.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');materialSelect.dataset.sig=sig;if(materials.includes(selected))materialSelect.value=selected}}
   const q=String($('productionProductsSearch')?.value||'').trim().toLowerCase(),material=$('productionProductsMaterial')?.value||'';
   const filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc].join(' ').toLowerCase().includes(q)));
-  const totals=groups.reduce((a,g)=>({total:a.total+g.total,ongoing:a.ongoing+g.ongoing,finished:a.finished+g.finished}),{total:0,ongoing:0,finished:0});
-  if($('productionProductsKpis'))$('productionProductsKpis').innerHTML=[['Unique Products',groups.length,'specifications'],['Total Production',totals.total,'requested qty'],['Ongoing',totals.ongoing,'active production'],['Finished',totals.finished,'incl. logistics']].map(([k,v,n])=>`<div class="pp-kpi"><span>${k}</span><b>${money(v)}</b><div class="small">${n}</div></div>`).join('');
+  const totals=groups.reduce((a,g)=>({total:a.total+g.total,requested:a.requested+g.requested,ongoing:a.ongoing+g.ongoing,finished:a.finished+g.finished}),{total:0,requested:0,ongoing:0,finished:0});
+  if($('productionProductsKpis'))$('productionProductsKpis').innerHTML=[['Unique Products',groups.length,'specifications'],['Total Production',totals.total,'all requested qty'],['Ongoing',totals.ongoing,'active production'],['Finished',totals.finished,'incl. logistics']].map(([k,v,n])=>`<div class="pp-kpi"><span>${k}</span><b>${money(v)}</b><div class="small">${n}</div></div>`).join('');
+  const canViewJobs=currentUser?.role==='admin'||hasPerm('products_view_jobs');
   grid.innerHTML=filtered.length?filtered.map(g=>{
-
-    const pct=g.total>0
-        ?Math.max(
-            0,
-            Math.min(
-                100,
-                g.finished/g.total*100
-            )
-        )
-        :0;
-
-    const difference=Math.max(
-        0,
-        Number(g.total||0)
-        - Number(g.ongoing||0)
-        - Number(g.finished||0)
-    );
-
+    const workload=Math.max(0,Number(g.requested||0)+Number(g.ongoing||0)+Number(g.finished||0));
+    const pct=workload>0?Math.max(0,Math.min(100,Number(g.finished||0)/workload*100)):0;
+    const pending=Math.max(0,Number(g.requested||0)+Number(g.ongoing||0));
+    const latest=g.latestUpdatedAt?new Date(g.latestUpdatedAt).toLocaleString():'-';
     return `<div class="pp-card"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag">${g.totalJobs} job${g.totalJobs===1?'':'s'}</span></div><div class="pp-stats">
 
     <div class="pp-stat total">
         <span>Requested</span>
-        <b>${money(g.total)}</b>
-        <small>${esc(g.unit)}</small>
+        <b>${money(g.requested)}</b>
+        <small>${g.requestedJobs} job${g.requestedJobs===1?'':'s'} • ${esc(g.unit)}</small>
     </div>
 
     <div class="pp-stat ongoing">
         <span>Ongoing</span>
         <b>${money(g.ongoing)}</b>
-        <small>
-            ${g.ongoingJobs} job${g.ongoingJobs===1?'':'s'}
-        </small>
+        <small>${g.ongoingJobs} job${g.ongoingJobs===1?'':'s'}</small>
     </div>
 
     <div class="pp-stat finished">
         <span>Finished</span>
         <b>${money(g.finished)}</b>
-        <small>
-            ${g.finishedJobs} job${g.finishedJobs===1?'':'s'}
-        </small>
+        <small>${g.finishedJobs} job${g.finishedJobs===1?'':'s'}</small>
     </div>
 
     <div class="pp-stat difference">
         <span>Pending</span>
-        <b>${money(difference)}</b>
+        <b>${money(pending)}</b>
         <small>${esc(g.unit)}</small>
     </div>
 
-</div><div class="pp-progress" title="Finished against requested total"><span style="width:${pct.toFixed(1)}%"></span></div><div class="pp-card-foot"><div class="pp-mini">Logistics: <b>${money(g.logistics)} ${esc(g.unit)}</b><br>Finished progress: ${pct.toFixed(0)}%</div><button class="btn ghost sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">View Jobs</button></div></div>`}).join(''):'<div class="empty" style="grid-column:1/-1">No matching production products.</div>';
+</div><div class="pp-progress" title="Finished against current + completed workload"><span style="width:${pct.toFixed(1)}%"></span></div><div class="pp-card-foot"><div class="pp-mini">Logistics: <b>${money(g.logistics)} ${esc(g.unit)}</b><br>Finished progress: ${pct.toFixed(0)}% • Latest: ${esc(latest)}</div>${canViewJobs?`<button class="btn ghost sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">View Jobs</button>`:''}</div></div>`}).join(''):'<div class="empty" style="grid-column:1/-1">No matching production products.</div>';
 }
 function openProductionProductDetailsV103(encodedKey){
+  if(currentUser?.role!=='admin'&&!hasPerm('products_view_jobs'))return requirePerm('products_view_jobs','view product jobs');
   const key=decodeURIComponent(encodedKey),g=productionProductGroupsV103().find(x=>x.key===key);if(!g)return;
   $('productionProductDetailMeta').textContent=`${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs / ${g.unit}`;
   const jobs=[...g.jobs].sort((a,b)=>Date.parse(b._spgsUpdatedAt||b.createdAt||0)-Date.parse(a._spgsUpdatedAt||a.createdAt||0));
@@ -3525,7 +3540,7 @@ function productionCardV8(r){
   return `<div class="prod-card ${prodStatusClassV8(r.status)} ${unread?'has-unread-update':''}"><div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(r.orderNo)}</b><span class="prod-status">${esc(r.status)}</span></div><div><b>${esc(r.customerName)}</b></div><div class="prod-meta">${esc(r.size)} • ${esc(r.material)} • ${esc(r.layout)}<br>${money(r.requestQty)} ${esc(r.unit)} • ${money(r.pcs)} pcs/roll<br>PI ${esc(r.piSerial)} • Need ${esc(r.needDate||'-')}<br>Sales: ${esc(r.ownerDisplay||r.ownerUser||'-')}</div><div class="actions"><button class="btn ghost sm" onclick="openProductionV8('${r.id}')">Open</button><button class="btn green sm" onclick="downloadProductionImageV8('${r.id}')">Image</button>${r.status==='Finished'?`<button class="btn navy sm" onclick="openDispatchV8('${r.id}')">Dispatch</button>`:''}</div>${unread?`<img class="prod-update-gif" src="data:image/gif;base64,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" title="New production update" alt="New update">`:''}</div>`
 }
 function openProductionV8(id){const r=state.productionRequests.find(x=>x.id===id);if(!r)return;if(window.spgsMarkProductionSeen)window.spgsMarkProductionSeen(id);$('prodDetailMeta').textContent=`${r.orderNo} • ${r.piSerial} • ${r.customerName}`;const canProd=currentUser?.role==='admin'||hasPerm('production_manage');$('prodDetailBody').innerHTML=`<div class="grid"><div class="field"><label>Status</label><select id="prodEditStatus" ${canProd?'':'disabled'}>${['Requested','Approved','Planned','In Production','QC Check','Finished'].map(s=>`<option ${r.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Planned / Need Date</label><input id="prodEditDate" type="date" value="${esc(r.needDate||'')}" ${canProd?'':'disabled'}></div><div class="field"><label>Shift</label><select id="prodEditShift" ${canProd?'':'disabled'}><option value="day" ${r.shift==='day'?'selected':''}>Day Shift</option><option value="night" ${r.shift==='night'?'selected':''}>Night Shift</option></select></div><div class="field"><label>Priority</label><select id="prodEditPriority" ${canProd?'':'disabled'}><option value="normal" ${r.priority==='normal'?'selected':''}>Normal</option><option value="urgent" ${r.priority==='urgent'?'selected':''}>Urgent</option></select></div><div class="field full"><label>Production / QC Note</label><textarea id="prodEditNote" ${canProd?'':'disabled'}>${esc(r.lastNote||'')}</textarea></div></div><div class="prod-summary-note"><b>${esc(r.customerName)}</b> • ${esc(r.size)} / ${esc(r.material)} / ${esc(r.layout)} / ${money(r.pcs)} pcs per roll • Requested ${money(r.requestQty)} ${esc(r.unit)}</div><div class="prod-history">${(r.history||[]).map(h=>`<div><b>${esc(h.status)}</b> — ${esc(h.by)} • ${new Date(h.at).toLocaleString()}${h.note?`<br>${esc(h.note)}`:''}</div>`).join('')}</div><div class="actions">${canProd?`<button class="btn primary" onclick="saveProductionUpdateV8('${r.id}')">Save Update</button>`:''}<button class="btn green" onclick="downloadProductionImageV8('${r.id}')">Download Request Image</button></div>`;$('productionDetailModal').classList.add('show')}
-function saveProductionUpdateV8(id){const r=state.productionRequests.find(x=>x.id===id);if(!r||!(currentUser?.role==='admin'||hasPerm('production_manage')))return;const old=r.status;r.status=$('prodEditStatus').value;r.needDate=$('prodEditDate').value;r.shift=$('prodEditShift').value;r.priority=$('prodEditPriority').value;r.lastNote=$('prodEditNote').value.trim();r.history=r.history||[];r.history.push({status:r.status,note:r.lastNote,by:currentUser.display,username:currentUser.username,at:new Date().toISOString()});if(old!==r.status&&r.status==='Finished'){notifyV8(r.ownerUser,'Production Finished',`${r.orderNo} for ${r.customerName} is finished (${money(r.requestQty)} ${r.unit}).`,r.id);const pi=state.docs.find(d=>d.id===r.piId);if(pi)pi.productionStatus='Part / all production finished'}audit('PRODUCTION_UPDATE',`${r.orderNo}: ${old} → ${r.status}`);saveState();renderProductionBoard();renderStoresQueueV8();openProductionV8(id);toast('Production update saved')}
+function saveProductionUpdateV8(id){const r=state.productionRequests.find(x=>x.id===id);if(!r||!(currentUser?.role==='admin'||hasPerm('production_manage')))return;const old=r.status;r.status=$('prodEditStatus').value;r.needDate=$('prodEditDate').value;r.shift=$('prodEditShift').value;r.priority=$('prodEditPriority').value;r.lastNote=$('prodEditNote').value.trim();r._spgsUpdatedAt=new Date().toISOString();r.history=r.history||[];r.history.push({status:r.status,note:r.lastNote,by:currentUser.display,username:currentUser.username,at:r._spgsUpdatedAt});if(old!==r.status&&r.status==='Finished'){notifyV8(r.ownerUser,'Production Finished',`${r.orderNo} for ${r.customerName} is finished (${money(r.requestQty)} ${r.unit}).`,r.id);const pi=state.docs.find(d=>d.id===r.piId);if(pi)pi.productionStatus='Part / all production finished'}audit('PRODUCTION_UPDATE',`${r.orderNo}: ${old} → ${r.status}`);saveState();renderProductionBoard();renderStoresQueueV8();openProductionV8(id);toast('Production update saved')}
 function productionSvgV8(r){const hist=(r.history||[]).slice(-4),lines=hist.map((h,i)=>`<text x="85" y="${855+i*42}" font-size="18" fill="#52646a">${esc(h.status)} • ${esc(h.by)} • ${esc(new Date(h.at).toLocaleString())}</text>`).join('');return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200"><defs><linearGradient id="g" x2="1"><stop stop-color="#078f92"/><stop offset="1" stop-color="#0bb0b7"/></linearGradient></defs><rect width="1200" height="1200" fill="#f3f8f9"/><rect width="1200" height="175" fill="url(#g)"/><text x="65" y="78" font-size="42" font-family="Arial" font-weight="800" fill="white">SoftCreation</text><text x="65" y="128" font-size="26" font-family="Arial" fill="white">PRODUCTION REQUEST &amp; FACTORY PLAN</text><rect x="55" y="210" width="1090" height="900" rx="28" fill="white" stroke="#cfe2e4" stroke-width="3"/><text x="85" y="270" font-size="30" font-family="Arial" font-weight="800" fill="#172f36">${esc(r.orderNo)}</text><text x="820" y="270" font-size="22" font-family="Arial" font-weight="800" fill="#078f92">${esc(r.status.toUpperCase())}</text><text x="85" y="330" font-size="20" font-family="Arial" fill="#667980">PI / REF</text><text x="320" y="330" font-size="24" font-family="Arial" font-weight="700">${esc(r.piSerial)} / ${esc(r.poRef||'-')}</text><text x="85" y="385" font-size="20" font-family="Arial" fill="#667980">CUSTOMER</text><text x="320" y="385" font-size="24" font-family="Arial" font-weight="700">${esc(r.customerName)}</text><text x="85" y="440" font-size="20" font-family="Arial" fill="#667980">ITEM / SIZE</text><text x="320" y="440" font-size="24" font-family="Arial" font-weight="700">${esc(r.size)}</text><text x="85" y="495" font-size="20" font-family="Arial" fill="#667980">SPECIFICATION</text><text x="320" y="495" font-size="24" font-family="Arial" font-weight="700">${esc(r.material)} • ${esc(r.layout)} • ${money(r.pcs)} pcs/roll</text><rect x="85" y="545" width="1030" height="120" rx="18" fill="#eaf8f7"/><text x="115" y="590" font-size="20" font-family="Arial" fill="#087f83">PRODUCTION QUANTITY</text><text x="115" y="640" font-size="42" font-family="Arial" font-weight="900" fill="#172f36">${money(r.requestQty)} ${esc(r.unit)}</text><text x="700" y="590" font-size="20" font-family="Arial" fill="#087f83">REQUIRED DATE</text><text x="700" y="640" font-size="30" font-family="Arial" font-weight="800">${esc(r.needDate||'-')}</text><text x="85" y="725" font-size="20" font-family="Arial" fill="#667980">INSTRUCTIONS</text><foreignObject x="85" y="745" width="1000" height="85"><div xmlns="http://www.w3.org/1999/xhtml" style="font:22px Arial;color:#273b42">${esc(r.instructions||'Confirm material, size, winding, label count and packing quality before dispatch.')}</div></foreignObject><text x="85" y="820" font-size="20" font-family="Arial" font-weight="800" fill="#087f83">STATUS HISTORY</text>${lines}<text x="85" y="1060" font-size="18" font-family="Arial" fill="#667980">Sales owner: ${esc(r.ownerDisplay||r.ownerUser)} • Generated ${esc(new Date().toLocaleString())}</text><rect x="55" y="1135" width="1090" height="8" fill="url(#g)"/></svg>`}
 function svgCanvasV8(svg,w=1200,h=1200){return new Promise((res,rej)=>{const b=new Blob([svg],{type:'image/svg+xml'}),u=URL.createObjectURL(b),im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);URL.revokeObjectURL(u);res(c)};im.onerror=rej;im.src=u})}
 async function downloadProductionImageV8(id){const r=state.productionRequests.find(x=>x.id===id);if(!r)return;const c=await svgCanvasV8(productionSvgV8(r));c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`${r.orderNo.replaceAll('/','-')}_${r.customerName}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)},'image/png',1);audit('DOWNLOAD_PRODUCTION_IMAGE',r.orderNo);saveState()}
