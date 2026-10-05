@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.34 - Production Summary Pagination + Grouped Production Workspace + Quote Request Document Status -->
+<!-- SoftCreation v1.0.35 - Scoped Production UI Fix + Production Summary Pagination + Quote Request Status -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.34</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.35</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.34</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.35</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -16083,11 +16083,115 @@ window.toggleBpSeparateDeliveryButton = function(){
 
 <script>
 /* =========================================================
-   V1.0.34 - Production Summary / Production Workspace
+   V1.0.35 - Scoped Production Summary / Production Workspace
              + Quote Request document-linked status
    ========================================================= */
 (function(){
   'use strict';
+
+  /* V1.0.35: styles are deliberately scoped to the three new/changed
+     production surfaces. No global selectors are used here. */
+  if(!document.getElementById('v1035ProductionScopedStyles')){
+    const scopedStyle=document.createElement('style');
+    scopedStyle.id='v1035ProductionScopedStyles';
+    scopedStyle.textContent=`
+      #production .sc-pagebar,
+      #productionwork .sc-pagebar{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+        flex-wrap:wrap;
+        margin-top:14px;
+        padding:10px 12px;
+        border:1px solid #d7e6e8;
+        border-radius:12px;
+        background:#f8fbfc;
+      }
+      #production .sc-page-info,
+      #productionwork .sc-page-info{font-size:11px;color:#5f717a}
+      #production .sc-page-actions,
+      #productionwork .sc-page-actions{display:flex;align-items:center;gap:9px;font-size:11px;color:#566b75}
+      #productionwork .production-work-note{margin-bottom:12px}
+      #productionwork .production-work-grid .production-work-card{
+        width:100%;
+        text-align:left;
+        font:inherit;
+        color:inherit;
+        cursor:pointer;
+        transition:.16s ease;
+      }
+      #productionwork .production-work-grid .production-work-card:hover{
+        transform:translateY(-2px);
+        border-color:#8bcfd0;
+        box-shadow:0 14px 34px rgba(21,54,66,.13);
+      }
+      #productionwork .production-work-card-foot{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        margin-top:10px;
+        padding-top:9px;
+        border-top:1px dashed #d5e4e6;
+        font-size:9.5px;
+        color:#62747d;
+      }
+      #productionwork .production-open-hint{color:#087f83;font-weight:900;white-space:nowrap}
+      #productionWorkModal .production-work-modal-card{max-width:1180px}
+      #productionWorkModal .production-work-job-list{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:12px;
+      }
+      #productionWorkModal .production-work-job{
+        border:1px solid #d8e5e7;
+        border-radius:14px;
+        background:#fff;
+        padding:13px;
+      }
+      #productionWorkModal .production-work-job.urgent{border-color:#efc96b;background:#fffdf6}
+      #productionWorkModal .production-work-job.finished{border-color:#b9dfca;background:#f8fdfa}
+      #productionWorkModal .production-work-job-head{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:10px;
+      }
+      #productionWorkModal .production-work-job-head>div{display:flex;flex-direction:column;gap:2px}
+      #productionWorkModal .production-work-job-head b{font-size:13px}
+      #productionWorkModal .production-work-job-head span{font-size:9.5px;color:#6c7d85}
+      #productionWorkModal .production-work-job-customer{
+        margin-top:8px;
+        font-size:13px;
+        font-weight:900;
+        color:#203354;
+      }
+      #productionWorkModal .production-work-job-meta{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:5px 12px;
+        margin-top:8px;
+        font-size:10px;
+        color:#526872;
+      }
+      #productionWorkModal .production-work-last-update{
+        margin-top:9px;
+        padding:8px 9px;
+        border-radius:9px;
+        background:#f2f7f8;
+        font-size:9.5px;
+        line-height:1.45;
+        color:#596d76;
+      }
+      @media(max-width:780px){
+        #productionWorkModal .production-work-job-list{grid-template-columns:1fr}
+        #productionWorkModal .production-work-job-meta{grid-template-columns:1fr}
+        #productionwork .production-work-card-foot{align-items:flex-start;flex-direction:column}
+      }
+    `;
+    document.head.appendChild(scopedStyle);
+  }
 
   /* ------------------------------
      Access + navigation
