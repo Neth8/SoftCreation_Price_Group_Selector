@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.27 - Approved Prices Quotation Request Cart DOM Fix -->
+<!-- SoftCreation v1.0.28 - Approved Prices Separate Delivery + Per-Line Remove Fix -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.27</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.28</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.27</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.28</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -3877,7 +3877,7 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
     id="bpSeparateDeliveryFields"
     class="field full bp-separate-delivery"
     hidden
-    style="margin-top:10px"
+    style="display:none;margin-top:10px"
   >
     <div class="bp-delivery-grid">
 
@@ -3963,8 +3963,16 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
  window.bpAddLabel=function(){bpCalculate();const c=allowedCats('label').find(x=>x.id===bpSelectedTier);if(!c)return toast('Select an approved price');const p=state.settings.pricing||DEFAULT_PRICING,m=$('bpMaterial').value,w=Number($('bpWidth').value),h=Number($('bpHeight').value),ups=Number($('bpUps').value),pcs=Number($('bpPcs').value),area=(pcs/ups)*(h+2.75)*(w*ups+3+(ups-1))/1000000,pack=(p.strappingRoll/150*35/100)+(p.stretchFilm/30000*35),full=p.materialRates[m]*area+p.core+pack+p.service*area,scale=p.materialRates[m]*area+p.core+pack+p.scaleService*area,price=(c.base==='scale'?scale:full)*categoryFactor(c);bpCart.push({kind:'label',itemId:'',desc:'ELP',size:`${w}mm x ${h}mm`,material:m,layout:`${ups}UP`,pcs,qty:Number($('bpLabelQty').value||1),unit:'Rolls',price,priceTier:c.name});renderBpCart();toast('Label added to request')};
  window.bpAddMaster=function(kind,id,catId){const c=allowedCats(kind==='device'?'device':'product').find(x=>x.id===catId);if(!c)return toast('Approved category unavailable');const qty=Math.max(1,Number(prompt('Quantity:',1)||0));if(!qty)return;let line;if(kind==='device'){const d=state.devices.find(x=>x.id===id);if(!d)return;line={kind,itemId:d.id,desc:d.name,size:d.model,material:d.brand,layout:d.warranty||'',pcs:'',qty,unit:'Units',price:Number(d.cost)>0?Number(d.cost)*categoryFactor(c):Number(d.price),priceTier:c.name}}else{const p=state.productItems.find(x=>x.id===id);if(!p)return;line={kind:'product',itemId:p.id,desc:p.type==='ribbon'?'RIBBON':'PAPER ROLL',size:p.type==='ribbon'?`${p.width}mm x ${p.length}m`:`${p.width}mm x ${p.diameter}mm`,material:p.type==='ribbon'?`${p.material} / ${p.color}`:`${p.paperType} / ${p.coating}`,layout:'',pcs:'',qty,unit:'Rolls',price:productPrice(p,c),priceTier:c.name}}bpCart.push(line);renderBpCart();toast('Item added to request')};
  function renderPortalMasters(){const dc=allowedCats('device'),pc=allowedCats('product');$('bpDevices').innerHTML=(state.devices||[]).map(d=>{const cats=dc.filter(c=>!(d.categoryIds||[]).length||d.categoryIds.includes(c.id));return `<div class="portal-item"><b>${esc(d.name)} — ${esc(d.model)}</b><div class="small">${esc(d.brand||'')} • ${esc(d.warranty||'')}</div><div class="actions">${cats.map(c=>`<button class="btn ghost sm" onclick="bpAddMaster('device','${d.id}','${c.id}')">${esc(c.name)} • LKR ${money(Number(d.cost)>0?Number(d.cost)*categoryFactor(c):d.price)}</button>`).join('')||'<span class="small">No approved category</span>'}</div></div>`}).join('')||'<div class="empty">No device items available.</div>';$('bpProducts').innerHTML=(state.productItems||[]).map(p=>{const cats=pc.filter(c=>!(p.categoryIds||[]).length||p.categoryIds.includes(c.id));return `<div class="portal-item"><b>${esc(productLabel(p))}</b><div class="actions">${cats.map(c=>`<button class="btn ghost sm" onclick="bpAddMaster('product','${p.id}','${c.id}')">${esc(c.name)} • LKR ${money(productPrice(p,c))}</button>`).join('')||'<span class="small">No approved category</span>'}</div></div>`}).join('')||'<div class="empty">No ribbon or paper items available.</div>'}
- function renderBpCart(){const total=bpCart.reduce((s,l)=>s+l.qty*l.price,0);$('bpCart').innerHTML=bpCart.length?`<table class="table"><thead><tr><th>Item</th><th>Tier</th><th>Qty</th><th>Price</th><th>Amount</th><th></th></tr></thead><tbody>${bpCart.map((l,i)=>`<tr><td><b>${esc(l.desc)}</b><div class="small">${esc([l.size,l.material,l.layout,l.pcs?l.pcs+' pcs':''].filter(Boolean).join(' / '))}</div></td><td>${esc(l.priceTier)}</td><td>${money(l.qty)} ${esc(l.unit)}</td><td>LKR ${money(l.price)}</td><td><b>LKR ${money(l.qty*l.price)}</b></td><td><button class="btn red sm" onclick="bpCart.splice(${i},1);renderBpCart()">×</button></td></tr>`).join('')}</tbody></table><div class="sumline"><span>Requested Item Total</span><strong>LKR ${money(total)}</strong></div>`:'<div class="empty">Add approved items to prepare a request.</div>'}
- window.renderBpCart=renderBpCart;window.bpClearCart=function(){bpCart=[];renderBpCart()};
+ function renderBpCart(){const total=bpCart.reduce((s,l)=>s+l.qty*l.price,0);$('bpCart').innerHTML=bpCart.length?`<table class="table"><thead><tr><th>Item</th><th>Tier</th><th>Qty</th><th>Price</th><th>Amount</th><th></th></tr></thead><tbody>${bpCart.map((l,i)=>`<tr><td><b>${esc(l.desc)}</b><div class="small">${esc([l.size,l.material,l.layout,l.pcs?l.pcs+' pcs':''].filter(Boolean).join(' / '))}</div></td><td>${esc(l.priceTier)}</td><td>${money(l.qty)} ${esc(l.unit)}</td><td>LKR ${money(l.price)}</td><td><b>LKR ${money(l.qty*l.price)}</b></td><td><button class="btn red sm" onclick="bpRemoveCartItem(${i})">×</button></td></tr>`).join('')}</tbody></table><div class="sumline"><span>Requested Item Total</span><strong>LKR ${money(total)}</strong></div>`:'<div class="empty">Add approved items to prepare a request.</div>'}
+ window.renderBpCart=renderBpCart;
+ window.bpClearCart=function(){bpCart=[];renderBpCart()};
+ window.bpRemoveCartItem=function(index){
+   index=Number(index);
+   if(!Number.isInteger(index)||index<0||index>=bpCart.length)return;
+   bpCart.splice(index,1);
+   renderBpCart();
+   toast('Item removed from request');
+ };
  function assignedHandler(){const u=userRecord();return u?.quoteHandler||state.users.find(x=>x.role==='manager'&&x.active!==false)?.username||'admin'}
 window.toggleBpSeparateDelivery=function(){
 
@@ -13231,6 +13239,71 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   refreshNewDocumentItemActionsV1026();
   updatePIBRRequirementNoticeV1026();
+})();
+</script>
+
+
+<script>
+/* =========================================================
+   v1.0.28 — APPROVED PRICES DELIVERY TOGGLE FINAL FIX
+   ---------------------------------------------------------
+   The base .field rule uses display:flex, therefore relying on
+   the hidden attribute alone can leave separate-delivery fields
+   visible. This final override controls both hidden and display.
+   ========================================================= */
+(function(){
+  'use strict';
+
+  function applyBpSeparateDeliveryStateV1028(){
+    const checkbox=document.getElementById('bpSeparateDelivery');
+    const button=document.getElementById('bpSeparateDeliveryToggle');
+    const fields=document.getElementById('bpSeparateDeliveryFields');
+
+    const enabled=!!checkbox?.checked;
+
+    if(fields){
+      fields.hidden=!enabled;
+      fields.style.display=enabled?'':'none';
+    }
+
+    if(button){
+      button.setAttribute('aria-pressed',enabled?'true':'false');
+    }
+
+    [
+      'bpDeliveryCustomerName',
+      'bpDeliveryLine1',
+      'bpDeliveryLine2',
+      'bpDeliveryContact1'
+    ].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el)el.required=enabled;
+    });
+
+    return enabled;
+  }
+
+  window.toggleBpSeparateDelivery=applyBpSeparateDeliveryStateV1028;
+
+  window.toggleBpSeparateDeliveryButton=function(){
+    const checkbox=document.getElementById('bpSeparateDelivery');
+    if(!checkbox)return;
+
+    checkbox.checked=!checkbox.checked;
+    applyBpSeparateDeliveryStateV1028();
+  };
+
+  /*
+    Guarantee OFF state is visually hidden on first render and
+    after older request/customer setup code has run.
+  */
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>{
+      setTimeout(applyBpSeparateDeliveryStateV1028,0);
+    },{once:true});
+  }else{
+    setTimeout(applyBpSeparateDeliveryStateV1028,0);
+  }
 })();
 </script>
 
