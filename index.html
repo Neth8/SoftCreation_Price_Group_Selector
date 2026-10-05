@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.28 - Approved Prices Separate Delivery + Per-Line Remove Fix -->
+<!-- SoftCreation v1.0.29 - Allow PI When Customer Is Explicitly Marked No BR -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.28</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.29</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.28</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.29</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -732,12 +732,12 @@
     <div class="customer-cloud-doc-head">
       <div>
         <label>BR Certificate</label>
-        <div class="hint">Optional when creating or updating the customer. A saved BR certificate is required before a Pro Forma Invoice can be created or saved for this customer.</div>
+        <div class="hint">Optional when creating or updating the customer. If a BR is available, upload and save it. If the customer does not currently have a BR, turn on the option below; that customer may still proceed to Pro Forma Invoice.</div>
       </div>
       <button class="btn ghost sm" id="custBrViewBtn" type="button" onclick="viewCustomerCloudDocumentV1024('br')" style="display:none">View Saved</button>
     </div>
     <input id="custBrCloudFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"/>
-    <div id="custBrDocStatus" class="customer-cloud-doc-status ready">No BR certificate uploaded yet. Customer can be saved, but Pro Forma Invoice will be blocked until the BR is uploaded and saved.</div>
+    <div id="custBrDocStatus" class="customer-cloud-doc-status ready">No BR certificate uploaded yet. Upload the BR when available, or mark the customer as currently having no BR.</div>
 
     <label class="checkline customer-no-br-check">
       <input id="custNoBr" type="checkbox" onchange="updateCustomerBrOverrideUIV1024()">
@@ -748,7 +748,7 @@
       <div class="field">
         <label>Administrator Password</label>
         <input id="custBrAdminPassword" type="password" autocomplete="off"/>
-        <div class="hint">Legacy field retained for backward compatibility. BR is now enforced when creating/saving a Pro Forma Invoice.</div>
+        <div class="hint">Legacy field retained for backward compatibility. No password is required when the customer is explicitly marked as currently having no BR.</div>
       </div>
     </div>
   </div>
@@ -12353,8 +12353,8 @@ window.toggleBpSeparateDeliveryButton = function(){
         $('custBrDocStatus').className='customer-cloud-doc-status saved';
       }else{
         $('custBrDocStatus').textContent=c?.brNoCertificate
-          ? 'No BR is currently available for this customer. Customer Master can still be saved, but Pro Forma Invoice is blocked until a BR certificate is uploaded and saved.'
-          : 'No BR certificate uploaded yet. Customer Master can be saved, but Pro Forma Invoice is blocked until a BR certificate is uploaded and saved.';
+          ? 'Customer is marked as currently having no BR. Pro Forma Invoice is allowed under this temporary No-BR status. Upload the BR when it becomes available.'
+          : 'No BR certificate uploaded yet. Customer can be saved, but Pro Forma Invoice is blocked unless the BR is uploaded or the customer is explicitly marked as currently having no BR.';
         $('custBrDocStatus').className='customer-cloud-doc-status override';
       }
     }
@@ -12437,8 +12437,8 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     if($('custBrDocStatus')&&!c?.brDocument){
       $('custBrDocStatus').textContent=noBr
-        ? 'Customer marked as currently having no BR. Customer can be saved, but Pro Forma Invoice will be blocked until a BR certificate is uploaded and saved.'
-        : 'No BR certificate uploaded yet. Customer can be saved, but Pro Forma Invoice will be blocked until a BR certificate is uploaded and saved.';
+        ? 'Customer marked as currently having no BR. Pro Forma Invoice is allowed under this temporary No-BR status. Upload the BR when it becomes available.'
+        : 'No BR certificate uploaded yet. Customer can be saved, but Pro Forma Invoice is blocked unless the BR is uploaded or the customer is explicitly marked as currently having no BR.';
       $('custBrDocStatus').className='customer-cloud-doc-status override';
     }
   };
@@ -12972,7 +12972,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       const status=$('custBrDocStatus');
       if(status){
         status.textContent=
-          'This customer has no BR certificate on file. Customer details can still be saved, but Pro Forma Invoice creation/saving is blocked until the BR is uploaded and saved.';
+          'This customer has no BR certificate on file and is not marked as "currently no BR". Upload and save the BR, or turn on the No-BR option before creating a Pro Forma Invoice.';
         status.className='customer-cloud-doc-status override';
       }
     }
@@ -13052,8 +13052,8 @@ window.toggleBpSeparateDeliveryButton = function(){
    - Restores Add Ribbon / Paper in New Document.
    - Keeps Add Device usable in Device Quotations.
    - Customer Master can be saved without BR.
-   - A saved BR in Supabase is mandatory before a PI can be
-     created from a quotation or saved as a standalone PI.
+   - A PI is allowed when the customer either has a saved BR
+     in Supabase OR is explicitly marked as currently having no BR.
    ========================================================= */
 (function(){
   'use strict';
@@ -13068,20 +13068,34 @@ window.toggleBpSeparateDeliveryButton = function(){
     );
   }
 
+  function customerHasTemporaryNoBRV1029(customer){
+    return customer?.brNoCertificate===true;
+  }
+
+  function customerCanProceedToPIV1029(customer){
+    return !!(
+      customerHasSavedBRV1026(customer) ||
+      customerHasTemporaryNoBRV1029(customer)
+    );
+  }
+
   function selectedCustomerV1026(id=''){
     const customerId=id||$('customerSelect')?.value||state.current?.customerId||'';
     return (state.customers||[]).find(c=>c.id===customerId)||null;
   }
 
   function brRequiredMessageV1026(customer,action='create this Pro Forma Invoice'){
-    return `BR CERTIFICATE REQUIRED\n\nCustomer:\n${customer?.name||'Selected Customer'}\n\nA saved Business Registration (BR) certificate is required before you can ${action}.\n\nOpen Customer Master → Edit Customer → select the BR certificate → Save Customer.\n\nAfter the BR upload is saved in Supabase, try the Pro Forma action again.`;
+    return `BR STATUS REQUIRED\n\nCustomer:\n${customer?.name||'Selected Customer'}\n\nBefore you can ${action}, either:\n\n1. Upload and save the Business Registration (BR) certificate, OR\n2. Open Customer Master and turn on "Customer does not currently have a BR certificate", then save the customer.\n\nCustomers explicitly marked as currently having no BR are allowed to proceed to Pro Forma Invoice until the BR becomes available.`;
   }
 
   window.requireCustomerBRForPIV1026=function(customer,action='create this Pro Forma Invoice'){
     if(!customer)return true; /* Existing customer-selection validation handles this. */
-    if(customerHasSavedBRV1026(customer))return true;
 
-    const short=`PI blocked — add and save BR for ${customer.name||'this customer'} first`;
+    if(customerCanProceedToPIV1029(customer)){
+      return true;
+    }
+
+    const short=`PI blocked — add BR or mark ${customer.name||'this customer'} as currently having no BR`;
     if(typeof toast==='function')toast(short);
     alert(brRequiredMessageV1026(customer,action));
     return false;
@@ -13104,16 +13118,19 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     if(!customer){
       box.className='pi-br-requirement-notice neutral';
-      box.innerHTML='<b>BR requirement:</b> Select a customer. A saved BR certificate is required before this Pro Forma Invoice can be saved.';
+      box.innerHTML='<b>BR status:</b> Select a customer. The customer must either have a saved BR certificate or be explicitly marked as currently having no BR.';
       return;
     }
 
     if(customerHasSavedBRV1026(customer)){
       box.className='pi-br-requirement-notice ok';
       box.innerHTML=`<b>BR verified:</b> ${esc(customer.name)} has a saved BR certificate. Pro Forma Invoice can proceed.`;
+    }else if(customerHasTemporaryNoBRV1029(customer)){
+      box.className='pi-br-requirement-notice neutral';
+      box.innerHTML=`<b>Temporary No-BR status:</b> ${esc(customer.name)} is marked as currently having no BR certificate. Pro Forma Invoice is allowed. Upload and save the BR when it becomes available.`;
     }else{
       box.className='pi-br-requirement-notice blocked';
-      box.innerHTML=`<b>BR required before Pro Forma:</b> ${esc(customer.name)} has no saved BR certificate. Open Customer Master, upload the BR, and <b>Save Customer</b> before creating/saving this PI.`;
+      box.innerHTML=`<b>BR status required before Pro Forma:</b> ${esc(customer.name)} has no saved BR and is not marked as currently having no BR. Upload the BR or update the customer No-BR status before creating/saving this PI.`;
     }
   };
 
