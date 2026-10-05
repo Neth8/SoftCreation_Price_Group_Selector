@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.30 - Approved Prices Sales Order Portal + Dropdown Performance -->
+<!-- SoftCreation v1.0.31 - Separate Customer Allocation + Approved Item Qty UX Fix -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.30</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.31</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.30</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.31</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -13700,14 +13700,14 @@ window.toggleBpSeparateDeliveryButton = function(){
           </div>
         </div>
 
-        <div class="section">Delivery Allocation</div>
+        <div class="section">Delivery Customers & Item Allocation</div>
         <div class="bp-so-delivery-hint-v1030">
-          Delivery 1 receives the remaining quantity automatically. Use <b>+ Add Another Delivery Address</b> to split quantities to other addresses.
+          Each delivery block represents a <b>separate customer</b>. Delivery Customer 1 is the ordering customer and automatically receives the remaining quantity. Use <b>+ Add Separate Customer</b> to divide the selected items between other customers.
         </div>
         <div id="bpSoDeliveriesV1030"></div>
 
         <div class="actions bp-so-bottom-actions-v1030">
-          <button class="btn ghost" type="button" onclick="bpSoAddDeliveryV1030()">+ Add Another Delivery Address</button>
+          <button class="btn ghost" type="button" onclick="bpSoAddDeliveryV1030()">+ Add Separate Customer</button>
         </div>
 
         <div id="bpSoValidationV1030"></div>
@@ -13912,7 +13912,34 @@ window.toggleBpSeparateDeliveryButton = function(){
 
             <div class="bp-so-add-controls-v1030">
               <label>Qty</label>
-              <input id="bpSoAddQtyV1030_${i}" type="number" min="0.01" step="0.01" value="1">
+
+              <div class="bp-so-qty-stepper-v1031">
+                <button
+                  type="button"
+                  class="bp-so-qty-step-v1031"
+                  onclick="bpSoAdjustAddQtyV1031(${i},-1)"
+                  aria-label="Decrease quantity"
+                >−</button>
+
+                <input
+                  id="bpSoAddQtyV1030_${i}"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  value="1"
+                  onfocus="this.select()"
+                  oninput="bpSoCleanAddQtyV1031(this)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();bpSoAddItemV1030(${i})}"
+                >
+
+                <button
+                  type="button"
+                  class="bp-so-qty-step-v1031"
+                  onclick="bpSoAdjustAddQtyV1031(${i},1)"
+                  aria-label="Increase quantity"
+                >+</button>
+              </div>
+
               <button class="btn primary sm" type="button" onclick="bpSoAddItemV1030(${i})">+ Add</button>
             </div>
           </div>
@@ -13920,16 +13947,71 @@ window.toggleBpSeparateDeliveryButton = function(){
       : '<div class="empty">No previously approved items found for this customer. Only quotation → PI history belonging to this portal user is shown.</div>';
   };
 
+  window.bpSoCleanAddQtyV1031=function(input){
+    if(!input)return;
+
+    let value=String(input.value||'')
+      .replace(/[^\d.]/g,'');
+
+    const dot=value.indexOf('.');
+
+    if(dot!==-1){
+      value=
+        value.slice(0,dot+1)+
+        value.slice(dot+1).replace(/\./g,'');
+    }
+
+    if(
+      value.length>1 &&
+      value.startsWith('0') &&
+      value[1]!=='.'
+    ){
+      value=value.replace(/^0+/,'')||'0';
+    }
+
+    input.value=value;
+  };
+
+  window.bpSoAdjustAddQtyV1031=function(index,change){
+    const input=$(`bpSoAddQtyV1030_${index}`);
+    if(!input)return;
+
+    let qty=Number(input.value||0);
+
+    if(!Number.isFinite(qty)||qty<=0){
+      qty=1;
+    }
+
+    qty=Math.max(
+      1,
+      qty+Number(change||0)
+    );
+
+    input.value=
+      String(
+        Math.round(qty*100)/100
+      );
+
+    input.focus();
+    input.select();
+  };
+
   window.bpSoAddItemV1030=function(index){
     const src=soItemCache[Number(index)];
     if(!src)return;
 
-    const qty=Math.max(
-      0,
-      Number($(`bpSoAddQtyV1030_${index}`)?.value||0)
-    );
+    const input=$(`bpSoAddQtyV1030_${index}`);
 
-    if(!(qty>0))return toast('Enter a valid quantity');
+    const qty=
+      Number(
+        String(input?.value||'')
+          .replace(',','.')
+      );
+
+    if(!(qty>0)){
+      input?.focus();
+      return toast('Enter a valid quantity');
+    }
 
     const existing=soCart.find(x=>x.cartKey===src.cartKey);
 
@@ -13939,11 +14021,16 @@ window.toggleBpSeparateDeliveryButton = function(){
       soCart.push({...src,qty});
     }
 
+    if(input){
+      input.value='1';
+    }
+
     ensureDeliveryBaseV1030();
     rebalanceAllocationsV1030();
     renderSOCartV1030();
     renderSODeliveriesV1030();
     renderSOCustomerOptionsV1030();
+
     toast('Item added to Sales Order');
   };
 
@@ -14006,7 +14093,7 @@ window.toggleBpSeparateDeliveryButton = function(){
   }
 
   /* -------------------------------------------------------
-     Multiple delivery addresses + item allocation
+     Multiple delivery customers + item allocation
      ------------------------------------------------------- */
   window.bpSoAddDeliveryV1030=function(){
     const c=selectedSOCustomerV1030();
@@ -14070,94 +14157,230 @@ window.toggleBpSeparateDeliveryButton = function(){
     const c=selectedSOCustomerV1030();
 
     if(!c){
-      box.innerHTML='<div class="empty">Select an eligible customer.</div>';
+      box.innerHTML='<div class="empty">Select an eligible ordering customer.</div>';
       return;
     }
 
     ensureDeliveryBaseV1030();
     rebalanceAllocationsV1030();
 
-    box.innerHTML=soDeliveries.map((d,di)=>{
-      const total=deliveryAllocatedV1030(d);
+    box.innerHTML=
+      soDeliveries.map((d,di)=>{
+        const total=
+          deliveryAllocatedV1030(d);
 
-      return `
-        <div class="bp-so-delivery-card-v1030">
-          <div class="bp-so-delivery-title-v1030">
-            <div>
-              <b>Delivery ${di+1}${di===0?' • Primary / Remaining':''}</b>
-              <span>${di===0?'Registered customer delivery is prefilled. Remaining item quantities stay here automatically.':'Enter another delivery address and allocate quantities below.'}</span>
+        const isPrimary=
+          di===0;
+
+        return `
+          <div class="bp-so-delivery-card-v1030">
+
+            <div class="bp-so-delivery-title-v1030">
+              <div>
+                <b>
+                  Delivery Customer ${di+1}
+                  ${isPrimary?' • Ordering Customer / Balance':''}
+                </b>
+
+                <span>
+                  ${
+                    isPrimary
+                      ? 'Prefilled from Customer Master. Any selected-item quantity not allocated to another delivery customer remains with this customer automatically.'
+                      : 'This is a separate customer. Enter that customer’s company / receiver details and allocate selected-item quantities below.'
+                  }
+                </span>
+              </div>
+
+              ${
+                di>0
+                  ? `
+                    <button
+                      class="btn red sm"
+                      type="button"
+                      onclick="bpSoRemoveDeliveryV1030(${di})"
+                    >
+                      Remove Customer
+                    </button>
+                  `
+                  : ''
+              }
             </div>
-            ${di>0?`<button class="btn red sm" type="button" onclick="bpSoRemoveDeliveryV1030(${di})">Remove Address</button>`:''}
-          </div>
 
-          <div class="bp-delivery-grid">
-            <div class="field full">
-              <label>Customer / Receiver Name <span class="required-dot">*</span></label>
-              <input value="${esc(d.name||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'name',this.value)">
+            <div class="bp-delivery-grid">
+              <div class="field full">
+                <label>
+                  Delivery Customer / Company Name
+                  <span class="required-dot">*</span>
+                </label>
+
+                <input
+                  value="${esc(d.name||'')}"
+                  oninput="bpSoUpdateDeliveryV1030(${di},'name',this.value)"
+                >
+              </div>
+
+              <div class="field">
+                <label>
+                  Address Line 1
+                  <span class="required-dot">*</span>
+                </label>
+
+                <input
+                  value="${esc(d.line1||'')}"
+                  oninput="bpSoUpdateDeliveryV1030(${di},'line1',this.value)"
+                >
+              </div>
+
+              <div class="field">
+                <label>
+                  Address Line 2
+                  <span class="required-dot">*</span>
+                </label>
+
+                <input
+                  value="${esc(d.line2||'')}"
+                  oninput="bpSoUpdateDeliveryV1030(${di},'line2',this.value)"
+                >
+              </div>
+
+              <div class="field">
+                <label>
+                  Customer Contact Number
+                  <span class="required-dot">*</span>
+                </label>
+
+                <input
+                  type="tel"
+                  value="${esc(d.contact1||'')}"
+                  oninput="bpSoUpdateDeliveryV1030(${di},'contact1',this.value)"
+                >
+              </div>
+
+              <div class="field">
+                <label>
+                  Second Contact Number
+                  <span class="hint">(Optional)</span>
+                </label>
+
+                <input
+                  type="tel"
+                  value="${esc(d.contact2||'')}"
+                  oninput="bpSoUpdateDeliveryV1030(${di},'contact2',this.value)"
+                >
+              </div>
             </div>
-            <div class="field">
-              <label>Address Line 1 <span class="required-dot">*</span></label>
-              <input value="${esc(d.line1||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'line1',this.value)">
+
+            <div class="bp-so-allocation-head-v1030">
+              <b>
+                Items for Delivery Customer ${di+1}
+              </b>
+
+              <span>
+                Total allocated quantity: ${money(total)}
+              </span>
             </div>
-            <div class="field">
-              <label>Address Line 2 <span class="required-dot">*</span></label>
-              <input value="${esc(d.line2||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'line2',this.value)">
-            </div>
-            <div class="field">
-              <label>Contact Number <span class="required-dot">*</span></label>
-              <input type="tel" value="${esc(d.contact1||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'contact1',this.value)">
-            </div>
-            <div class="field">
-              <label>Second Contact Number <span class="hint">(Optional)</span></label>
-              <input type="tel" value="${esc(d.contact2||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'contact2',this.value)">
-            </div>
-          </div>
 
-          <div class="bp-so-allocation-head-v1030">
-            <b>Allocate Selected Items</b>
-            <span>Total allocated to this address: ${money(total)}</span>
-          </div>
+            <div class="bp-so-allocation-list-v1030">
+              ${
+                soCart.length
+                  ? soCart.map(line=>{
+                      const qty=
+                        Number(
+                          d.allocations?.[
+                            line.cartKey
+                          ]||0
+                        );
 
-          <div class="bp-so-allocation-list-v1030">
-            ${soCart.length
-              ? soCart.map(line=>{
-                  const qty=Number(d.allocations?.[line.cartKey]||0);
-                  const encoded=encodeURIComponent(line.cartKey);
+                      const encoded=
+                        encodeURIComponent(
+                          line.cartKey
+                        );
 
-                  const otherExtra=soDeliveries
-                    .slice(1)
-                    .filter((_,i)=>i+1!==di)
-                    .reduce((s,x)=>s+Number(x.allocations?.[line.cartKey]||0),0);
+                      const otherExtra=
+                        soDeliveries
+                          .slice(1)
+                          .filter(
+                            (_,i)=>i+1!==di
+                          )
+                          .reduce(
+                            (s,x)=>
+                              s+
+                              Number(
+                                x.allocations?.[
+                                  line.cartKey
+                                ]||0
+                              ),
+                            0
+                          );
 
-                  const max=Math.max(0,Number(line.qty||0)-otherExtra);
+                      const max=
+                        Math.max(
+                          0,
+                          Number(line.qty||0)-
+                          otherExtra
+                        );
 
-                  return `
-                    <div class="bp-so-allocation-row-v1030">
-                      <div>
-                        <b>${esc([line.desc,line.size,line.material].filter(Boolean).join(' • '))}</b>
-                        <span>Ordered ${money(line.qty)} ${esc(line.unit)}${di===0?' • automatic remaining':''}</span>
+                      return `
+                        <div class="bp-so-allocation-row-v1030">
+                          <div>
+                            <b>
+                              ${
+                                esc(
+                                  [
+                                    line.desc,
+                                    line.size,
+                                    line.material
+                                  ]
+                                  .filter(Boolean)
+                                  .join(' • ')
+                                )
+                              }
+                            </b>
+
+                            <span>
+                              Ordered
+                              ${money(line.qty)}
+                              ${esc(line.unit)}
+                              ${
+                                isPrimary
+                                  ? ' • receives remaining balance automatically'
+                                  : ''
+                              }
+                            </span>
+                          </div>
+
+                          <div class="field">
+                            <label>
+                              Qty for Customer ${di+1}
+                            </label>
+
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              ${isPrimary?'readonly':''}
+                              ${!isPrimary?`max="${max}"`:''}
+                              value="${qty}"
+                              ${
+                                !isPrimary
+                                  ? `onchange="bpSoSetAllocationV1030(${di},'${encoded}',this.value)"`
+                                  : ''
+                              }
+                            >
+                          </div>
+                        </div>
+                      `;
+                    }).join('')
+                  : `
+                      <div class="empty">
+                        Add Sales Order items first.
                       </div>
-                      <div class="field">
-                        <label>Qty to Delivery ${di+1}</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          ${di===0?'readonly':''}
-                          ${di>0?`max="${max}"`:''}
-                          value="${qty}"
-                          ${di>0?`onchange="bpSoSetAllocationV1030(${di},'${encoded}',this.value)"`:''}
-                        >
-                      </div>
-                    </div>
-                  `;
-                }).join('')
-              : '<div class="empty">Add Sales Order items first.</div>'
-            }
+                    `
+              }
+            </div>
           </div>
-        </div>
-      `;
-    }).join('');
+        `;
+      }).join('');
   }
 
   /* -------------------------------------------------------
@@ -14203,10 +14426,10 @@ window.toggleBpSeparateDeliveryButton = function(){
       const total=deliveryAllocatedV1030(d);
       if(!(total>0))continue;
 
-      if(!String(d.name||'').trim())return `Delivery ${i+1}: Customer / Receiver Name is required.`;
-      if(!String(d.line1||'').trim())return `Delivery ${i+1}: Address Line 1 is required.`;
-      if(!String(d.line2||'').trim())return `Delivery ${i+1}: Address Line 2 is required.`;
-      if(!String(d.contact1||'').trim())return `Delivery ${i+1}: Contact Number is required.`;
+      if(!String(d.name||'').trim())return `Delivery Customer ${i+1}: Customer / Company Name is required.`;
+      if(!String(d.line1||'').trim())return `Delivery Customer ${i+1}: Address Line 1 is required.`;
+      if(!String(d.line2||'').trim())return `Delivery Customer ${i+1}: Address Line 2 is required.`;
+      if(!String(d.contact1||'').trim())return `Delivery Customer ${i+1}: Contact Number is required.`;
     }
 
     return '';
@@ -14429,7 +14652,7 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     audit(
       'CREATE_PORTAL_SALES_ORDER',
-      `${so.soNo} • ${so.customerName} • ${so.lines.length} item(s) • ${activeDeliveries.length} delivery address(es)`
+      `${so.soNo} • ${so.customerName} • ${so.lines.length} item(s) • ${activeDeliveries.length} delivery customer(s)`
     );
 
     saveState();
@@ -14588,7 +14811,7 @@ window.toggleBpSeparateDeliveryButton = function(){
         <strong>LKR ${money(so.total||0)}</strong>
       </div>
 
-      <div class="section">Delivery Addresses</div>
+      <div class="section">Delivery Customers</div>
       <div class="bp-so-view-deliveries-v1030">
         ${(deliveries.length?deliveries:(p?.consignments||[]).map((c,i)=>({
           sequence:i+1,
@@ -14603,7 +14826,7 @@ window.toggleBpSeparateDeliveryButton = function(){
           }))
         }))).map((d,i)=>`
           <div class="bp-so-view-delivery-v1030">
-            <b>Delivery ${d.sequence||i+1} • ${esc(d.name||'')}</b>
+            <b>Delivery Customer ${d.sequence||i+1} • ${esc(d.name||'')}</b>
             <div>${esc([d.line1,d.line2].filter(Boolean).join(', '))}</div>
             <div class="small">${esc(d.contact1||'')}${d.contact2?` • ${esc(d.contact2)}`:''}</div>
             <div class="small" style="margin-top:6px">
