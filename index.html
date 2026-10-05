@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.26 - Ribbon/Device New Document Fix + BR Required Only for PI -->
+<!-- SoftCreation v1.0.27 - Approved Prices Quotation Request Cart DOM Fix -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.26</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.27</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.26</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.27</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -3843,50 +3843,55 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
 
 <!-- CUSTOMER LOGIN ONLY: separate delivery override. Hidden for admin/internal users. -->
 <div class="field full" id="bpCustomerSeparateDeliveryBlock" style="display:none">
-<div class="bp-delivery-toggle">
 
-  <!-- Internal value used by existing request logic -->
-  <input
-    id="bpSeparateDelivery"
-    type="checkbox"
-    hidden
-  >
+  <div class="bp-delivery-toggle">
 
-<button
-  id="bpSeparateDeliveryToggle"
-  class="bp-toggle-btn"
-  type="button"
-  aria-pressed="false"
-  onclick="window.toggleBpSeparateDeliveryButton()"
->
-  <span class="bp-toggle-off">OFF</span>
-  <span class="bp-toggle-on">ON</span>
-  <span class="bp-toggle-knob"></span>
-</button>
+    <input
+      id="bpSeparateDelivery"
+      type="checkbox"
+      hidden
+    >
 
+    <button
+      id="bpSeparateDeliveryToggle"
+      class="bp-toggle-btn"
+      type="button"
+      aria-pressed="false"
+      onclick="window.toggleBpSeparateDeliveryButton()"
+    >
+      <span class="bp-toggle-off">OFF</span>
+      <span class="bp-toggle-on">ON</span>
+      <span class="bp-toggle-knob"></span>
+    </button>
 
-  <span class="bp-delivery-toggle-copy">
+    <span class="bp-delivery-toggle-copy">
+      <b>Deliver to a separate location</b>
+      <small>
+        Turn this on only when delivery is different from the registered customer address.
+      </small>
+    </span>
 
-    <b>
-      Deliver to a separate location
-    </b>
-
-    <small>
-      Turn this on only when delivery is different from the registered customer address.
-    </small>
-
-  </span>
-
-</div>
+  </div>
 
   <div
     id="bpSeparateDeliveryFields"
-    class="bp-separate-delivery"
+    class="field full bp-separate-delivery"
     hidden
     style="margin-top:10px"
   >
-
     <div class="bp-delivery-grid">
+
+      <div class="field full">
+        <label>
+          Customer Name
+          <span class="required-dot">*</span>
+        </label>
+        <input
+          id="bpDeliveryCustomerName"
+          type="text"
+          placeholder="Customer / Receiver name"
+        >
+      </div>
 
       <div class="field">
         <label>
@@ -3917,98 +3922,40 @@ enhanceProductionWorkflowV8();installProductionConversionV8();
           Contact Number
           <span class="required-dot">*</span>
         </label>
-<div
-  id="bpSeparateDeliveryFields"
-  class="field full bp-separate-delivery"
-  hidden
->
-  <div class="bp-delivery-grid">
+        <input
+          id="bpDeliveryContact1"
+          type="tel"
+          placeholder="07XXXXXXXX"
+        >
+      </div>
 
-    <div class="field full">
-
-      <label>
-        Customer Name
-        <span class="required-dot">*</span>
-      </label>
-
-      <input
-        id="bpDeliveryCustomerName"
-        type="text"
-        placeholder="Customer / Receiver name"
-      >
-
-    </div>
-
-
-    <div class="field">
-
-      <label>
-        Address Line 1
-        <span class="required-dot">*</span>
-      </label>
-
-      <input
-        id="bpDeliveryLine1"
-        type="text"
-        placeholder="Building / No. / Street"
-      >
+      <div class="field">
+        <label>
+          Second Contact Number
+          <span class="hint">(Optional)</span>
+        </label>
+        <input
+          id="bpDeliveryContact2"
+          type="tel"
+          placeholder="Optional second number"
+        >
+      </div>
 
     </div>
-
-
-    <div class="field">
-
-      <label>
-        Address Line 2
-        <span class="required-dot">*</span>
-      </label>
-
-      <input
-        id="bpDeliveryLine2"
-        type="text"
-        placeholder="Area / City / Town"
-      >
-
-    </div>
-
-
-    <div class="field">
-
-      <label>
-        Contact Number
-        <span class="required-dot">*</span>
-      </label>
-
-      <input
-        id="bpDeliveryContact1"
-        type="tel"
-        placeholder="07XXXXXXXX"
-      >
-
-    </div>
-
-
-    <div class="field">
-
-      <label>
-        Second Contact Number
-        <span class="hint">(Optional)</span>
-      </label>
-
-      <input
-        id="bpDeliveryContact2"
-        type="tel"
-        placeholder="Optional second number"
-      >
-
-    </div>
-
   </div>
-</div>
 
 </div>
 
-</div><div id="bpCart" class="portal-cart"></div><div class="actions"><button class="btn green" onclick="submitBranchQuoteRequest()">Send Quotation Request</button><button class="btn ghost" onclick="bpClearCart()">Clear</button></div></div><div class="portal-card" style="margin-top:12px"><h3>My Requests</h3><div id="bpMyRequests"></div></div></div></div></div></div></section>
+</div>
+
+<div id="bpCart" class="portal-cart"></div>
+
+<div class="actions">
+  <button class="btn green" onclick="submitBranchQuoteRequest()">Send Quotation Request</button>
+  <button class="btn ghost" onclick="bpClearCart()">Clear</button>
+</div>
+
+</div><div class="portal-card" style="margin-top:12px"><h3>My Requests</h3><div id="bpMyRequests"></div></div></div></div></div></div></section>
  <section id="quoterequests" class="view"><div class="panel"><div class="panel-title">Branch Quotation Request Desk</div><div class="panel-body"><div class="notice">Open a request and convert it directly into a quotation draft. Requested item prices remain frozen.</div><div class="listbar"><select id="brStatusFilter" onchange="renderBranchRequests()"><option value="">All statuses</option><option>Pending</option><option>In Review</option><option>Completed</option><option>Rejected</option></select></div><div id="branchRequestList"></div></div></div></section>`);
  let bpCart=[],bpSelectedTier='';window.bpSelectTier=function(id){bpSelectedTier=id;bpCalculate()};
  function allowedCats(type){const u=userRecord()||currentUser;return (state.priceCategories||[]).filter(c=>c.active!==false&&(c.appliesTo||[]).includes(type)&&(currentUser?.role==='admin'||(u?.priceCategoryIds||[]).includes(c.id)))}
