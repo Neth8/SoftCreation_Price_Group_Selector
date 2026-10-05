@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.29 - Allow PI When Customer Is Explicitly Marked No BR -->
+<!-- SoftCreation v1.0.30 - Approved Prices Sales Order Portal + Dropdown Performance -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.29</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.30</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.29</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.30</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -13321,6 +13321,1529 @@ window.toggleBpSeparateDeliveryButton = function(){
   }else{
     setTimeout(applyBpSeparateDeliveryStateV1028,0);
   }
+})();
+</script>
+
+
+<script>
+/* =========================================================
+   v1.0.30
+   APPROVED PRICES: QUOTATION REQUEST / SALES ORDER PORTAL
+   + HIGH-FREQUENCY DROPDOWN PERFORMANCE
+   ---------------------------------------------------------
+   Sales Order sources:
+   - Only saved PIs that were converted from quotations.
+   - For portal users, the PI must belong to the signed-in user
+     through a Branch Quotation Request, linked customer/company,
+     owned customer, or introducer-linked customer.
+   - Approved unit price is taken from the saved PI snapshot.
+   - The newest converted-PI snapshot is shown per repeated item.
+   - Sales Orders reuse state.salesOrders and Order Fulfilment.
+   ========================================================= */
+(function(){
+  'use strict';
+
+  const MODE_KEY_PREFIX='sc_branchportal_mode_v1030_';
+  const SO_PAGE_SIZE=5;
+  const DIRECT='Direct delivery to dealer customers';
+  const MIXED='Mixed delivery';
+
+  let portalMode='quote';
+  let soCart=[];
+  let soDeliveries=[];
+  let soItemCache=[];
+  let soPage=1;
+  let lastSOEligibleCustomerId='';
+
+  /* -------------------------------------------------------
+     Shared helpers
+     ------------------------------------------------------- */
+  function userRecordV1030(){
+    return (state.users||[]).find(
+      u=>u.id===currentUser?.id || u.username===currentUser?.username
+    )||null;
+  }
+
+  function normalizeV1030(v=''){
+    return String(v??'').trim().toLowerCase().replace(/\s+/g,' ');
+  }
+
+  function itemFingerprintV1030(l={}){
+    if(l.itemId)return `${l.kind||'item'}::${l.itemId}`;
+    return [
+      l.kind||'label',
+      l.desc||'',
+      l.size||'',
+      l.material||'',
+      l.layout||'',
+      l.pcs||'',
+      l.unit||''
+    ].map(normalizeV1030).join('::');
+  }
+
+  function customerAddressPartsV1030(c={}){
+    const raw=String(c.delivery||c.address||'').trim();
+    if(!raw)return {line1:'',line2:''};
+
+    let parts=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+    if(parts.length<2){
+      const comma=raw.split(',').map(x=>x.trim()).filter(Boolean);
+      if(comma.length>1)parts=comma;
+    }
+
+    return {
+      line1:parts[0]||raw,
+      line2:parts.slice(1).join(', ')
+    };
+  }
+
+  function selectSetFastV1030(select,html,preferred='',signature=''){
+    if(!select)return;
+    const sig=signature||html;
+
+    if(select.dataset.scOptionsV1030!==sig){
+      select.innerHTML=html;
+      select.dataset.scOptionsV1030=sig;
+    }
+
+    if(preferred!==undefined && preferred!==null){
+      const value=String(preferred);
+      if([...select.options].some(o=>o.value===value)){
+        select.value=value;
+      }
+    }
+  }
+
+  window.scSelectSetFastV1030=selectSetFastV1030;
+
+  function convertedPISourcesV1030(){
+    const docs=state.docs||[];
+    const byId=new Map(docs.map(d=>[d.id,d]));
+    const requests=new Map((state.quoteRequests||[]).map(r=>[r.id,r]));
+    const u=userRecordV1030();
+    const username=currentUser?.username||'';
+
+    const allowedCustomerIds=new Set();
+
+    if(u?.companyLinkType==='customer' && u.companyLinkId){
+      allowedCustomerIds.add(u.companyLinkId);
+    }
+
+    (state.customers||[])
+      .filter(c=>c.ownerUser===username)
+      .forEach(c=>allowedCustomerIds.add(c.id));
+
+    if(u?.companyLinkType==='introducer' && u.companyLinkId){
+      (state.customers||[])
+        .filter(c=>c.introducerId===u.companyLinkId)
+        .forEach(c=>allowedCustomerIds.add(c.id));
+    }
+
+    return docs
+      .filter(d=>{
+        if(d.type!=='PI' || !d.sourceQuoteId)return false;
+
+        const q=byId.get(d.sourceQuoteId);
+        if(!q || q.type!=='Q')return false;
+
+        if(currentUser?.role==='admin')return true;
+
+        const req=q.sourceBranchRequestId
+          ? requests.get(q.sourceBranchRequestId)
+          : null;
+
+        if(req?.requester===username)return true;
+
+        if(allowedCustomerIds.has(d.customerId))return true;
+
+        if(
+          d.ownerUser===username ||
+          q.ownerUser===username ||
+          d.createdByUser===username ||
+          q.createdByUser===username
+        ){
+          return true;
+        }
+
+        return false;
+      })
+      .sort((a,b)=>
+        Number(b.created||Date.parse(b.createdAt||b.date||0)||0) -
+        Number(a.created||Date.parse(a.createdAt||a.date||0)||0)
+      );
+  }
+
+  function eligibleCustomersV1030(){
+    const source=convertedPISourcesV1030();
+    const ids=new Set(source.map(d=>d.customerId).filter(Boolean));
+    return (state.customers||[])
+      .filter(c=>ids.has(c.id))
+      .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  }
+
+  function eligibleItemsV1030(customerId){
+    const map=new Map();
+
+    convertedPISourcesV1030()
+      .filter(pi=>pi.customerId===customerId)
+      .forEach(pi=>{
+        const lines=
+          typeof activeDocLines==='function'
+            ? activeDocLines(pi)
+            : (pi.lines||[]).filter(l=>l.use!==false);
+
+        lines.forEach(line=>{
+          const price=Number(line.price||0);
+          if(!(price>0))return;
+
+          const key=itemFingerprintV1030(line);
+          if(map.has(key))return; // newest PI wins because source is newest first
+
+          const q=(state.docs||[]).find(x=>x.id===pi.sourceQuoteId);
+
+          map.set(key,{
+            cartKey:`${key}::${pi.id}`,
+            fingerprint:key,
+            kind:line.kind||'label',
+            itemId:line.itemId||'',
+            desc:line.desc||'ELP',
+            size:line.size||'',
+            material:line.material||'',
+            layout:line.layout||'',
+            pcs:line.pcs||'',
+            unit:line.unit||'Rolls',
+            price,
+            priceTier:line.priceTier||'Approved PI Price',
+            sourcePIId:pi.id,
+            sourcePISerial:pi.serial||'',
+            sourcePIDate:pi.date||'',
+            sourceQuoteId:pi.sourceQuoteId||'',
+            sourceQuoteSerial:q?.serial||'',
+            customerId:pi.customerId,
+            customerName:pi.customer?.name||''
+          });
+        });
+      });
+
+    return [...map.values()];
+  }
+
+  function selectedSOCustomerV1030(){
+    const id=$('bpSoCustomerV1030')?.value||'';
+    return (state.customers||[]).find(c=>c.id===id)||null;
+  }
+
+  function newDeliveryV1030(customer=null,primary=false){
+    const p=customerAddressPartsV1030(customer||{});
+
+    return {
+      id:uid('sodel'),
+      primary:!!primary,
+      name:customer?.name||'',
+      line1:p.line1,
+      line2:p.line2,
+      contact1:customer?.phone||'',
+      contact2:'',
+      allocations:{}
+    };
+  }
+
+  function ensureDeliveryBaseV1030(){
+    const c=selectedSOCustomerV1030();
+    if(!c)return;
+
+    if(!soDeliveries.length){
+      soDeliveries=[newDeliveryV1030(c,true)];
+    }
+  }
+
+  function lineByKeyV1030(key){
+    return soCart.find(l=>l.cartKey===key)||null;
+  }
+
+  function rebalanceAllocationsV1030(){
+    ensureDeliveryBaseV1030();
+    if(!soDeliveries.length)return;
+
+    for(const line of soCart){
+      let remaining=Math.max(0,Number(line.qty||0));
+
+      for(let i=1;i<soDeliveries.length;i++){
+        const d=soDeliveries[i];
+        let q=Math.max(0,Number(d.allocations?.[line.cartKey]||0));
+        q=Math.min(q,remaining);
+        d.allocations[line.cartKey]=q;
+        remaining-=q;
+      }
+
+      soDeliveries[0].allocations[line.cartKey]=remaining;
+    }
+
+    /* Remove allocations for cart lines that were deleted. */
+    const keys=new Set(soCart.map(l=>l.cartKey));
+    soDeliveries.forEach(d=>{
+      Object.keys(d.allocations||{}).forEach(k=>{
+        if(!keys.has(k))delete d.allocations[k];
+      });
+    });
+  }
+
+  function deliveryAllocatedV1030(d){
+    return Object.values(d?.allocations||{})
+      .reduce((s,q)=>s+Number(q||0),0);
+  }
+
+  function orderTotalV1030(){
+    return soCart.reduce(
+      (s,l)=>s+Number(l.qty||0)*Number(l.price||0),
+      0
+    );
+  }
+
+  /* -------------------------------------------------------
+     Build portal UI without disturbing Quotation Request mode.
+     ------------------------------------------------------- */
+  function ensurePortalSOUIV1030(){
+    const portal=$('branchportal');
+    if(!portal || $('bpModeSwitchV1030'))return;
+
+    const hero=portal.querySelector('.branch-hero');
+    const grid=portal.querySelector('.portal-grid');
+    if(!grid || grid.children.length<2)return;
+
+    const left=grid.children[0];
+    const right=grid.children[1];
+
+    [...left.children].forEach(el=>{
+      if(el.classList.contains('portal-card')){
+        el.classList.add('bp-v1030-quote-only');
+      }
+    });
+
+    [...right.children].forEach(el=>{
+      if(el.classList.contains('portal-card')){
+        el.classList.add('bp-v1030-quote-only');
+      }
+    });
+
+    const modeHtml=`
+      <div id="bpModeSwitchV1030" class="bp-mode-switch-v1030">
+        <div>
+          <b>Approved Prices Workflow</b>
+          <span>Switch between a new quotation request and a repeat sales order.</span>
+        </div>
+        <div class="bp-mode-buttons-v1030">
+          <button id="bpModeQuoteV1030" class="btn primary" type="button" onclick="bpSetPortalModeV1030('quote')">Quotation Request</button>
+          <button id="bpModeSalesV1030" class="btn ghost" type="button" onclick="bpSetPortalModeV1030('sales')">Sales Order</button>
+        </div>
+      </div>
+    `;
+
+    if(hero)hero.insertAdjacentHTML('afterend',modeHtml);
+    else grid.insertAdjacentHTML('beforebegin',modeHtml);
+
+    left.insertAdjacentHTML('afterbegin',`
+      <div id="bpSoItemCardV1030" class="portal-card bp-v1030-sales-only">
+        <div class="bp-so-card-head-v1030">
+          <div>
+            <h3>Previously Approved Items</h3>
+            <div class="hint">Only items from your quotations that were converted to Pro Forma Invoices are available. The newest approved PI price is locked.</div>
+          </div>
+          <span class="bp-so-lock-badge-v1030">PI PRICE LOCKED</span>
+        </div>
+
+        <div class="grid bp-so-filter-grid-v1030">
+          <div class="field full">
+            <label>Customer / Company</label>
+            <select id="bpSoCustomerV1030" onchange="bpSoCustomerChangedV1030()"></select>
+          </div>
+          <div class="field full">
+            <label>Search Previous Items</label>
+            <input id="bpSoItemSearchV1030" type="search" placeholder="Search size, material, item, PI number..." oninput="bpSoRenderEligibleItemsV1030()">
+          </div>
+        </div>
+
+        <div id="bpSoEligibleSummaryV1030" class="bp-so-source-summary-v1030"></div>
+        <div id="bpSoEligibleItemsV1030" class="bp-so-eligible-items-v1030"></div>
+      </div>
+    `);
+
+    right.insertAdjacentHTML('afterbegin',`
+      <div id="bpSoOrderCardV1030" class="portal-card bp-v1030-sales-only">
+        <div class="bp-so-card-head-v1030">
+          <div>
+            <h3>Sales Order</h3>
+            <div class="hint">Select repeat-order items, set quantities, then split the order between one or more delivery addresses.</div>
+          </div>
+          <span id="bpSoOrderCustomerBadgeV1030" class="bp-so-lock-badge-v1030"></span>
+        </div>
+
+        <div class="section">Selected Items</div>
+        <div id="bpSoSelectedItemsV1030"></div>
+
+        <div class="grid bp-so-meta-v1030">
+          <div class="field">
+            <label>Sales Order Date</label>
+            <input id="bpSoDateV1030" type="date">
+          </div>
+          <div class="field">
+            <label>Required Date</label>
+            <input id="bpSoNeedDateV1030" type="date">
+          </div>
+          <div class="field full">
+            <label>Customer PO / Reference</label>
+            <input id="bpSoRefV1030" placeholder="Optional customer PO / reference">
+          </div>
+          <div class="field full">
+            <label>Stores / Production Note</label>
+            <textarea id="bpSoNoteV1030" placeholder="Optional instructions"></textarea>
+          </div>
+        </div>
+
+        <div class="section">Delivery Allocation</div>
+        <div class="bp-so-delivery-hint-v1030">
+          Delivery 1 receives the remaining quantity automatically. Use <b>+ Add Another Delivery Address</b> to split quantities to other addresses.
+        </div>
+        <div id="bpSoDeliveriesV1030"></div>
+
+        <div class="actions bp-so-bottom-actions-v1030">
+          <button class="btn ghost" type="button" onclick="bpSoAddDeliveryV1030()">+ Add Another Delivery Address</button>
+        </div>
+
+        <div id="bpSoValidationV1030"></div>
+
+        <div class="bp-so-grand-total-v1030">
+          <span>Sales Order Total</span>
+          <strong id="bpSoTotalV1030">LKR 0.00</strong>
+        </div>
+
+        <div class="actions">
+          <button class="btn green" type="button" onclick="bpSoSubmitV1030()">Submit Sales Order</button>
+          <button class="btn ghost" type="button" onclick="bpSoClearV1030()">Clear</button>
+        </div>
+      </div>
+    `);
+
+    right.insertAdjacentHTML('beforeend',`
+      <div id="bpSoHistoryCardV1030" class="portal-card bp-v1030-sales-only" style="margin-top:12px">
+        <div class="bp-so-card-head-v1030">
+          <div>
+            <h3>My Sales Orders</h3>
+            <div class="hint">Your repeat Sales Orders are listed here with pagination.</div>
+          </div>
+        </div>
+        <div id="bpSoMyOrdersV1030"></div>
+      </div>
+    `);
+
+    document.body.insertAdjacentHTML('beforeend',`
+      <div id="bpSoViewModalV1030" class="modal">
+        <div class="modal-card" style="max-width:1000px">
+          <div class="modal-head">
+            <div>
+              <b id="bpSoViewTitleV1030">Sales Order</b>
+              <div id="bpSoViewMetaV1030" class="small"></div>
+            </div>
+            <button class="closex" type="button" onclick="closeModal('bpSoViewModalV1030')">×</button>
+          </div>
+          <div id="bpSoViewBodyV1030" class="modal-body"></div>
+        </div>
+      </div>
+    `);
+
+    $('bpSoDateV1030').value=today();
+  }
+
+  /* -------------------------------------------------------
+     Mode switch
+     ------------------------------------------------------- */
+  window.bpSetPortalModeV1030=function(mode){
+    ensurePortalSOUIV1030();
+
+    portalMode=mode==='sales'?'sales':'quote';
+
+    const portal=$('branchportal');
+    portal?.classList.toggle('bp-portal-sales-mode-v1030',portalMode==='sales');
+
+    const q=$('bpModeQuoteV1030');
+    const s=$('bpModeSalesV1030');
+
+    if(q){
+      q.className=portalMode==='quote'?'btn primary':'btn ghost';
+      q.setAttribute('aria-pressed',portalMode==='quote'?'true':'false');
+    }
+
+    if(s){
+      s.className=portalMode==='sales'?'btn primary':'btn ghost';
+      s.setAttribute('aria-pressed',portalMode==='sales'?'true':'false');
+    }
+
+    try{
+      localStorage.setItem(
+        MODE_KEY_PREFIX+(currentUser?.username||'guest'),
+        portalMode
+      );
+    }catch(_){}
+
+    if(portalMode==='sales'){
+      bpSoRefreshV1030();
+    }else{
+      try{window.bpCalculate?.()}catch(_){}
+      try{window.renderBpCart?.()}catch(_){}
+      try{window.refreshBranchCustomerProfiles?.()}catch(_){}
+    }
+  };
+
+  function restorePortalModeV1030(){
+    let mode='quote';
+    try{
+      mode=localStorage.getItem(
+        MODE_KEY_PREFIX+(currentUser?.username||'guest')
+      )||'quote';
+    }catch(_){}
+    bpSetPortalModeV1030(mode);
+  }
+
+  /* -------------------------------------------------------
+     Sales Order customer + item source
+     ------------------------------------------------------- */
+  window.bpSoCustomerChangedV1030=function(){
+    if(soCart.length){
+      /* The customer selector is disabled once items are added, so this
+         path is mainly a safety backstop. */
+      return;
+    }
+
+    lastSOEligibleCustomerId=$('bpSoCustomerV1030')?.value||'';
+    soDeliveries=[];
+    ensureDeliveryBaseV1030();
+    bpSoRenderEligibleItemsV1030();
+    renderSOCartV1030();
+    renderSODeliveriesV1030();
+  };
+
+  function renderSOCustomerOptionsV1030(){
+    const select=$('bpSoCustomerV1030');
+    if(!select)return;
+
+    const customers=eligibleCustomersV1030();
+    const current=select.value||lastSOEligibleCustomerId||'';
+    const u=userRecordV1030();
+
+    const preferred=
+      customers.some(c=>c.id===current)
+        ? current
+        : (
+            u?.companyLinkType==='customer' &&
+            customers.some(c=>c.id===u.companyLinkId)
+              ? u.companyLinkId
+              : customers[0]?.id||''
+          );
+
+    const html=customers.length
+      ? customers.map(c=>
+          `<option value="${esc(c.id)}">${esc(c.name)}${c.phone?` • ${esc(c.phone)}`:''}</option>`
+        ).join('')
+      : '<option value="">No converted-PI customer available</option>';
+
+    const sig=customers.map(c=>`${c.id}|${c.name}|${c.phone||''}`).join('~');
+
+    selectSetFastV1030(select,html,preferred,sig);
+    select.disabled=soCart.length>0 || !customers.length;
+
+    lastSOEligibleCustomerId=select.value||'';
+
+    if(!soDeliveries.length && select.value){
+      ensureDeliveryBaseV1030();
+    }
+
+    const badge=$('bpSoOrderCustomerBadgeV1030');
+    if(badge){
+      const c=selectedSOCustomerV1030();
+      badge.textContent=c?c.name:'NO ELIGIBLE CUSTOMER';
+    }
+  }
+
+  window.bpSoRenderEligibleItemsV1030=function(){
+    renderSOCustomerOptionsV1030();
+
+    const customerId=$('bpSoCustomerV1030')?.value||'';
+    const search=normalizeV1030($('bpSoItemSearchV1030')?.value||'');
+
+    let items=customerId?eligibleItemsV1030(customerId):[];
+
+    if(search){
+      items=items.filter(x=>
+        [
+          x.desc,x.size,x.material,x.layout,x.pcs,
+          x.sourcePISerial,x.sourceQuoteSerial,x.priceTier
+        ].join(' ').toLowerCase().includes(search)
+      );
+    }
+
+    soItemCache=items;
+
+    const sourceCount=new Set(items.map(x=>x.sourcePIId)).size;
+    const summary=$('bpSoEligibleSummaryV1030');
+    if(summary){
+      summary.innerHTML=customerId
+        ? `<b>${items.length}</b> repeat item${items.length===1?'':'s'} from <b>${sourceCount}</b> converted PI${sourceCount===1?'':'s'}.`
+        : 'No eligible customer selected.';
+    }
+
+    const box=$('bpSoEligibleItemsV1030');
+    if(!box)return;
+
+    box.innerHTML=items.length
+      ? items.map((x,i)=>`
+          <div class="bp-so-eligible-item-v1030">
+            <div class="bp-so-item-main-v1030">
+              <b>${esc([x.desc,x.size,x.material,x.layout,x.pcs?x.pcs+' pcs':''].filter(Boolean).join(' • '))}</b>
+              <div class="small">
+                Approved from ${esc(x.sourcePISerial)}
+                ${x.sourcePIDate?` • ${esc(x.sourcePIDate)}`:''}
+                ${x.sourceQuoteSerial?` • Quote ${esc(x.sourceQuoteSerial)}`:''}
+              </div>
+              <div class="bp-so-approved-price-v1030">
+                LKR ${money(x.price)} / ${esc(x.unit||'Unit')}
+                <span>${esc(x.priceTier||'Approved PI Price')}</span>
+              </div>
+            </div>
+
+            <div class="bp-so-add-controls-v1030">
+              <label>Qty</label>
+              <input id="bpSoAddQtyV1030_${i}" type="number" min="0.01" step="0.01" value="1">
+              <button class="btn primary sm" type="button" onclick="bpSoAddItemV1030(${i})">+ Add</button>
+            </div>
+          </div>
+        `).join('')
+      : '<div class="empty">No previously approved items found for this customer. Only quotation → PI history belonging to this portal user is shown.</div>';
+  };
+
+  window.bpSoAddItemV1030=function(index){
+    const src=soItemCache[Number(index)];
+    if(!src)return;
+
+    const qty=Math.max(
+      0,
+      Number($(`bpSoAddQtyV1030_${index}`)?.value||0)
+    );
+
+    if(!(qty>0))return toast('Enter a valid quantity');
+
+    const existing=soCart.find(x=>x.cartKey===src.cartKey);
+
+    if(existing){
+      existing.qty=Number(existing.qty||0)+qty;
+    }else{
+      soCart.push({...src,qty});
+    }
+
+    ensureDeliveryBaseV1030();
+    rebalanceAllocationsV1030();
+    renderSOCartV1030();
+    renderSODeliveriesV1030();
+    renderSOCustomerOptionsV1030();
+    toast('Item added to Sales Order');
+  };
+
+  window.bpSoSetQtyV1030=function(index,value){
+    const line=soCart[Number(index)];
+    if(!line)return;
+
+    const qty=Math.max(0,Number(value||0));
+    if(!(qty>0))return;
+
+    line.qty=qty;
+    rebalanceAllocationsV1030();
+    renderSOCartV1030();
+    renderSODeliveriesV1030();
+  };
+
+  window.bpSoRemoveItemV1030=function(index){
+    index=Number(index);
+    if(!Number.isInteger(index) || index<0 || index>=soCart.length)return;
+
+    soCart.splice(index,1);
+    rebalanceAllocationsV1030();
+    renderSOCartV1030();
+    renderSODeliveriesV1030();
+    renderSOCustomerOptionsV1030();
+    toast('Item removed from Sales Order');
+  };
+
+  function renderSOCartV1030(){
+    const box=$('bpSoSelectedItemsV1030');
+    if(!box)return;
+
+    box.innerHTML=soCart.length
+      ? `
+        <div class="bp-so-selected-list-v1030">
+          ${soCart.map((l,i)=>`
+            <div class="bp-so-selected-line-v1030">
+              <div>
+                <b>${esc([l.desc,l.size,l.material,l.layout,l.pcs?l.pcs+' pcs':''].filter(Boolean).join(' • '))}</b>
+                <div class="small">Locked: ${esc(l.sourcePISerial)} • LKR ${money(l.price)} / ${esc(l.unit)}</div>
+              </div>
+              <div class="field">
+                <label>Qty</label>
+                <input type="number" min="0.01" step="0.01" value="${Number(l.qty||1)}" onchange="bpSoSetQtyV1030(${i},this.value)">
+              </div>
+              <div class="bp-so-line-amount-v1030">
+                <span>Amount</span>
+                <b>LKR ${money(Number(l.qty||0)*Number(l.price||0))}</b>
+              </div>
+              <button class="btn red sm" type="button" onclick="bpSoRemoveItemV1030(${i})">×</button>
+            </div>
+          `).join('')}
+        </div>
+      `
+      : '<div class="empty">Use the + Add buttons on the left to select repeat-order items.</div>';
+
+    if($('bpSoTotalV1030')){
+      $('bpSoTotalV1030').textContent=`LKR ${money(orderTotalV1030())}`;
+    }
+  }
+
+  /* -------------------------------------------------------
+     Multiple delivery addresses + item allocation
+     ------------------------------------------------------- */
+  window.bpSoAddDeliveryV1030=function(){
+    const c=selectedSOCustomerV1030();
+    if(!c)return toast('Select an eligible customer first');
+
+    ensureDeliveryBaseV1030();
+    soDeliveries.push(newDeliveryV1030(null,false));
+    rebalanceAllocationsV1030();
+    renderSODeliveriesV1030();
+
+    setTimeout(()=>{
+      const list=$('bpSoDeliveriesV1030');
+      list?.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
+    },20);
+  };
+
+  window.bpSoRemoveDeliveryV1030=function(index){
+    index=Number(index);
+    if(index<=0 || index>=soDeliveries.length)return;
+
+    soDeliveries.splice(index,1);
+    rebalanceAllocationsV1030();
+    renderSODeliveriesV1030();
+  };
+
+  window.bpSoUpdateDeliveryV1030=function(index,field,value){
+    const d=soDeliveries[Number(index)];
+    if(!d)return;
+    if(!['name','line1','line2','contact1','contact2'].includes(field))return;
+    d[field]=String(value??'');
+  };
+
+  window.bpSoSetAllocationV1030=function(index,encodedKey,value){
+    index=Number(index);
+    if(index<=0 || index>=soDeliveries.length)return;
+
+    const key=decodeURIComponent(encodedKey);
+    const line=lineByKeyV1030(key);
+    if(!line)return;
+
+    let desired=Math.max(0,Number(value||0));
+
+    const usedByOtherExtras=soDeliveries
+      .slice(1)
+      .filter((_,i)=>i+1!==index)
+      .reduce((s,d)=>s+Number(d.allocations?.[key]||0),0);
+
+    const max=Math.max(0,Number(line.qty||0)-usedByOtherExtras);
+    desired=Math.min(desired,max);
+
+    soDeliveries[index].allocations[key]=desired;
+
+    rebalanceAllocationsV1030();
+    renderSODeliveriesV1030();
+  };
+
+  function renderSODeliveriesV1030(){
+    const box=$('bpSoDeliveriesV1030');
+    if(!box)return;
+
+    const c=selectedSOCustomerV1030();
+
+    if(!c){
+      box.innerHTML='<div class="empty">Select an eligible customer.</div>';
+      return;
+    }
+
+    ensureDeliveryBaseV1030();
+    rebalanceAllocationsV1030();
+
+    box.innerHTML=soDeliveries.map((d,di)=>{
+      const total=deliveryAllocatedV1030(d);
+
+      return `
+        <div class="bp-so-delivery-card-v1030">
+          <div class="bp-so-delivery-title-v1030">
+            <div>
+              <b>Delivery ${di+1}${di===0?' • Primary / Remaining':''}</b>
+              <span>${di===0?'Registered customer delivery is prefilled. Remaining item quantities stay here automatically.':'Enter another delivery address and allocate quantities below.'}</span>
+            </div>
+            ${di>0?`<button class="btn red sm" type="button" onclick="bpSoRemoveDeliveryV1030(${di})">Remove Address</button>`:''}
+          </div>
+
+          <div class="bp-delivery-grid">
+            <div class="field full">
+              <label>Customer / Receiver Name <span class="required-dot">*</span></label>
+              <input value="${esc(d.name||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'name',this.value)">
+            </div>
+            <div class="field">
+              <label>Address Line 1 <span class="required-dot">*</span></label>
+              <input value="${esc(d.line1||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'line1',this.value)">
+            </div>
+            <div class="field">
+              <label>Address Line 2 <span class="required-dot">*</span></label>
+              <input value="${esc(d.line2||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'line2',this.value)">
+            </div>
+            <div class="field">
+              <label>Contact Number <span class="required-dot">*</span></label>
+              <input type="tel" value="${esc(d.contact1||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'contact1',this.value)">
+            </div>
+            <div class="field">
+              <label>Second Contact Number <span class="hint">(Optional)</span></label>
+              <input type="tel" value="${esc(d.contact2||'')}" oninput="bpSoUpdateDeliveryV1030(${di},'contact2',this.value)">
+            </div>
+          </div>
+
+          <div class="bp-so-allocation-head-v1030">
+            <b>Allocate Selected Items</b>
+            <span>Total allocated to this address: ${money(total)}</span>
+          </div>
+
+          <div class="bp-so-allocation-list-v1030">
+            ${soCart.length
+              ? soCart.map(line=>{
+                  const qty=Number(d.allocations?.[line.cartKey]||0);
+                  const encoded=encodeURIComponent(line.cartKey);
+
+                  const otherExtra=soDeliveries
+                    .slice(1)
+                    .filter((_,i)=>i+1!==di)
+                    .reduce((s,x)=>s+Number(x.allocations?.[line.cartKey]||0),0);
+
+                  const max=Math.max(0,Number(line.qty||0)-otherExtra);
+
+                  return `
+                    <div class="bp-so-allocation-row-v1030">
+                      <div>
+                        <b>${esc([line.desc,line.size,line.material].filter(Boolean).join(' • '))}</b>
+                        <span>Ordered ${money(line.qty)} ${esc(line.unit)}${di===0?' • automatic remaining':''}</span>
+                      </div>
+                      <div class="field">
+                        <label>Qty to Delivery ${di+1}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          ${di===0?'readonly':''}
+                          ${di>0?`max="${max}"`:''}
+                          value="${qty}"
+                          ${di>0?`onchange="bpSoSetAllocationV1030(${di},'${encoded}',this.value)"`:''}
+                        >
+                      </div>
+                    </div>
+                  `;
+                }).join('')
+              : '<div class="empty">Add Sales Order items first.</div>'
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  /* -------------------------------------------------------
+     Sales Order submit → existing state.salesOrders +
+     existing Order Fulfilment architecture.
+     ------------------------------------------------------- */
+  function nextSONoV1030(){
+    const prefix=`SC/SO/${today().replaceAll('-','')}/`;
+    const used=new Set((state.salesOrders||[]).map(x=>x.soNo));
+    let n=Math.max(1,(state.salesOrders||[]).length+1);
+
+    while(used.has(prefix+String(n).padStart(3,'0')))n++;
+
+    return prefix+String(n).padStart(3,'0');
+  }
+
+  function nextOFNoV1030(){
+    const prefix=`SC/OF/${today().slice(0,4)}/`;
+    const used=new Set((state.dealerFulfilments||[]).map(x=>x.planNo));
+    let n=Math.max(1,(state.dealerFulfilments||[]).length+1);
+
+    while(used.has(prefix+String(n).padStart(4,'0')))n++;
+
+    return prefix+String(n).padStart(4,'0');
+  }
+
+  function validateSOAllocationsV1030(){
+    if(!soCart.length)return 'Add at least one repeat-order item.';
+
+    for(const line of soCart){
+      const allocated=soDeliveries.reduce(
+        (s,d)=>s+Number(d.allocations?.[line.cartKey]||0),
+        0
+      );
+
+      if(Math.abs(allocated-Number(line.qty||0))>0.001){
+        return `${[line.desc,line.size].filter(Boolean).join(' ')} is not fully allocated. Ordered ${money(line.qty)}, allocated ${money(allocated)}.`;
+      }
+    }
+
+    for(let i=0;i<soDeliveries.length;i++){
+      const d=soDeliveries[i];
+      const total=deliveryAllocatedV1030(d);
+      if(!(total>0))continue;
+
+      if(!String(d.name||'').trim())return `Delivery ${i+1}: Customer / Receiver Name is required.`;
+      if(!String(d.line1||'').trim())return `Delivery ${i+1}: Address Line 1 is required.`;
+      if(!String(d.line2||'').trim())return `Delivery ${i+1}: Address Line 2 is required.`;
+      if(!String(d.contact1||'').trim())return `Delivery ${i+1}: Contact Number is required.`;
+    }
+
+    return '';
+  }
+
+  function createPortalFulfilmentV1030(so){
+    const plan={
+      id:uid('df'),
+      planNo:nextOFNoV1030(),
+      piId:'',
+      piSerial:so.soNo,
+      sourceType:'SO',
+      sourceSOId:so.id,
+      sourceSerial:so.soNo,
+      dealerId:so.customerId,
+      dealerName:so.customerName,
+      dealerPhone:so.customerPhone,
+      poRef:so.customerRef||'',
+      method:so.method,
+      instructions:so.note||'',
+      ownerUser:so.ownerUser,
+      ownerDisplay:so.ownerDisplay,
+      lines:so.lines.map(l=>({
+        desc:l.desc,
+        size:l.size,
+        material:l.material,
+        layout:l.layout,
+        pcs:l.pcs,
+        qty:l.qty,
+        unit:l.unit
+      })),
+      consignments:[],
+      createdAt:new Date().toISOString(),
+      createdBy:currentUser?.display||currentUser?.username||'',
+      erpSONo:so.erpSONo||''
+    };
+
+    so.deliveries.forEach((d,di)=>{
+      const allocations=(d.allocations||[])
+        .map(a=>({
+          lineIndex:Number(a.lineIndex),
+          qty:Number(a.qty||0)
+        }))
+        .filter(a=>a.qty>0);
+
+      if(!allocations.length)return;
+
+      plan.consignments.push({
+        id:uid('con'),
+        consignmentNo:`${plan.planNo}/S${String(plan.consignments.length+1).padStart(2,'0')}`,
+        recipient:d.name,
+        phone:d.contact1,
+        phone2:d.contact2||'',
+        address:[d.line1,d.line2].filter(Boolean).join(', '),
+        map:'',
+        payer:'Customer',
+        charge:0,
+        blind:false,
+        allocations,
+        status:'Awaiting Instructions',
+        courier:'',
+        tracking:'',
+        dispatchDate:'',
+        expectedDate:'',
+        deliveredDate:'',
+        receiver:'',
+        deliveredQty:0,
+        note:so.note||'',
+        proof:null,
+        packageImages:[],
+        history:[],
+        updatedAt:new Date().toISOString(),
+        updatedBy:currentUser?.display||currentUser?.username||''
+      });
+    });
+
+    state.dealerFulfilments=state.dealerFulfilments||[];
+    state.dealerFulfilments.unshift(plan);
+
+    return plan;
+  }
+
+  window.bpSoSubmitV1030=function(){
+    const customer=selectedSOCustomerV1030();
+    if(!customer)return toast('Select an eligible customer');
+
+    rebalanceAllocationsV1030();
+
+    const error=validateSOAllocationsV1030();
+    const warn=$('bpSoValidationV1030');
+
+    if(error){
+      if(warn){
+        warn.innerHTML=`<div class="bp-so-validation-error-v1030">${esc(error)}</div>`;
+      }
+      return toast(error);
+    }
+
+    if(warn)warn.innerHTML='';
+
+    /* Revalidate every price source immediately before saving. */
+    const validItems=eligibleItemsV1030(customer.id);
+    const validPIIds=new Set(convertedPISourcesV1030()
+      .filter(pi=>pi.customerId===customer.id)
+      .map(pi=>pi.id)
+    );
+
+    if(soCart.some(l=>!validPIIds.has(l.sourcePIId))){
+      return toast('An approved PI source is no longer available. Refresh the Sales Order and try again.');
+    }
+
+    const sourcePIIds=[...new Set(soCart.map(l=>l.sourcePIId))];
+    const sourcePISerials=[...new Set(soCart.map(l=>l.sourcePISerial).filter(Boolean))];
+
+    const activeDeliveries=soDeliveries
+      .map((d,di)=>{
+        const allocations=soCart.map((line,lineIndex)=>({
+          lineKey:line.cartKey,
+          lineIndex,
+          qty:Number(d.allocations?.[line.cartKey]||0)
+        })).filter(a=>a.qty>0);
+
+        return {
+          id:d.id,
+          sequence:di+1,
+          primary:di===0,
+          name:String(d.name||'').trim(),
+          line1:String(d.line1||'').trim(),
+          line2:String(d.line2||'').trim(),
+          contact1:String(d.contact1||'').trim(),
+          contact2:String(d.contact2||'').trim(),
+          allocations
+        };
+      })
+      .filter(d=>d.allocations.length);
+
+    const first=activeDeliveries[0];
+    const now=new Date().toISOString();
+
+    const so={
+      id:uid('so'),
+      soNo:nextSONoV1030(),
+      date:$('bpSoDateV1030')?.value||today(),
+      needDate:$('bpSoNeedDateV1030')?.value||'',
+      customerRef:$('bpSoRefV1030')?.value.trim()||'',
+      customerId:customer.id,
+      customerName:customer.name,
+      customerPhone:customer.phone||'',
+
+      sourcePIId:sourcePIIds[0]||'',
+      sourcePISerial:
+        sourcePISerials.length===1
+          ? sourcePISerials[0]
+          : `${sourcePISerials.length} Approved PIs`,
+      sourcePIIds,
+      sourcePISerials,
+
+      method:activeDeliveries.length>1?MIXED:DIRECT,
+
+      shipTo:{
+        name:first?.name||customer.name,
+        phone:first?.contact1||customer.phone||'',
+        phone2:first?.contact2||'',
+        address:[first?.line1,first?.line2].filter(Boolean).join(', '),
+        map:''
+      },
+
+      deliveries:activeDeliveries,
+
+      note:$('bpSoNoteV1030')?.value.trim()||'',
+
+      lines:soCart.map(l=>({
+        kind:l.kind||'label',
+        itemId:l.itemId||'',
+        desc:l.desc||'ELP',
+        size:l.size||'',
+        material:l.material||'',
+        layout:l.layout||'',
+        pcs:l.pcs||'',
+        unit:l.unit||'Rolls',
+        qty:Number(l.qty||0),
+        price:Number(l.price||0),
+        priceTier:l.priceTier||'Approved PI Price',
+        use:true,
+        sourcePIId:l.sourcePIId,
+        sourcePISerial:l.sourcePISerial,
+        sourceQuoteId:l.sourceQuoteId||'',
+        sourceQuoteSerial:l.sourceQuoteSerial||''
+      })),
+
+      total:orderTotalV1030(),
+
+      ownerUser:currentUser?.username||'',
+      ownerDisplay:currentUser?.display||currentUser?.username||'',
+
+      portalSource:'Approved Prices',
+      portalSalesOrder:true,
+
+      erpStatus:'Pending ERP Sync',
+      erpSONo:'',
+      erpMessage:'',
+
+      createdAt:now,
+      updatedAt:now,
+      history:[
+        {
+          action:'Created from Approved Prices Portal',
+          by:currentUser?.display||currentUser?.username||'',
+          username:currentUser?.username||'',
+          at:now
+        }
+      ]
+    };
+
+    state.salesOrders=state.salesOrders||[];
+    state.salesOrders.unshift(so);
+
+    const plan=createPortalFulfilmentV1030(so);
+    so.fulfilmentPlanId=plan.id;
+
+    audit(
+      'CREATE_PORTAL_SALES_ORDER',
+      `${so.soNo} • ${so.customerName} • ${so.lines.length} item(s) • ${activeDeliveries.length} delivery address(es)`
+    );
+
+    saveState();
+
+    soCart=[];
+    soDeliveries=[];
+    soPage=1;
+
+    ['bpSoNeedDateV1030','bpSoRefV1030','bpSoNoteV1030'].forEach(id=>{
+      if($(id))$(id).value='';
+    });
+    if($('bpSoDateV1030'))$('bpSoDateV1030').value=today();
+
+    ensureDeliveryBaseV1030();
+
+    bpSoRefreshV1030();
+
+    try{renderSalesOrders91?.()}catch(_){}
+    try{renderDealerFulfilment?.()}catch(_){}
+
+    toast(`${so.soNo} submitted and linked to Order Fulfilment`);
+  };
+
+  window.bpSoClearV1030=function(){
+    if(soCart.length && !confirm('Clear the current Sales Order items and delivery allocations?'))return;
+
+    soCart=[];
+    soDeliveries=[];
+
+    ['bpSoNeedDateV1030','bpSoRefV1030','bpSoNoteV1030'].forEach(id=>{
+      if($(id))$(id).value='';
+    });
+
+    ensureDeliveryBaseV1030();
+    bpSoRefreshV1030();
+  };
+
+  /* -------------------------------------------------------
+     My Sales Orders pagination + view
+     ------------------------------------------------------- */
+  function mySalesOrdersV1030(){
+    const username=currentUser?.username||'';
+
+    return (state.salesOrders||[])
+      .filter(x=>
+        currentUser?.role==='admin'
+          ? true
+          : x.ownerUser===username
+      )
+      .sort((a,b)=>
+        Date.parse(b.updatedAt||b.createdAt||b.date||0) -
+        Date.parse(a.updatedAt||a.createdAt||a.date||0)
+      );
+  }
+
+  function portalSOStatusV1030(so){
+    const p=(state.dealerFulfilments||[]).find(x=>x.id===so.fulfilmentPlanId || x.sourceSOId===so.id);
+    const statuses=(p?.consignments||[]).map(c=>c.status||'');
+
+    if(statuses.length && statuses.every(x=>x==='Delivered'))return 'Delivered';
+    if(statuses.some(x=>['Handed to Courier','In Transit'].includes(x)))return 'In Transit';
+    if(statuses.some(x=>x==='Ready for Dispatch'))return 'Ready for Dispatch';
+
+    return so.erpStatus||'Pending ERP Sync';
+  }
+
+  window.bpSoSetPageV1030=function(page){
+    const all=mySalesOrdersV1030();
+    const pages=Math.max(1,Math.ceil(all.length/SO_PAGE_SIZE));
+    soPage=Math.max(1,Math.min(pages,Number(page)||1));
+    renderMySalesOrdersV1030();
+  };
+
+  function renderMySalesOrdersV1030(){
+    const box=$('bpSoMyOrdersV1030');
+    if(!box)return;
+
+    const all=mySalesOrdersV1030();
+    const pages=Math.max(1,Math.ceil(all.length/SO_PAGE_SIZE));
+
+    if(soPage>pages)soPage=pages;
+    if(soPage<1)soPage=1;
+
+    const start=(soPage-1)*SO_PAGE_SIZE;
+    const rows=all.slice(start,start+SO_PAGE_SIZE);
+
+    box.innerHTML=rows.length
+      ? `
+        <div class="bp-so-history-list-v1030">
+          ${rows.map(so=>`
+            <div class="portal-item bp-so-history-row-v1030">
+              <div>
+                <b>${esc(so.soNo||'Sales Order')}</b>
+                <div class="small">
+                  ${esc(so.date||'')}
+                  • ${esc(so.customerName||'')}
+                  • ${Number(so.lines?.length||0)} item${Number(so.lines?.length||0)===1?'':'s'}
+                </div>
+                <div class="small">
+                  LKR ${money(so.total||0)}
+                  • ${esc(portalSOStatusV1030(so))}
+                  ${so.erpSONo?` • ERP ${esc(so.erpSONo)}`:''}
+                </div>
+              </div>
+              <button class="btn ghost sm" type="button" onclick="bpSoViewOrderV1030('${so.id}')">View</button>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="bp-so-pager-v1030">
+          <span>Showing ${start+1}-${Math.min(start+rows.length,all.length)} of ${all.length}</span>
+          <div>
+            <button class="btn ghost sm" type="button" onclick="bpSoSetPageV1030(${soPage-1})" ${soPage<=1?'disabled':''}>← Previous</button>
+            <span>Page <b>${soPage}</b> / ${pages}</span>
+            <button class="btn ghost sm" type="button" onclick="bpSoSetPageV1030(${soPage+1})" ${soPage>=pages?'disabled':''}>Next →</button>
+          </div>
+        </div>
+      `
+      : '<div class="empty">No Sales Orders submitted yet.</div>';
+  }
+
+  window.bpSoViewOrderV1030=function(id){
+    const so=(state.salesOrders||[]).find(x=>x.id===id);
+    if(!so)return;
+
+    if(currentUser?.role!=='admin' && so.ownerUser!==currentUser?.username){
+      return toast('This Sales Order is not available to this user');
+    }
+
+    $('bpSoViewTitleV1030').textContent=so.soNo||'Sales Order';
+    $('bpSoViewMetaV1030').textContent=
+      `${so.date||''} • ${so.customerName||''} • ${portalSOStatusV1030(so)}`;
+
+    const p=(state.dealerFulfilments||[]).find(x=>x.id===so.fulfilmentPlanId || x.sourceSOId===so.id);
+    const deliveries=so.deliveries||[];
+
+    $('bpSoViewBodyV1030').innerHTML=`
+      <div class="section">Items</div>
+      <table class="table">
+        <thead><tr><th>Item</th><th>Source PI</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${(so.lines||[]).map(l=>`
+            <tr>
+              <td><b>${esc([l.desc,l.size,l.material,l.layout,l.pcs?l.pcs+' pcs':''].filter(Boolean).join(' • '))}</b></td>
+              <td>${esc(l.sourcePISerial||so.sourcePISerial||'-')}</td>
+              <td>${money(l.qty)} ${esc(l.unit||'')}</td>
+              <td>LKR ${money(l.price)}</td>
+              <td><b>LKR ${money(Number(l.qty||0)*Number(l.price||0))}</b></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <div class="sumline">
+        <span>Sales Order Total</span>
+        <strong>LKR ${money(so.total||0)}</strong>
+      </div>
+
+      <div class="section">Delivery Addresses</div>
+      <div class="bp-so-view-deliveries-v1030">
+        ${(deliveries.length?deliveries:(p?.consignments||[]).map((c,i)=>({
+          sequence:i+1,
+          name:c.recipient,
+          line1:c.address,
+          line2:'',
+          contact1:c.phone,
+          contact2:c.phone2||'',
+          allocations:(c.allocations||[]).map(a=>({
+            lineIndex:a.lineIndex,
+            qty:a.qty
+          }))
+        }))).map((d,i)=>`
+          <div class="bp-so-view-delivery-v1030">
+            <b>Delivery ${d.sequence||i+1} • ${esc(d.name||'')}</b>
+            <div>${esc([d.line1,d.line2].filter(Boolean).join(', '))}</div>
+            <div class="small">${esc(d.contact1||'')}${d.contact2?` • ${esc(d.contact2)}`:''}</div>
+            <div class="small" style="margin-top:6px">
+              ${(d.allocations||[]).map(a=>{
+                const l=(so.lines||[])[Number(a.lineIndex)];
+                return l?`${esc([l.desc,l.size].filter(Boolean).join(' '))}: <b>${money(a.qty)} ${esc(l.unit||'')}</b>`:'';
+              }).filter(Boolean).join('<br>')}
+            </div>
+          </div>
+        `).join('')||'<div class="empty">No delivery allocation saved.</div>'}
+      </div>
+    `;
+
+    $('bpSoViewModalV1030').classList.add('show');
+  };
+
+  function bpSoRefreshV1030(){
+    ensurePortalSOUIV1030();
+    renderSOCustomerOptionsV1030();
+    bpSoRenderEligibleItemsV1030();
+    renderSOCartV1030();
+    renderSODeliveriesV1030();
+    renderMySalesOrdersV1030();
+
+    if($('bpSoDateV1030') && !$('bpSoDateV1030').value){
+      $('bpSoDateV1030').value=today();
+    }
+  }
+
+  window.bpSoRefreshV1030=bpSoRefreshV1030;
+
+  /* -------------------------------------------------------
+     Dropdown performance
+     -------------------------------------------------------
+     The application has many nested refresh wrappers. Large selects were
+     repeatedly being rebuilt even when their option set had not changed.
+     These wrappers cache the expensive high-frequency dropdowns while
+     preserving synchronous behaviour required by the existing system.
+     ------------------------------------------------------- */
+
+  /* Customer + customer item dropdowns */
+  if(typeof window.refreshCustomerPick==='function'){
+    const baseRefreshCustomerPickV1030=window.refreshCustomerPick;
+    let lastCustomerPickSigV1030='';
+
+    window.refreshCustomerPick=function(force=false){
+      const selected=$('customerSelect')?.value||'';
+      const cSig=(state.customers||[])
+        .map(c=>`${c.id}|${c.name||''}`)
+        .join('~');
+      const iSig=(state.items||[])
+        .map(i=>`${i.id}|${i.size||''}|${i.material||''}|${i.layout||''}|${i.pcs||''}`)
+        .join('~');
+      const c=(state.customers||[]).find(x=>x.id===selected);
+      const h=c?.priceHistory||[];
+      const hLast=h[h.length-1];
+      const sig=[
+        state.current?.id||'',
+        $('docType')?.value||'',
+        $('quoteCategory')?.value||'',
+        $('payMode')?.value||'',
+        selected,
+        cSig,
+        iSig,
+        h.length,
+        hLast?.changedAt||hLast?.date||''
+      ].join('¦');
+
+      if(!force && sig===lastCustomerPickSigV1030)return;
+
+      const r=baseRefreshCustomerPickV1030.apply(this,arguments);
+      lastCustomerPickSigV1030=sig;
+      return r;
+    };
+
+    try{refreshCustomerPick=window.refreshCustomerPick}catch(_){}
+  }
+
+  /* User → linked company/customer dropdown */
+  if(typeof window.refreshUserCompanyLinkOptions==='function'){
+    const baseCompanyOptionsV1030=window.refreshUserCompanyLinkOptions;
+    let lastCompanySigV1030='';
+
+    window.refreshUserCompanyLinkOptions=function(selected=''){
+      const type=$('userCompanyLinkType')?.value||'customer';
+      const records=type==='introducer'
+        ? (state.introducers||[])
+        : (state.customers||[]);
+
+      const sig=type+'¦'+records
+        .map(x=>`${x.id}|${x.name||''}|${x.phone||''}|${x.active!==false}`)
+        .join('~');
+
+      const select=$('userCompanyLinkId');
+
+      if(sig===lastCompanySigV1030 && select){
+        if(selected && [...select.options].some(o=>o.value===selected)){
+          select.value=selected;
+        }
+        return;
+      }
+
+      lastCompanySigV1030=sig;
+      return baseCompanyOptionsV1030.apply(this,arguments);
+    };
+
+    try{refreshUserCompanyLinkOptions=window.refreshUserCompanyLinkOptions}catch(_){}
+  }
+
+  /* Approved Prices customer-profile dropdown */
+  if(typeof window.refreshBranchCustomerProfiles==='function'){
+    const baseBranchProfilesV1030=window.refreshBranchCustomerProfiles;
+    let lastBranchProfileSigV1030='';
+
+    window.refreshBranchCustomerProfiles=function(force=false){
+      const u=userRecordV1030();
+      const sig=[
+        currentUser?.username||'',
+        u?.companyLinkType||'',
+        u?.companyLinkId||'',
+        u?.lastPortalCustomerKey||'',
+        (state.customers||[])
+          .map(c=>`${c.id}|${c.name||''}|${c.phone||''}|${c.ownerUser||''}|${c.introducerId||''}`)
+          .join('~'),
+        (state.introducers||[])
+          .map(i=>`${i.id}|${i.name||''}|${i.active!==false}`)
+          .join('~')
+      ].join('¦');
+
+      if(!force && sig===lastBranchProfileSigV1030)return;
+
+      const r=baseBranchProfilesV1030.apply(this,arguments);
+      lastBranchProfileSigV1030=sig;
+      return r;
+    };
+
+    try{refreshBranchCustomerProfiles=window.refreshBranchCustomerProfiles}catch(_){}
+  }
+
+  /* Admin profit-document dropdown */
+  if(typeof window.loadAdminPanel==='function'){
+    window.loadAdminPanel=function(){
+      const p=state.settings.pricing||DEFAULT_PRICING;
+      const m=p.materialRates;
+
+      $('admTT').value=m.TT;
+      $('admDTTop').value=m['DT TOP'];
+      $('admPVC').value=m.PVC;
+      $('admDTEco').value=m['DT ECO'];
+      $('admHighstick').value=m.HIGHSTICK;
+      $('admCore').value=p.core;
+      $('admStrap').value=p.strappingRoll;
+      $('admStretch').value=p.stretchFilm;
+      $('admService').value=p.service;
+      $('admScaleService').value=p.scaleService;
+      $('admVat').value=p.vat;
+      $('admSsclShare').value=p.ssclShare;
+      $('admSsclRate').value=p.ssclRate;
+      $('admCommission').value=p.commission;
+
+      const sel=$('profitDoc');
+      const current=sel?.value||'';
+      const docs=state.docs||[];
+      const html=
+        '<option value="">-- Select document --</option>'+
+        docs.map(d=>
+          `<option value="${d.id}">${esc(d.serial)} • ${esc(d.customer?.name||'')} • ${esc(d.date)}</option>`
+        ).join('');
+      const sig=docs.map(d=>`${d.id}|${d.serial}|${d.customer?.name||''}|${d.date||''}`).join('~');
+
+      selectSetFastV1030(sel,html,current,sig);
+
+      try{lastProfitDocId=''}catch(_){}
+      if(typeof renderProfitReport==='function')renderProfitReport();
+    };
+
+    try{loadAdminPanel=window.loadAdminPanel}catch(_){}
+  }
+
+  /* Approved Prices calculator keeps its original closure-owned
+     price-tier state. It is intentionally not replaced here. The main
+     dropdown performance gains come from preventing repeated customer,
+     company-link and Admin document option rebuilds. */
+
+  /* -------------------------------------------------------
+     Integrate with existing view/refresh chain.
+     ------------------------------------------------------- */
+  const showViewV1030=window.showView;
+  if(typeof showViewV1030==='function'){
+    window.showView=function(id){
+      const r=showViewV1030.apply(this,arguments);
+
+      if(id==='branchportal'){
+        ensurePortalSOUIV1030();
+        restorePortalModeV1030();
+      }
+
+      return r;
+    };
+
+    try{showView=window.showView}catch(_){}
+  }
+
+  const refreshAllV1030=window.refreshAll;
+  if(typeof refreshAllV1030==='function'){
+    window.refreshAll=function(){
+      const r=refreshAllV1030.apply(this,arguments);
+
+      if($('branchportal')?.classList.contains('active') && portalMode==='sales'){
+        bpSoRefreshV1030();
+      }
+
+      return r;
+    };
+
+    try{refreshAll=window.refreshAll}catch(_){}
+  }
+
+  /* Dedicated cloud realtime updates may arrive while the portal is open. */
+  const renderSOInternalV1030=window.renderSalesOrders91;
+  if(typeof renderSOInternalV1030==='function'){
+    window.renderSalesOrders91=function(){
+      const r=renderSOInternalV1030.apply(this,arguments);
+
+      if($('branchportal')?.classList.contains('active') && portalMode==='sales'){
+        renderMySalesOrdersV1030();
+      }
+
+      return r;
+    };
+
+    try{renderSalesOrders91=window.renderSalesOrders91}catch(_){}
+  }
+
+  ensurePortalSOUIV1030();
+
+  if($('branchportal')?.classList.contains('active')){
+    restorePortalModeV1030();
+  }
+
 })();
 </script>
 
