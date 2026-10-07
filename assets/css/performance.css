@@ -1,4 +1,0 @@
-/* Performance-only containment. No visual/business-rule changes. */
-.view.active{contain:layout style}
-#quoteList,#piList,#customerList,#itemList,#deviceList,#prodBoard,#productionProductList,#poList,#soList91,#dfList{contain:layout style}
-img{content-visibility:auto}
