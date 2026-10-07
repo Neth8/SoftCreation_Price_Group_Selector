@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.40 - Approved Price Add Actions + Grouped Factory QC Flow -->
+<!-- SoftCreation v1.0.41 - Performance + Products Logistics Access -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.40</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.41</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.40</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.41</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -6326,12 +6326,29 @@ async function spgsStartProductionRealtime(){
     copy.users=(copy.users||[]).map(u=>{const x={...u};delete x.password;return x});
     return copy;
   }
-  function spgsWriteLocal(){
+  /* v1.0.41 performance-safe local backup writer.
+     Business data and cloud sync are unchanged. */
+  let spgsLocalWriteTimerV1041=0;
+  let spgsLocalLastRawV1041='';
+  let spgsLocalPendingV1041=false;
+  function spgsWriteLocalNowV1041(){
+    if(!spgsLocalPendingV1041 && spgsLocalLastRawV1041)return;
+    spgsLocalPendingV1041=false;
+    if(spgsLocalWriteTimerV1041){clearTimeout(spgsLocalWriteTimerV1041);spgsLocalWriteTimerV1041=0}
     try{
       const raw=JSON.stringify(spgsLocalPayload());
-      SPGS_LOCAL_KEYS.forEach(k=>localStorage.setItem(k,raw));
+      if(raw===spgsLocalLastRawV1041)return;
+      SPGS_LOCAL_KEYS.forEach(k=>{try{if(localStorage.getItem(k)!==raw)localStorage.setItem(k,raw)}catch(_){}});
+      spgsLocalLastRawV1041=raw;
     }catch(e){console.warn('SPGS local save failed',e)}
   }
+  function spgsWriteLocal(){
+    spgsLocalPendingV1041=true;
+    if(spgsLocalWriteTimerV1041)return;
+    spgsLocalWriteTimerV1041=setTimeout(spgsWriteLocalNowV1041,60);
+  }
+  window.addEventListener('pagehide',spgsWriteLocalNowV1041);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')spgsWriteLocalNowV1041()});
   function spgsFreshness(x){
     if(!x||typeof x!=='object')return 0;
     let best=0;
@@ -17470,4 +17487,21 @@ window.toggleBpSeparateDeliveryButton = function(){
 })();
 </script>
 
+<script>
+(function(){
+'use strict';
+const SC1041=window.SC1041=window.SC1041||{version:'1.0.41',productDispatchModalId:'scProductDispatchChooserV1041'};
+function byId(id){return document.getElementById(id)}
+function activeView(){return document.querySelector('.view.active')?.id||'dashboard'}
+function availableForDispatchV1041(r){try{if(typeof productionAvailableV81==='function')return Number(productionAvailableV81(r)||0)}catch(_){}const dispatched=(r?.dispatches||[]).reduce((n,d)=>n+Number(d?.qty||0),0);return Math.max(0,Number(r?.finishedQty||r?.packing?.total||0)-dispatched)}
+function dispatchableJobsV1041(g){return (g?.jobs||[]).filter(r=>['Finished','Dispatched'].includes(String(r?.status||''))&&availableForDispatchV1041(r)>0)}
+function ensureDispatchChooserV1041(){if(byId(SC1041.productDispatchModalId))return;const host=document.createElement('div');host.id=SC1041.productDispatchModalId;host.className='modal';host.innerHTML=`<div class="modal-card" style="width:min(900px,96vw)"><div class="modal-head"><div><b>Product Dispatch / Logistics</b><div id="scProductDispatchMetaV1041" class="small"></div></div><button class="btn ghost sm" type="button" onclick="closeModal('${SC1041.productDispatchModalId}')">Close</button></div><div id="scProductDispatchBodyV1041" class="panel-body"></div></div>`;document.body.appendChild(host)}
+window.openProductDispatchV1041=function(encodedKey){if(typeof productionProductGroupsV103!=='function')return toast('Products data is not ready yet');const key=decodeURIComponent(encodedKey),g=productionProductGroupsV103().find(x=>x.key===key);if(!g)return toast('Product batch was not found');const jobs=dispatchableJobsV1041(g);if(!jobs.length)return toast('No finished balance is ready for dispatch');if(jobs.length===1&&typeof openDispatchLoadingV81==='function')return openDispatchLoadingV81(jobs[0].id);ensureDispatchChooserV1041();byId('scProductDispatchMetaV1041').textContent=`${g.size} • ${g.material} • ${g.layout} • ${Number(g.pcs||0).toLocaleString()} pcs / ${g.unit}`;byId('scProductDispatchBodyV1041').innerHTML=`<div class="notice" style="margin-bottom:10px">Choose the exact finished production order to dispatch. The existing dispatch workflow and packing balances are used unchanged.</div><div class="sc-product-dispatch-list">${jobs.map(r=>`<div class="sc-product-dispatch-row"><div><b>${typeof esc==='function'?esc(r.orderNo||'-'):(r.orderNo||'-')}</b><div class="small">${typeof esc==='function'?esc(r.customerName||'-'):(r.customerName||'-')} • PI ${typeof esc==='function'?esc(r.piSerial||'-'):(r.piSerial||'-')} • Status ${typeof esc==='function'?esc(r.status||'-'):(r.status||'-')}</div></div><div class="sc-product-dispatch-actions"><span class="tag">Available ${typeof money==='function'?money(availableForDispatchV1041(r)):availableForDispatchV1041(r)} ${typeof esc==='function'?esc(r.unit||'Rolls'):(r.unit||'Rolls')}</span><button class="btn navy sm" type="button" onclick="closeModal('${SC1041.productDispatchModalId}');openDispatchLoadingV81('${r.id}')">Dispatch</button></div></div>`).join('')}</div>`;byId(SC1041.productDispatchModalId).classList.add('show')};
+function enhanceProductCardsV1041(){const grid=byId('productionProductsGrid');if(!grid||typeof productionProductGroupsV103!=='function')return;const groups=productionProductGroupsV103(),q=String(byId('productionProductsSearch')?.value||'').trim().toLowerCase(),material=byId('productionProductsMaterial')?.value||'',filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc,...g.jobs.map(r=>r.customerName||''),...g.jobs.map(r=>r.piSerial||'')].join(' ').toLowerCase().includes(q))),cards=[...grid.querySelectorAll('.pp-card')];cards.forEach((card,index)=>{const g=filtered[index];if(!g)return;const jobs=dispatchableJobsV1041(g);if(!jobs.length)return;const foot=card.querySelector('.pp-card-foot');if(!foot||foot.querySelector('.sc-product-dispatch-btn'))return;const noActive=[...foot.querySelectorAll('.tag')].find(x=>String(x.textContent||'').trim()==='No active work');if(noActive)noActive.remove();const btn=document.createElement('button');btn.className='btn navy sm sc-product-dispatch-btn';btn.type='button';btn.textContent=jobs.length===1?'Dispatch':'Dispatch / Logistics';btn.onclick=()=>window.openProductDispatchV1041(encodeURIComponent(g.key));foot.appendChild(btn)})}
+const productRenderV1041=window.renderProductionProducts;if(typeof productRenderV1041==='function'){window.renderProductionProducts=function(){const r=productRenderV1041.apply(this,arguments);try{enhanceProductCardsV1041()}catch(e){console.warn('Products logistics enhancement failed',e)}return r};try{renderProductionProducts=window.renderProductionProducts}catch(_){}}
+const productGridV1041=byId('productionProductsGrid');if(productGridV1041){let queued=false;const obs=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;try{enhanceProductCardsV1041()}catch(_){}})});obs.observe(productGridV1041,{childList:true})}
+window.refreshAll=function(){try{if(typeof updateStats==='function')updateStats()}catch(_){}try{switch(activeView()){case'dashboard':window.renderDashboardReport?.();window.renderApprovalInbox?.();break;case'editor':window.refreshCustomerPick?.();break;case'quotations':case'pis':window.renderDocLists?.();break;case'customers':window.renderCustomers?.();break;case'items':window.renderItems?.();break;case'devices':window.renderDevices?.();break;case'admin':window.loadAdminPanel?.();break;case'settings':window.renderUsers?.();window.loadSettingsUI?.();window.refreshUserCompanyLinkOptions?.();break;case'categories':window.renderCategories?.();break;case'products':window.renderProducts?.();break;case'production':window.renderProductionBoard?.();break;case'productionproducts':window.renderProductionProducts?.();break;case'stores':window.renderStoresQueueV8?.();break;case'introducers':window.renderIntroducersV84?.();break;case'branchportal':window.renderPortalMasters?.();window.renderBpCart?.();window.renderMyBranchRequests?.();window.refreshBranchCustomerProfiles?.();break;case'quoterequests':window.renderBranchRequests?.();break;case'purchaseorders':window.renderPurchaseOrders?.();break;case'dealerfulfilment':window.renderDealerFulfilment?.();break;case'salesorders':window.renderSalesOrders91?.();break}}catch(e){console.warn('SoftCreation visible-view refresh failed',e)}};try{refreshAll=window.refreshAll}catch(_){}
+ensureDispatchChooserV1041();try{enhanceProductCardsV1041()}catch(_){}
+})();
+</script>
 </body></html>

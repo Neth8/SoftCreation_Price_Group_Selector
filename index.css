@@ -4513,3 +4513,7 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   }
 }
 
+
+
+/* v1.0.41 Products Logistics chooser */
+.sc-product-dispatch-list{display:grid;gap:8px}.sc-product-dispatch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}.sc-product-dispatch-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}@media(max-width:650px){.sc-product-dispatch-row{align-items:flex-start;flex-direction:column}.sc-product-dispatch-actions{width:100%;justify-content:space-between}}#productionProductsGrid,#prodBoard,#storesQueue,#quoteList,#piList,#customerList,#itemList,#deviceList,#poList,#soList91{contain:layout style}
