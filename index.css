@@ -4514,7 +4514,7 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 }
 
 /* =====================================================================
-   SOFTCREATION NATIVE FACTORY CONSUMPTION MODULE v1.1
+   SOFTCREATION NATIVE FACTORY MODULE
    ===================================================================== */
 #factory .factory-title-row>div:first-child{display:flex;flex-direction:column;gap:2px}
 #factory .factory-title-row small{font-size:10px;color:rgba(255,255,255,.78);font-weight:650}
@@ -4530,11 +4530,10 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .factory-kpis{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;margin-bottom:14px}
 .factory-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;box-shadow:0 6px 18px rgba(21,54,66,.06)}
 .factory-kpi span{display:block;font-size:10px;color:var(--muted);font-weight:900;text-transform:uppercase}
-.factory-kpi b{display:block;font-size:21px;margin-top:5px}
+.factory-kpi b{display:block;font-size:24px;margin-top:5px}
 .factory-kpi small{font-size:10px;color:var(--muted)}
 .factory-inner-panel{box-shadow:none;margin-bottom:14px}
 .factory-form-grid{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:10px;margin-bottom:10px}
-.factory-form-grid-job{grid-template-columns:minmax(360px,2fr) minmax(180px,.7fr)}
 .factory-field{display:flex;flex-direction:column;gap:5px}
 .factory-field label{font-size:11px;font-weight:900;color:#4b5d70}
 .factory-field input,.factory-field select,.factory-field textarea,#factory select,#factory input,#factory textarea{width:100%;border:1px solid #cfdde2;border-radius:10px;background:#fbfdfe;padding:9px 10px;outline:none}
@@ -4543,39 +4542,37 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .factory-table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:11px}
 .factory-table th,.factory-table td{padding:9px 10px;border-bottom:1px solid #e0eaec;text-align:left;vertical-align:top}
 .factory-table th{background:#f2f8f8;color:#5c7078;font-size:10px;text-transform:uppercase;position:sticky;top:0}
-.factory-report-toolbar{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
-.factory-report-toolbar>select{max-width:620px}
-.factory-report-toolbar .factory-field{min-width:170px}
+.factory-master-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.factory-master-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.factory-report-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.factory-report-toolbar select{max-width:620px}
 .factory-job-head{border:1px solid #cfe2e4;background:#f7fbfb;border-radius:11px;padding:10px 12px;margin-bottom:10px}
 .factory-job-head b{display:block;font-size:14px;color:#087f83}
 .factory-job-head span{display:block;margin-top:3px;font-size:10px;color:#657780}
+.factory-cost-total{display:flex;justify-content:flex-end;gap:18px;align-items:center;margin-top:12px;padding:12px;border-top:1px dashed #cbdfe2}
+.factory-cost-total span{font-size:11px;color:var(--muted);font-weight:850}.factory-cost-total b{font-size:18px}
+.factory-loading{padding:32px;text-align:center;color:var(--muted);font-weight:750}
+@media(max-width:900px){
+  .factory-kpis{grid-template-columns:1fr 1fr}
+  .factory-form-grid{grid-template-columns:1fr 1fr}
+  .factory-master-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .factory-kpis,.factory-form-grid{grid-template-columns:1fr}
+  .factory-title-actions{width:100%}
+  #factory .panel-title.factory-title-row{align-items:flex-start;flex-direction:column}
+}
+
+
+
+/* Factory v1.1 — finished-job raw material usage additions */
+.factory-finished-job-grid{grid-template-columns:minmax(360px,2fr) minmax(180px,.8fr)}
+.factory-usage-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px;padding-top:12px;border-top:1px dashed #d7e4e6}
+.factory-usage-row{display:grid;grid-template-columns:minmax(210px,1.35fr) minmax(150px,1fr) minmax(150px,1fr) minmax(125px,.7fr) 70px auto;gap:8px;align-items:end;padding:9px;border:1px solid #dce8ea;border-radius:12px;background:#fbfdfd;margin-bottom:8px}
+.factory-usage-unit{height:38px;display:flex;align-items:center;font-size:11px;font-weight:900;color:#536b73}
 .factory-job-selected{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:8px;margin:10px 0 14px}
 .factory-job-selected>div{border:1px solid #d8e6e8;background:#f8fbfb;border-radius:11px;padding:9px}
 .factory-job-selected span{display:block;font-size:9px;color:var(--muted);font-weight:850;text-transform:uppercase}
 .factory-job-selected b{display:block;font-size:11px;margin-top:3px}
-.factory-existing-note{margin:0 0 12px}
-.factory-usage-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px;padding-top:12px;border-top:1px dashed #d7e4e6}
-.factory-usage-row{display:grid;grid-template-columns:minmax(260px,2fr) minmax(150px,.8fr) 90px auto;gap:8px;align-items:end;padding:9px;border:1px solid #dce8ea;border-radius:12px;background:#fbfdfd;margin-bottom:8px}
-.factory-usage-unit{height:38px;display:flex;align-items:center;font-size:11px;font-weight:900;color:#536b73}
-.factory-cost-total{display:flex;justify-content:flex-end;gap:18px;align-items:center;margin-top:12px;padding:12px;border-top:1px dashed #cbdfe2}
-.factory-cost-total span{font-size:11px;color:var(--muted);font-weight:850}
-.factory-cost-total b{font-size:18px}
-.factory-consumption-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-.factory-consumption-summary span{background:#eef8f7;border:1px solid #cfe5e3;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:850;color:#416369}
-.factory-loading{padding:32px;text-align:center;color:var(--muted);font-weight:750}
-@media(max-width:1000px){
-  .factory-job-selected{grid-template-columns:1fr 1fr 1fr}
-}
-@media(max-width:900px){
-  .factory-kpis{grid-template-columns:1fr 1fr}
-  .factory-form-grid,.factory-form-grid-job{grid-template-columns:1fr 1fr}
-  .factory-usage-row{grid-template-columns:1fr 1fr 80px auto}
-}
-@media(max-width:650px){
-  .factory-kpis,.factory-form-grid,.factory-form-grid-job,.factory-job-selected{grid-template-columns:1fr}
-  .factory-usage-row{grid-template-columns:1fr}
-  .factory-usage-unit{height:auto}
-  .factory-title-actions{width:100%}
-  #factory .panel-title.factory-title-row{align-items:flex-start;flex-direction:column}
-  .factory-usage-head{align-items:flex-start;flex-direction:column}
-}
+@media(max-width:1050px){.factory-usage-row{grid-template-columns:1fr 1fr 1fr}.factory-job-selected{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:700px){.factory-finished-job-grid,.factory-usage-row,.factory-job-selected{grid-template-columns:1fr}.factory-usage-head{align-items:flex-start;flex-direction:column}.factory-usage-unit{height:auto}}

@@ -17473,66 +17473,57 @@ window.toggleBpSeparateDeliveryButton = function(){
 
 <script>
 /* =====================================================================
-   SOFTCREATION NATIVE FACTORY CONSUMPTION MODULE v1.1
-   ---------------------------------------------------
-   Factory is part of the BOS. This module records ACTUAL raw-material
-   consumption against completed production jobs. It does not maintain
-   stock-in / available-stock balances and has no Factory backup screen.
-   Uses the existing BOS user/permission system, productionRequests and
-   the already-created Supabase factory state + revision-controlled RPC.
+   SOFTCREATION NATIVE FACTORY USAGE MODULE v1.1
+   Uses the existing BOS shell, currentUser/permissions, productionRequests,
+   Supabase browser key and the already-created factory inventory RPC/tables.
+   No iframe. No second login. No separate app.
    ===================================================================== */
 (function(){
   'use strict';
 
   const FACTORY_WORKSPACE='softcreation_main';
   const FACTORY_REST='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
-  const FACTORY_CACHE_KEY='softcreation_factory_consumption_cache_v1';
+  const FACTORY_CACHE_KEY='softcreation_factory_inventory_cloud_cache_v1';
   const FACTORY_FEATURES=[
-    ['factory_view','Factory — Production Consumption'],
-    ['factory_issue','Factory — Record Material Usage'],
-    ['factory_reports','Factory — Usage Reports'],
-    ['factory_manage','Factory — Material Masters / Corrections'],
+    ['factory_view','Factory — Raw Material Usage'],
+    ['factory_issue','Factory — Record Raw Materials Used'],
+    ['factory_reports','Factory — Job & Usage Reports'],
+    ['factory_manage','Factory — Masters / Admin'],
     ['factory_cost_view','Factory — Material Cost View']
   ];
 
   let factoryDb={
-    version:3,revision:0,
-    items:[],issues:[],audit:[],
-    suppliers:[],owners:[],lots:[],returns:[]
+    version:2,revision:0,items:[],suppliers:[],owners:[],
+    lots:[],issues:[],returns:[],audit:[]
   };
   let factoryLoaded=false;
   let factoryLoading=false;
   let factoryPage='Dashboard';
-  let factoryUsageRows=[];
 
   const f$=id=>document.getElementById(id);
   const fEsc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fNum=v=>Number(v);
+  const fQty=v=>Math.round(Number(v||0)*1e6)/1e6;
   const fFmt=v=>Number(v||0).toLocaleString('en-LK',{maximumFractionDigits:4});
   const fMoney=v=>'LKR '+Number(v||0).toLocaleString('en-LK',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fToday=()=>new Date().toISOString().slice(0,10);
-  const fMonth=()=>fToday().slice(0,7);
   const fUid=()=>typeof uid==='function'?uid('factory'):((crypto.randomUUID&&crypto.randomUUID())||Date.now().toString(36)+Math.random().toString(36).slice(2));
+  const fName=(list,id)=>list.find(x=>x.id===id)?.name||'Unknown';
   const fCan=p=>currentUser?.role==='admin'||hasPerm(p);
 
   function factoryBlank(){
-    return {
-      version:3,revision:0,
-      items:[],issues:[],audit:[],
-      suppliers:[],owners:[],lots:[],returns:[]
-    };
+    return {version:2,revision:0,items:[],suppliers:[],owners:[],lots:[],issues:[],returns:[],audit:[]};
   }
   function factoryNormalize(raw){
     const d={...factoryBlank(),...(raw&&typeof raw==='object'?raw:{})};
-    ['items','issues','audit','suppliers','owners','lots','returns'].forEach(k=>{
+    ['items','suppliers','owners','lots','issues','returns','audit'].forEach(k=>{
       if(!Array.isArray(d[k]))d[k]=[];
     });
-    d.version=3;
+    d.version=2;
     d.revision=Number(d.revision||0);
     delete d.auth;
     return d;
   }
-
   function factoryKey(){
     const key=(localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
     if(!key)throw new Error('Supabase browser key is not configured on this device.');
@@ -17551,18 +17542,11 @@ window.toggleBpSeparateDeliveryButton = function(){
   function factoryCache(){
     try{localStorage.setItem(FACTORY_CACHE_KEY,JSON.stringify(factoryDb))}catch(_){}
   }
-  function factorySetStatus(text,kind=''){
-    const el=f$('factoryCloudStatus');
-    if(!el)return;
-    el.textContent=text;
-    el.className='factory-cloud-status '+kind;
-  }
-
   async function loadFactoryCloud(force=false){
     if(factoryLoading)return;
     if(factoryLoaded&&!force)return;
     factoryLoading=true;
-    factorySetStatus('Connecting…','loading');
+    factorySetStatus('Connecting to Factory cloud…','loading');
     try{
       const rows=await factoryFetch(`/spgs_factory_inventory_state?workspace=eq.${encodeURIComponent(FACTORY_WORKSPACE)}&select=revision,payload,updated_at,updated_by&limit=1`);
       if(rows?.length){
@@ -17579,27 +17563,33 @@ window.toggleBpSeparateDeliveryButton = function(){
       console.error('Factory load failed',e);
       try{
         const cached=JSON.parse(localStorage.getItem(FACTORY_CACHE_KEY)||'null');
-        if(!cached)throw e;
-        factoryDb=factoryNormalize(cached);
-        factoryLoaded=true;
-        factorySetStatus('Cloud unavailable — cached view only','warn');
-        renderFactory();
+        if(cached){
+          factoryDb=factoryNormalize(cached);
+          factoryLoaded=true;
+          factorySetStatus('Cloud unavailable — showing last cached data (read only)','warn');
+          renderFactory();
+        }else throw e;
       }catch(_){
-        factorySetStatus('Factory cloud failed','bad');
+        factorySetStatus('Factory cloud connection failed','bad');
         if(f$('factoryBody'))f$('factoryBody').innerHTML=`<div class="notice"><b>Factory cloud unavailable.</b><br>${fEsc(e.message)}</div>`;
       }
     }finally{factoryLoading=false}
   }
-  window.loadFactoryCloud=loadFactoryCloud;
-
+  function factorySetStatus(text,kind=''){
+    const el=f$('factoryCloudStatus');
+    if(!el)return;
+    el.textContent=text;
+    el.className='factory-cloud-status '+kind;
+  }
   async function factoryCommit(action,mutator){
     if(!factoryLoaded)return toast('Factory data is not loaded yet');
     const next=JSON.parse(JSON.stringify(factoryDb));
     mutator(next);
-    next.version=3;
+    next.version=2;
     next.audit=next.audit||[];
     next.audit.push({
-      id:fUid(),at:new Date().toISOString(),
+      id:fUid(),
+      at:new Date().toISOString(),
       user:currentUser?.username||'unknown',
       display:currentUser?.display||'',
       action
@@ -17620,10 +17610,10 @@ window.toggleBpSeparateDeliveryButton = function(){
       const row=Array.isArray(rows)?rows[0]:rows;
       if(!row)throw new Error('Factory cloud did not return the saved revision');
       factoryDb=factoryNormalize(row.payload||next);
-      factoryDb.revision=Number(row.revision||expected+1);
+      factoryDb.revision=Number(row.revision||factoryDb.revision||expected+1);
       factoryCache();
       renderFactory();
-      toast('Factory usage saved');
+      toast('Factory saved successfully');
     }catch(e){
       console.error('Factory save failed',e);
       if(String(e.message).includes('FACTORY_REVISION_CONFLICT')||String(e.message).includes('40001')){
@@ -17635,10 +17625,10 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
   }
 
-  function factoryCompletedJobs(){
-    const completed=new Set(['Finished','Dispatched','Received','GRN Closed']);
+  function factoryProductionJobs(){
+    const allowed=new Set(['Finished','Dispatched','Received','GRN Closed']);
     return (state.productionRequests||[])
-      .filter(r=>r?.id&&completed.has(String(r.status||'')))
+      .filter(r=>r?.id&&allowed.has(String(r.status||'')))
       .sort((a,b)=>{
         const ad=Date.parse(a.finishedAt||a._spgsUpdatedAt||a.createdAt||0)||0;
         const bd=Date.parse(b.finishedAt||b._spgsUpdatedAt||b.createdAt||0)||0;
@@ -17648,50 +17638,39 @@ window.toggleBpSeparateDeliveryButton = function(){
   function factoryProductionById(id){
     return (state.productionRequests||[]).find(r=>r.id===id)||null;
   }
-  function factoryJobNo(r){
-    return r?.orderNo||r?.prodNo||r?.productionNo||r?.id||'-';
-  }
-  function factoryUsageForJob(id){
-    return (factoryDb.issues||[]).filter(x=>x.productionRequestId===id);
-  }
-  function factoryUsageCost(lines){
-    return (lines||[]).reduce((s,x)=>s+(x.price===null||x.price===undefined?0:Number(x.qty||0)*Number(x.price||0)),0);
-  }
-  function factoryUnpriced(lines){
-    return (lines||[]).filter(x=>Number(x.qty||0)>0&&(x.price===null||x.price===undefined)).length;
+  function factoryReturned(issueId){
+    return (factoryDb.returns||[]).filter(x=>x.issue===issueId).reduce((s,x)=>s+Number(x.qty||0),0);
   }
   function factoryOptions(list,placeholder='Select…'){
-    return `<option value="">${fEsc(placeholder)}</option>`+
-      list.map(x=>`<option value="${fEsc(x.id)}">${fEsc(x.name)}</option>`).join('');
+    return `<option value="">${fEsc(placeholder)}</option>`+list.map(x=>`<option value="${fEsc(x.id)}">${fEsc(x.name)}</option>`).join('');
   }
   function factoryField(label,input){
     return `<div class="factory-field"><label>${label}</label>${input}</div>`;
   }
   function factoryTable(headers,rows){
-    return `<div class="factory-scroll"><table class="factory-table"><thead><tr>${headers.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${
-      rows.length
-      ? rows.map(r=>'<tr>'+r.map(x=>`<td>${x}</td>`).join('')+'</tr>').join('')
-      : `<tr><td colspan="${headers.length}" class="small">No records yet</td></tr>`
-    }</tbody></table></div>`;
+    return `<div class="factory-scroll"><table class="factory-table"><thead><tr>${headers.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>'<tr>'+r.map(x=>`<td>${x}</td>`).join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}" class="small">No records yet</td></tr>`}</tbody></table></div>`;
   }
 
   function factoryTabs(){
-    return [
+    const all=[
       ['Dashboard','factory_view'],
       ['Issue to job','factory_issue'],
       ['Job reports','factory_reports'],
       ['Masters','factory_manage'],
       ['History','factory_view']
-    ].filter(([,p])=>fCan(p));
+    ];
+    return all.filter(([,p])=>fCan(p));
   }
-  window.factorySetPage=function(page){
+  function factorySetPage(page){
     if(!factoryTabs().some(x=>x[0]===page))return;
     factoryPage=page;
     renderFactory();
-  };
+  }
+  window.factorySetPage=factorySetPage;
 
   function renderFactory(){
-    const body=f$('factoryBody');if(!body)return;
+    const body=f$('factoryBody');
+    if(!body)return;
     if(!fCan('factory_view')){
       body.innerHTML='<div class="empty">Factory access is not enabled for this user.</div>';
       return;
@@ -17700,6 +17679,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!tabs.some(x=>x[0]===factoryPage))factoryPage=tabs[0]?.[0]||'Dashboard';
     const nav=f$('factorySubnav');
     if(nav)nav.innerHTML=tabs.map(([t])=>`<button type="button" class="factory-subnav-btn ${factoryPage===t?'active':''}" onclick="factorySetPage('${t}')">${t}</button>`).join('');
+
     if(!factoryLoaded){
       body.innerHTML='<div class="factory-loading">Loading Factory usage…</div>';
       return;
@@ -17717,139 +17697,130 @@ window.toggleBpSeparateDeliveryButton = function(){
   window.renderFactory=renderFactory;
 
   function factoryDashboardHtml(){
-    const completed=factoryCompletedJobs();
-    const recordedIds=new Set((factoryDb.issues||[]).map(x=>x.productionRequestId).filter(Boolean));
-    const awaiting=completed.filter(r=>!recordedIds.has(r.id));
-    const today=fToday(),month=fMonth();
-    const todayLines=factoryDb.issues.filter(x=>x.date===today);
-    const monthLines=factoryDb.issues.filter(x=>String(x.date||'').startsWith(month));
-    const jobsToday=new Set(todayLines.map(x=>x.productionRequestId||x.job)).size;
-    const qtyToday=todayLines.reduce((s,x)=>s+Number(x.qty||0),0);
-    const monthCost=factoryUsageCost(monthLines);
+    const finished=factoryProductionJobs();
+    const linked=new Set((factoryDb.issues||[]).map(x=>x.productionRequestId).filter(Boolean));
+    const awaiting=finished.filter(r=>!linked.has(r.id));
+    const today=fToday();
+    const todayLines=(factoryDb.issues||[]).filter(x=>x.date===today);
     return `
       <div class="factory-kpis">
-        <div class="factory-kpi"><span>Jobs Recorded Today</span><b>${jobsToday}</b><small>production jobs with usage</small></div>
-        <div class="factory-kpi"><span>Material Lines Today</span><b>${todayLines.length}</b><small>${fFmt(qtyToday)} combined entered qty</small></div>
-        <div class="factory-kpi"><span>Awaiting Usage Entry</span><b>${awaiting.length}</b><small>finished jobs with no usage</small></div>
-        <div class="factory-kpi"><span>This Month Material Cost</span><b>${fCan('factory_cost_view')?fMoney(monthCost):'Restricted'}</b><small>${fCan('factory_cost_view')?'snapshot material cost':'cost permission required'}</small></div>
+        <div class="factory-kpi"><span>Raw Materials</span><b>${factoryDb.items.length}</b><small>material masters</small></div>
+        <div class="factory-kpi"><span>Finished Jobs</span><b>${finished.length}</b><small>available for usage entry</small></div>
+        <div class="factory-kpi"><span>Jobs With Usage</span><b>${linked.size}</b><small>linked production jobs</small></div>
+        <div class="factory-kpi"><span>Usage Lines Today</span><b>${todayLines.length}</b><small>actual raw-material entries</small></div>
       </div>
       <div class="panel factory-inner-panel">
-        <div class="panel-title"><span>Finished Jobs Awaiting Material Usage</span><button class="btn ghost sm" type="button" onclick="loadFactoryCloud(true)">Refresh</button></div>
+        <div class="panel-title"><span>Finished Jobs Awaiting Raw Material Entry</span><button class="btn ghost sm" type="button" onclick="loadFactoryCloud(true)">Refresh Cloud</button></div>
         <div class="panel-body">
           ${factoryTable(
             ['Production','Customer','Product','Finished Qty','Status','Action'],
             awaiting.slice(0,50).map(r=>[
-              `<b>${fEsc(factoryJobNo(r))}</b>`,
+              `<b>${fEsc(r.orderNo||r.prodNo||r.id)}</b>`,
               fEsc(r.customerName||'-'),
               `${fEsc(r.size||'')} ${fEsc(r.material||'')} ${fEsc(r.layout||'')}`,
               `${fFmt(r.finishedQty||r.packing?.total||r.requestQty||0)} ${fEsc(r.unit||'Rolls')}`,
               `<span class="tag">${fEsc(r.status||'')}</span>`,
-              fCan('factory_issue')?`<button class="btn primary sm" type="button" onclick="factoryOpenUsageForJob('${r.id}')">Record Usage</button>`:'-'
+              fCan('factory_issue')?`<button class="btn primary sm" type="button" onclick="factoryOpenUsageForJob('${r.id}')">Add Raw Materials</button>`:'-'
             ])
           )}
         </div>
       </div>`;
   }
 
-  function factoryIssueHtml(){
-    if(!fCan('factory_issue'))return '<div class="empty">Material Usage permission is not enabled.</div>';
-    const jobs=factoryCompletedJobs().map(r=>({
-      id:r.id,
-      name:`${factoryJobNo(r)} | ${r.customerName||'-'} | ${r.size||''} ${r.material||''} ${r.layout||''} | ${fFmt(r.finishedQty||r.packing?.total||r.requestQty||0)} ${r.unit||'Rolls'} | ${r.status}`
-    }));
-    factoryUsageRows=[{itemId:'',qty:''}];
-    return `
-      <div class="panel factory-inner-panel">
-        <div class="panel-title">Record Actual Material Usage</div>
-        <div class="panel-body">
-          <div class="notice"><b>Post-production entry:</b> select the completed production job and enter the raw materials actually consumed for that job. This is a consumption record — there is no Stock In or running stock balance in Factory.</div>
-          <form id="factoryUsageForm">
-            <div class="factory-form-grid factory-form-grid-job">
-              ${factoryField('Completed Production Job *',`<select name="productionRequestId" id="factoryProductionJob" required onchange="factoryJobChanged()">${factoryOptions(jobs,'Select finished production job')}</select>`)}
-              ${factoryField('Usage Date *',`<input name="date" type="date" value="${fToday()}" required>`)}
-            </div>
-            <div id="factorySelectedJob"></div>
-            <div class="factory-usage-head">
-              <div><b>Materials Actually Used</b><div class="hint">Add one line for each raw material / consumable used in this production job.</div></div>
-              <button class="btn ghost sm" type="button" onclick="factoryAddUsageRow()">+ Add Material Line</button>
-            </div>
-            <div id="factoryUsageRows"></div>
-            <div class="factory-field"><label>Production / Usage Note</label><textarea name="notes" maxlength="500" placeholder="Optional production usage note"></textarea></div>
-            <div class="actions"><button class="btn primary" type="submit">Save Actual Material Usage</button></div>
-          </form>
-        </div>
-      </div>`;
+  let factoryUsageRows=[];
+
+  function factoryUsageOptions(list,selected='',placeholder='Select…'){
+    return `<option value="">${fEsc(placeholder)}</option>`+list.map(x=>`<option value="${fEsc(x.id)}" ${x.id===selected?'selected':''}>${fEsc(x.name)}</option>`).join('');
   }
 
+  function factoryRenderUsageRows(){
+    const host=f$('factoryUsageRows');if(!host)return;
+    host.innerHTML=factoryUsageRows.map((row,i)=>{
+      const item=factoryDb.items.find(x=>x.id===row.itemId);
+      return `
+        <div class="factory-usage-row">
+          <div class="factory-field"><label>Raw Material *</label><select onchange="factoryUsageRowChange(${i},'itemId',this.value)">${factoryUsageOptions(factoryDb.items,row.itemId,'Select raw material')}</select></div>
+          <div class="factory-field"><label>Supplier</label><select onchange="factoryUsageRowChange(${i},'supplierId',this.value)">${factoryUsageOptions(factoryDb.suppliers,row.supplierId,'Optional supplier')}</select></div>
+          <div class="factory-field"><label>Ownership</label><select onchange="factoryUsageRowChange(${i},'ownerId',this.value)">${factoryUsageOptions(factoryDb.owners,row.ownerId,'Optional ownership')}</select></div>
+          <div class="factory-field"><label>Actual Qty Used *</label><input type="number" min="0.000001" step="any" value="${fEsc(row.qty||'')}" oninput="factoryUsageRowChange(${i},'qty',this.value)"></div>
+          <div class="factory-usage-unit">${item?fEsc(item.unit||''):''}</div>
+          <button class="btn red sm" type="button" onclick="factoryRemoveUsageRow(${i})">Remove</button>
+        </div>`;
+    }).join('');
+  }
+  window.factoryUsageRowChange=function(i,key,value){
+    if(!factoryUsageRows[i])return;
+    factoryUsageRows[i][key]=value;
+    if(key==='itemId')factoryRenderUsageRows();
+  };
+  window.factoryAddUsageRow=function(){
+    factoryUsageRows.push({itemId:'',supplierId:'',ownerId:'',qty:''});
+    factoryRenderUsageRows();
+  };
+  window.factoryRemoveUsageRow=function(i){
+    if(factoryUsageRows.length<=1)return toast('At least one raw material line is required');
+    factoryUsageRows.splice(i,1);factoryRenderUsageRows();
+  };
   window.factoryOpenUsageForJob=function(id){
-    factoryPage='Issue to job';
-    renderFactory();
+    factoryPage='Issue to job';renderFactory();
     setTimeout(()=>{
       const s=f$('factoryProductionJob');
       if(s){s.value=id;factoryJobChanged()}
     },0);
   };
-
   window.factoryJobChanged=function(){
     const id=f$('factoryProductionJob')?.value||'';
     const host=f$('factorySelectedJob');
-    if(!host)return;
     const r=factoryProductionById(id);
-    if(!r){host.innerHTML='';renderFactoryUsageRows();return}
-    const existing=factoryUsageForJob(id);
+    if(!host)return;
+    if(!r){host.innerHTML='';return}
+    const existing=(factoryDb.issues||[]).filter(x=>x.productionRequestId===id);
     host.innerHTML=`
       <div class="factory-job-selected">
-        <div><span>Production</span><b>${fEsc(factoryJobNo(r))}</b></div>
+        <div><span>Production</span><b>${fEsc(r.orderNo||r.prodNo||r.id)}</b></div>
         <div><span>Customer</span><b>${fEsc(r.customerName||'-')}</b></div>
         <div><span>Product</span><b>${fEsc(r.size||'')} ${fEsc(r.material||'')} ${fEsc(r.layout||'')}</b></div>
-        <div><span>Finished</span><b>${fFmt(r.finishedQty||r.packing?.total||r.requestQty||0)} ${fEsc(r.unit||'Rolls')}</b></div>
+        <div><span>Finished Qty</span><b>${fFmt(r.finishedQty||r.packing?.total||r.requestQty||0)} ${fEsc(r.unit||'Rolls')}</b></div>
         <div><span>Status</span><b>${fEsc(r.status||'-')}</b></div>
       </div>
-      ${existing.length?`<div class="notice factory-existing-note"><b>Existing usage:</b> ${existing.length} material line${existing.length===1?'':'s'} already recorded for this job. New lines will be added as an additional usage entry / correction.</div>`:''}`;
-    renderFactoryUsageRows();
+      ${existing.length?`<div class="notice"><b>${existing.length} raw material line${existing.length===1?'':'s'} already recorded.</b> New lines will be added to this job.</div>`:''}`;
   };
 
-  window.factoryAddUsageRow=function(){
-    factoryUsageRows.push({itemId:'',qty:''});
-    renderFactoryUsageRows();
-  };
-  window.factoryRemoveUsageRow=function(i){
-    if(factoryUsageRows.length<=1)return toast('At least one material line is required');
-    factoryUsageRows.splice(i,1);
-    renderFactoryUsageRows();
-  };
-  window.factoryUsageRowChange=function(i,field,value){
-    if(!factoryUsageRows[i])return;
-    factoryUsageRows[i][field]=value;
-  };
-  function renderFactoryUsageRows(){
-    const host=f$('factoryUsageRows');if(!host)return;
-    host.innerHTML=factoryUsageRows.map((row,i)=>`
-      <div class="factory-usage-row">
-        <div class="factory-field">
-          <label>Material *</label>
-          <select onchange="factoryUsageRowChange(${i},'itemId',this.value)">
-            ${factoryOptions(factoryDb.items,'Select raw material').replace(`value="${fEsc(row.itemId)}"`,`value="${fEsc(row.itemId)}" selected`)}
-          </select>
+  function factoryIssueHtml(){
+    if(!fCan('factory_issue'))return '<div class="empty">Material Issue permission is not enabled.</div>';
+    const jobs=factoryProductionJobs().map(r=>({
+      id:r.id,
+      name:`${r.orderNo||r.prodNo||r.id} | ${r.customerName||'-'} | ${r.size||''} ${r.material||''} ${r.layout||''} | Finished ${fFmt(r.finishedQty||r.packing?.total||r.requestQty||0)} ${r.unit||'Rolls'} | ${r.status}`
+    }));
+    factoryUsageRows=[{itemId:'',supplierId:'',ownerId:'',qty:''}];
+    return `
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Issue / Record Raw Materials Used</div>
+        <div class="panel-body">
+          <div class="notice"><b>After production is finished:</b> select the completed job and add every raw material / consumable actually used. Raw Materials, Suppliers and Ownership come from the existing Factory Masters.</div>
+          <form id="factoryIssueForm">
+            <div class="factory-form-grid factory-finished-job-grid">
+              ${factoryField('Finished Production Job *',`<select name="productionRequestId" id="factoryProductionJob" required onchange="factoryJobChanged()">${factoryOptions(jobs,'Select finished production job')}</select>`)}
+              ${factoryField('Usage Date *',`<input name="date" type="date" value="${fToday()}" required>`)}
+            </div>
+            <div id="factorySelectedJob"></div>
+            <div class="factory-usage-head">
+              <div><b>Raw Materials Used</b><div class="hint">Add all materials used after completing this production job.</div></div>
+              <button class="btn ghost sm" type="button" onclick="factoryAddUsageRow()">+ Add Raw Material</button>
+            </div>
+            <div id="factoryUsageRows"></div>
+            <div class="factory-field"><label>Production / Usage Notes</label><textarea name="notes" maxlength="500"></textarea></div>
+            <div class="actions"><button class="btn primary" type="submit">Save Raw Material Usage</button></div>
+          </form>
         </div>
-        <div class="factory-field">
-          <label>Actual Qty Used *</label>
-          <input type="number" step="any" min="0.000001" value="${fEsc(row.qty)}" oninput="factoryUsageRowChange(${i},'qty',this.value)">
-        </div>
-        <div class="factory-usage-unit">${row.itemId?fEsc(factoryDb.items.find(x=>x.id===row.itemId)?.unit||''):''}</div>
-        <button class="btn red sm" type="button" onclick="factoryRemoveUsageRow(${i})">Remove</button>
-      </div>`).join('');
+      </div>`;
   }
-
   function factoryReportsHtml(){
     if(!fCan('factory_reports'))return '<div class="empty">Factory report permission is not enabled.</div>';
-    const jobMap=new Map();
-    (factoryDb.issues||[]).forEach(i=>{
-      const id=i.productionRequestId||i.job;
-      if(!jobMap.has(id))jobMap.set(id,{id,name:i.job||factoryJobNo(factoryProductionById(i.productionRequestId))});
-    });
-    const jobs=[...jobMap.values()];
-    const firstOfMonth=fMonth()+'-01';
+    const jobs=[...new Map((factoryDb.issues||[]).map(i=>[i.productionRequestId||i.job,{
+      id:i.productionRequestId||i.job,
+      name:i.productionRequestId?(factoryProductionById(i.productionRequestId)?.orderNo||i.job):i.job
+    }])).values()];
     return `
       <div class="panel factory-inner-panel">
         <div class="panel-title">Production Job Material Usage</div>
@@ -17861,248 +17832,255 @@ window.toggleBpSeparateDeliveryButton = function(){
           </div>
           <div id="factoryJobDetail"></div>
         </div>
-      </div>
-      <div class="panel factory-inner-panel">
-        <div class="panel-title">Material Consumption Summary</div>
-        <div class="panel-body">
-          <div class="factory-report-toolbar">
-            <div class="factory-field"><label>From</label><input id="factoryReportFrom" type="date" value="${firstOfMonth}"></div>
-            <div class="factory-field"><label>To</label><input id="factoryReportTo" type="date" value="${fToday()}"></div>
-            <button class="btn primary sm" type="button" onclick="renderFactoryConsumptionReport()">Run Report</button>
-          </div>
-          <div id="factoryConsumptionReport"></div>
-        </div>
       </div>`;
   }
-
   function factoryMastersHtml(){
     if(!fCan('factory_manage'))return '<div class="empty">Factory master-management permission is not enabled.</div>';
     return `
+      <div class="factory-master-grid">
+        <div class="panel factory-inner-panel">
+          <div class="panel-title">Suppliers</div>
+          <div class="panel-body">
+            <form id="factorySupplierForm">
+              ${factoryField('Supplier Name *','<input name="name" required maxlength="120">')}
+              ${factoryField('Contact / Description','<input name="description" maxlength="250">')}
+              <div class="actions"><button class="btn primary" type="submit">Create Supplier</button></div>
+            </form>
+            <div class="factory-master-tags">${factoryDb.suppliers.map(x=>`<span class="tag">${fEsc(x.name)}</span>`).join('')||'<span class="small">No suppliers</span>'}</div>
+          </div>
+        </div>
+        <div class="panel factory-inner-panel">
+          <div class="panel-title">Raw Material Ownership</div>
+          <div class="panel-body">
+            <form id="factoryOwnerForm">
+              ${factoryField('Owner Name *','<input name="name" placeholder="SoftCreation / customer name" required maxlength="120">')}
+              ${factoryField('Description','<input name="description" maxlength="250">')}
+              <div class="actions"><button class="btn primary" type="submit">Create Owner</button></div>
+            </form>
+            <div class="factory-master-tags">${factoryDb.owners.map(x=>`<span class="tag">${fEsc(x.name)}</span>`).join('')||'<span class="small">No owners</span>'}</div>
+          </div>
+        </div>
+      </div>
       <div class="panel factory-inner-panel">
-        <div class="panel-title">Raw Material / Consumable Master</div>
+        <div class="panel-title">Raw Materials</div>
         <div class="panel-body">
-          <div class="notice">Create only the materials you want users to select when recording actual production consumption — for example TT, DT TOP, cores, ribbon, stretch film and strapping.</div>
           <form id="factoryItemForm">
             <div class="factory-form-grid">
-              ${factoryField('Material Name *','<input name="name" required maxlength="120">')}
+              ${factoryField('Item Name *','<input name="name" required maxlength="120">')}
               ${factoryField('Description','<input name="description" maxlength="250">')}
-              ${factoryField('Usage Unit *','<input name="unit" required placeholder="m² / metre / roll / pcs / kg" maxlength="30">')}
-              ${factoryField('Current Unit Cost (LKR)','<input name="price" type="number" min="0" step="any" placeholder="Leave blank if unknown">')}
+              ${factoryField('Stock Unit *','<input name="unit" required placeholder="m² / metre / roll / pcs" maxlength="30">')}
+              ${factoryField('Unit Price (LKR)','<input name="price" type="number" min="0" step="any" placeholder="Leave blank if unknown">')}
             </div>
             <div class="actions"><button class="btn primary" type="submit">Create Material</button></div>
           </form>
-          ${factoryTable(['Material','Description','Unit','Current Unit Cost','Action'],factoryDb.items.map(i=>[
+          ${factoryTable(['Item','Description','Unit','Current Unit Price','Action'],factoryDb.items.map(i=>[
             fEsc(i.name),fEsc(i.description||''),fEsc(i.unit),
-            i.price===null||i.price===undefined?'<span class="tag amber">Cost missing</span>':fMoney(i.price),
-            `<button class="btn ghost sm" type="button" onclick="editFactoryPrice('${i.id}')">Edit Cost</button>`
+            i.price===null||i.price===undefined?'<span class="tag amber">Price missing</span>':fMoney(i.price),
+            `<button class="btn ghost sm" type="button" onclick="editFactoryPrice('${i.id}')">Edit Price</button>`
           ]))}
-          <div class="hint">The cost is captured as a snapshot when usage is saved. Later master-cost changes do not rewrite historical job cost.</div>
+          <div class="hint">Unit prices are captured as snapshots when material is issued. Later price changes do not rewrite historical job cost.</div>
         </div>
       </div>`;
   }
-
   function factoryHistoryHtml(){
-    const rows=(factoryDb.issues||[]).slice().sort((a,b)=>{
-      const aa=Date.parse(a.createdAt||a.issuedAt||a.date||0)||0;
-      const bb=Date.parse(b.createdAt||b.issuedAt||b.date||0)||0;
-      return bb-aa;
-    }).map(i=>{
-      const p=i.productionSnapshot||factoryProductionById(i.productionRequestId)||{};
+    const usageRows=(factoryDb.issues||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).map(i=>{
       const cells=[
-        fEsc(i.date||''),
-        `<b>${fEsc(i.job||factoryJobNo(p))}</b>`,
-        fEsc(p.customerName||''),
-        fEsc(i.itemName||''),
-        `${fFmt(i.qty)} ${fEsc(i.unit||'')}`,
-        fEsc(i.display||i.issuedByDisplay||i.issuedBy||'')
+        fEsc(i.date||''),'USAGE',fEsc(i.job||''),
+        fEsc(i.itemName||''),fEsc(i.supplierName||fName(factoryDb.suppliers,i.supplierId)),
+        fEsc(i.ownerName||fName(factoryDb.owners,i.ownerId)),
+        `${fFmt(i.qty)} ${fEsc(i.unit||'')}`,fEsc(i.notes||'')
       ];
-      if(fCan('factory_cost_view'))cells.push(i.price===null||i.price===undefined?'Unpriced':fMoney(Number(i.qty||0)*Number(i.price||0)));
-      if(fCan('factory_manage'))cells.push(`<button class="btn red sm" type="button" onclick="deleteFactoryUsage('${i.id}')">Delete</button>`);
       return cells;
     });
     return `
       <div class="panel factory-inner-panel">
-        <div class="panel-title">Factory Material Usage History</div>
-        <div class="panel-body">
-          ${factoryTable(
-            ['Date','Production','Customer','Material','Actual Used','Recorded By',...(fCan('factory_cost_view')?['Cost']:[]),...(fCan('factory_manage')?['Action']:[])],
-            rows
-          )}
-        </div>
+        <div class="panel-title">Factory Raw Material Usage History</div>
+        <div class="panel-body">${factoryTable(['Date','Type','Production','Raw Material','Supplier','Ownership','Qty Used','Notes'],usageRows)}</div>
       </div>
-      ${fCan('factory_manage')?`
-      <div class="panel factory-inner-panel">
-        <div class="panel-title">Factory Audit</div>
-        <div class="panel-body">${factoryTable(['Time','User','Action'],factoryDb.audit.slice().reverse().map(a=>[
-          fEsc(new Date(a.at).toLocaleString()),fEsc(a.display||a.user||''),fEsc(a.action||'')
-        ]))}</div>
-      </div>`:''}`;
+      ${fCan('factory_manage')?`<div class="panel factory-inner-panel"><div class="panel-title">Factory Audit</div><div class="panel-body">${factoryTable(['Time','User','Action'],factoryDb.audit.slice().reverse().map(a=>[
+        fEsc(new Date(a.at).toLocaleString()),fEsc(a.display||a.user||''),fEsc(a.action)
+      ]))}</div></div>`:''}`;
   }
 
-  function bindFactoryForms(){
-    const usage=f$('factoryUsageForm');
-    if(usage){
-      renderFactoryUsageRows();
-      usage.onsubmit=async e=>{
-        e.preventDefault();
-        if(!fCan('factory_issue'))return requirePerm('factory_issue','record Factory material usage');
-        const form=new FormData(e.target);
-        const prodId=String(form.get('productionRequestId')||'');
-        const prod=factoryProductionById(prodId);
-        if(!prod)return toast('Select a completed production job');
-        if(!factoryCompletedJobs().some(x=>x.id===prodId))return toast('Material usage can be recorded only for a completed production job');
+  window.renderFactoryStockTable=function(search=''){
+    const host=f$('factoryStockTable');if(!host)return;
+    const s=String(search||'').toLowerCase();
+    host.innerHTML=factoryTable(['Item','Description','Supplier','Ownership','Batch','Available','Unit'],
+      factoryDb.lots
+        .filter(l=>Number(l.remaining)>0)
+        .filter(l=>[
+          fName(factoryDb.items,l.item),fName(factoryDb.suppliers,l.supplier),
+          fName(factoryDb.owners,l.owner),l.code,l.description
+        ].join(' ').toLowerCase().includes(s))
+        .map(l=>{
+          const item=factoryDb.items.find(i=>i.id===l.item);
+          return [
+            fEsc(fName(factoryDb.items,l.item)),
+            fEsc(l.description||item?.description||''),
+            fEsc(fName(factoryDb.suppliers,l.supplier)),
+            fEsc(fName(factoryDb.owners,l.owner)),
+            fEsc(l.code),fFmt(l.remaining),fEsc(item?.unit||'')
+          ];
+        })
+    );
+  };
 
-        const clean=[];
+  function bindFactoryForms(){
+    const supplier=f$('factorySupplierForm');
+    if(supplier)supplier.onsubmit=e=>{e.preventDefault();createFactoryMaster('supplier',e.target)};
+    const owner=f$('factoryOwnerForm');
+    if(owner)owner.onsubmit=e=>{e.preventDefault();createFactoryMaster('owner',e.target)};
+    const item=f$('factoryItemForm');
+    if(item)item.onsubmit=e=>{e.preventDefault();createFactoryMaster('item',e.target)};
+
+    const issue=f$('factoryIssueForm');
+    if(issue){
+      factoryRenderUsageRows();
+      issue.onsubmit=async e=>{
+        e.preventDefault();
+        if(!requirePerm('factory_issue','record factory raw material usage'))return;
+        const f=new FormData(e.target);
+        const productionRequestId=String(f.get('productionRequestId')||'');
+        const prod=factoryProductionById(productionRequestId);
+        if(!prod)return toast('Select a finished production job');
+        if(!factoryProductionJobs().some(x=>x.id===productionRequestId))return toast('Only finished production jobs can receive raw material usage');
+
+        const rows=[];
         for(const row of factoryUsageRows){
           const item=factoryDb.items.find(x=>x.id===row.itemId);
           const q=Number(row.qty);
-          if(!item)return toast('Select a material on every usage line');
-          if(!Number.isFinite(q)||q<=0)return toast('Enter a valid positive quantity on every usage line');
-          clean.push({item,q});
+          if(!item)return toast('Select a raw material on every line');
+          if(!Number.isFinite(q)||q<=0)return toast('Enter a valid used quantity on every line');
+          rows.push({
+            item,q,
+            supplier:factoryDb.suppliers.find(x=>x.id===row.supplierId)||null,
+            owner:factoryDb.owners.find(x=>x.id===row.ownerId)||null
+          });
         }
-        if(!clean.length)return toast('Add at least one material usage line');
+        if(!rows.length)return toast('Add at least one raw material');
 
-        const date=String(form.get('date')||fToday());
-        const notes=String(form.get('notes')||'').trim();
+        const job=prod.orderNo||prod.prodNo||prod.id;
+        const notes=String(f.get('notes')||'').trim();
         const usageBatchId=fUid();
-        const job=factoryJobNo(prod);
-        await factoryCommit(`Recorded actual material usage for ${job}`,d=>{
-          clean.forEach(({item,q})=>d.issues.push({
+        await factoryCommit(`Recorded raw material usage for ${job}`,d=>{
+          rows.forEach(({item,q,supplier,owner})=>d.issues.push({
             id:fUid(),usageBatchId,
-            productionRequestId:prod.id,job,date,notes,
-            itemId:item.id,itemName:item.name,unit:item.unit,qty:q,
+            job,productionRequestId,exception:false,
+            qty:q,date:String(f.get('date')||fToday()),notes,
+            itemId:item.id,itemName:item.name,unit:item.unit,
+            supplierId:supplier?.id||'',supplierName:supplier?.name||'',
+            ownerId:owner?.id||'',ownerName:owner?.name||'',
             price:item.price??null,
             productionSnapshot:{
-              orderNo:factoryJobNo(prod),
-              piSerial:prod.piSerial||'',
-              customerName:prod.customerName||'',
-              size:prod.size||'',material:prod.material||'',layout:prod.layout||'',
+              orderNo:prod.orderNo||'',piSerial:prod.piSerial||'',
+              customerName:prod.customerName||'',size:prod.size||'',
+              material:prod.material||'',layout:prod.layout||'',
               pcs:prod.pcs||0,requestQty:prod.requestQty||0,
               finishedQty:prod.finishedQty||prod.packing?.total||prod.requestQty||0,
               unit:prod.unit||'Rolls',status:prod.status||''
             },
             issuedBy:currentUser?.username||'',
             issuedByDisplay:currentUser?.display||'',
-            createdAt:new Date().toISOString()
+            issuedAt:new Date().toISOString()
           }));
         });
-        factoryUsageRows=[{itemId:'',qty:''}];
+        factoryUsageRows=[{itemId:'',supplierId:'',ownerId:'',qty:''}];
       };
     }
+  }
 
-    const item=f$('factoryItemForm');
-    if(item)item.onsubmit=async e=>{
-      e.preventDefault();
-      if(!fCan('factory_manage'))return requirePerm('factory_manage','manage Factory material masters');
-      const f=new FormData(e.target);
-      const name=String(f.get('name')||'').trim();
-      const unit=String(f.get('unit')||'').trim();
-      if(!name||!unit)return toast('Material name and unit are required');
-      if(factoryDb.items.some(x=>String(x.name).toLowerCase()===name.toLowerCase()))return toast('Material already exists');
+  async function createFactoryMaster(kind,form){
+    if(!requirePerm('factory_manage','manage Factory masters'))return;
+    const f=new FormData(form);
+    const name=String(f.get('name')||'').trim();
+    if(!name)return toast('Name is required');
+    const list=kind==='item'?'items':kind==='owner'?'owners':'suppliers';
+    if(factoryDb[list].some(x=>String(x.name).toLowerCase()===name.toLowerCase()))return toast('Name already exists');
+    const entry={id:fUid(),name,description:String(f.get('description')||'').trim()};
+    if(kind==='item'){
+      entry.unit=String(f.get('unit')||'').trim();
+      if(!entry.unit)return toast('Unit is required');
       const raw=f.get('price');
-      const price=raw===''?null:Number(raw);
-      if(price!==null&&(!Number.isFinite(price)||price<0))return toast('Invalid unit cost');
-      await factoryCommit(`Created Factory material: ${name}`,d=>d.items.push({
-        id:fUid(),name,unit,price,
-        description:String(f.get('description')||'').trim(),
-        createdBy:currentUser?.username||'',createdAt:new Date().toISOString()
-      }));
-    };
+      entry.price=raw===''?null:Number(raw);
+      if(entry.price!==null&&(!Number.isFinite(entry.price)||entry.price<0))return toast('Invalid price');
+    }
+    await factoryCommit(`Created Factory ${kind}: ${name}`,d=>d[list].push(entry));
   }
 
   window.editFactoryPrice=async function(id){
-    if(!fCan('factory_manage'))return requirePerm('factory_manage','edit Factory material costs');
+    if(!requirePerm('factory_manage','edit Factory material prices'))return;
     const item=factoryDb.items.find(x=>x.id===id);if(!item)return;
-    if(!protectedEdit('change Factory material cost'))return;
-    const v=prompt('Unit cost in LKR. Blank = unknown. Applies only to future usage entries.',item.price??'');
+    if(!protectedEdit('change Factory material price'))return;
+    const v=prompt('Unit price in LKR. Blank = unknown. Applies only to future issues.',item.price??'');
     if(v===null)return;
     const p=v.trim()===''?null:Number(v);
-    if(p!==null&&(!Number.isFinite(p)||p<0))return toast('Invalid cost');
-    await factoryCommit(`Updated Factory material cost: ${item.name}`,d=>{d.items.find(x=>x.id===id).price=p});
+    if(p!==null&&(!Number.isFinite(p)||p<0))return toast('Invalid price');
+    await factoryCommit(`Updated Factory price: ${item.name}`,d=>{d.items.find(x=>x.id===id).price=p});
   };
 
-  window.deleteFactoryUsage=async function(id){
-    if(!fCan('factory_manage'))return requirePerm('factory_manage','correct Factory usage history');
-    const line=factoryDb.issues.find(x=>x.id===id);if(!line)return;
-    if(!protectedEdit('delete this Factory material usage line'))return;
-    if(!confirm(`Delete ${line.itemName} ${fFmt(line.qty)} ${line.unit} from ${line.job}?`))return;
-    await factoryCommit(`Deleted Factory usage line from ${line.job}: ${line.itemName}`,d=>{
-      d.issues=d.issues.filter(x=>x.id!==id);
-    });
-  };
-
-  function factoryJobMarkup(id,showCost=false,interactive=false){
-    const lines=factoryUsageForJob(id);
-    if(!lines.length)return '<div class="empty">No material usage recorded for this production job.</div>';
-    const prod=factoryProductionById(id);
+  function factoryJobKey(i){return i.productionRequestId||i.job}
+  function factoryJobMarkup(key,showCost=false,interactive=false){
+    const lines=(factoryDb.issues||[]).filter(i=>(i.productionRequestId||i.job)===key);
+    if(!lines.length)return '<div class="empty">No raw material usage for this job.</div>';
+    const prodId=lines.find(i=>i.productionRequestId)?.productionRequestId||'';
+    const prod=prodId?factoryProductionById(prodId):null;
     const snap=lines[0].productionSnapshot||{};
     const p=prod||snap;
     let unknown=0,total=0;
     const rows=lines.map(i=>{
-      const lineCost=(i.price===null||i.price===undefined)?null:Number(i.qty||0)*Number(i.price||0);
-      if(lineCost===null)unknown++;else total+=lineCost;
+      const cost=i.price===null||i.price===undefined?null:Number(i.qty||0)*Number(i.price||0);
+      if(cost===null)unknown++;else total+=cost;
       return [
-        fEsc(i.itemName),fFmt(i.qty),fEsc(i.unit||''),
-        ...(showCost?[i.price===null||i.price===undefined?'COST MISSING':fMoney(i.price),lineCost===null?'UNPRICED':fMoney(lineCost)]:[]),
-        ...(interactive&&fCan('factory_manage')?[`<button class="btn red sm" type="button" onclick="deleteFactoryUsage('${i.id}')">Delete</button>`]:[])
+        fEsc(i.itemName),fEsc(i.supplierName||fName(factoryDb.suppliers,i.supplierId)),
+        fEsc(i.ownerName||fName(factoryDb.owners,i.ownerId)),
+        fFmt(i.qty),fEsc(i.unit),
+        ...(showCost?[i.price===null||i.price===undefined?'PRICE MISSING':fMoney(i.price),cost===null?'UNPRICED':fMoney(cost)]:[])
       ];
     });
-    return `
-      <div class="factory-job-head">
-        <b>${fEsc(factoryJobNo(p)||lines[0].job)}</b>
-        <span>${fEsc(p.customerName||'')} • ${fEsc(p.size||'')} ${fEsc(p.material||'')} ${fEsc(p.layout||'')} • Finished ${fFmt(p.finishedQty||p.packing?.total||p.requestQty||0)} ${fEsc(p.unit||'Rolls')} • ${fEsc(p.status||'')}</span>
-      </div>
-      ${factoryTable(['Material','Actual Used','Unit',...(showCost?['Unit Cost','Material Cost']:[]),...(interactive&&fCan('factory_manage')?['Correction']:[])],rows)}
-      ${showCost?`<div class="factory-cost-total"><span>${unknown?'Known material subtotal':'Total material cost'}</span><b>${fMoney(total)}</b></div>${unknown?`<div class="notice">${unknown} material line${unknown===1?'':'s'} missing unit cost. Full job cost is incomplete.</div>`:''}`:''}`;
+    const heading=`<div class="factory-job-head"><b>${fEsc(prod?.orderNo||prod?.prodNo||snap.orderNo||lines[0].job)}</b><span>${fEsc(p.customerName||'')} • ${fEsc(p.size||'')} ${fEsc(p.material||'')} ${fEsc(p.layout||'')} • Finished ${fFmt(p.finishedQty||p.packing?.total||p.requestQty||0)} ${fEsc(p.unit||'Rolls')} • ${fEsc(p.status||'')}</span></div>`;
+    return `${heading}${factoryTable(
+      ['Raw Material','Supplier','Ownership','Actual Used','Unit',...(showCost?['Unit Price','Material Cost']:[])],
+      rows
+    )}${showCost?`<div class="factory-cost-total"><span>${unknown?'Known material subtotal':'Total material cost'}</span><b>${fMoney(total)}</b></div>${unknown?`<div class="notice">${unknown} unpriced line(s). Full job material cost is incomplete.</div>`:''}`:''}`;
   }
-
   window.showFactoryJob=function(){
-    const id=f$('factoryReportJob')?.value||'';
-    if(f$('factoryJobDetail'))f$('factoryJobDetail').innerHTML=id?factoryJobMarkup(id,fCan('factory_cost_view'),true):'';
+    const key=f$('factoryReportJob')?.value||'';
+    if(f$('factoryJobDetail'))f$('factoryJobDetail').innerHTML=key?factoryJobMarkup(key,fCan('factory_cost_view'),true):'';
   };
-
-  window.renderFactoryConsumptionReport=function(){
-    const from=f$('factoryReportFrom')?.value||'';
-    const to=f$('factoryReportTo')?.value||'';
-    const host=f$('factoryConsumptionReport');if(!host)return;
-    if(from&&to&&from>to)return toast('From date cannot be after To date');
-    const lines=(factoryDb.issues||[]).filter(i=>(!from||i.date>=from)&&(!to||i.date<=to));
-    const grouped=new Map();
-    lines.forEach(i=>{
-      const key=i.itemId||`${i.itemName}|${i.unit}`;
-      if(!grouped.has(key))grouped.set(key,{name:i.itemName,unit:i.unit,qty:0,cost:0,unknown:false,jobs:new Set()});
-      const g=grouped.get(key);
-      g.qty+=Number(i.qty||0);
-      g.jobs.add(i.productionRequestId||i.job);
-      if(i.price===null||i.price===undefined)g.unknown=true;
-      else g.cost+=Number(i.qty||0)*Number(i.price||0);
-    });
-    const rows=[...grouped.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(g=>[
-      fEsc(g.name),fFmt(g.qty),fEsc(g.unit||''),g.jobs.size,
-      ...(fCan('factory_cost_view')?[g.unknown?`${fMoney(g.cost)} + unpriced`:fMoney(g.cost)]:[])
-    ]);
-    const totalCost=lines.reduce((s,i)=>s+(i.price===null||i.price===undefined?0:Number(i.qty||0)*Number(i.price||0)),0);
-    host.innerHTML=`
-      <div class="factory-consumption-summary">
-        <span>${lines.length} usage lines</span>
-        <span>${new Set(lines.map(i=>i.productionRequestId||i.job)).size} production jobs</span>
-        ${fCan('factory_cost_view')?`<span>${fMoney(totalCost)} known material cost</span>`:''}
-      </div>
-      ${factoryTable(['Material','Total Used','Unit','Jobs',...(fCan('factory_cost_view')?['Known Cost']:[])],rows)}`;
-  };
-
   window.printFactoryJob=function(cost){
-    if(!fCan('factory_reports'))return requirePerm('factory_reports','print Factory reports');
-    if(cost&&!fCan('factory_cost_view'))return requirePerm('factory_cost_view','view Factory material cost');
-    const id=f$('factoryReportJob')?.value||'';
-    if(!id)return toast('Select a production job');
+    if(!requirePerm('factory_reports','print Factory job reports'))return;
+    if(cost&&!requirePerm('factory_cost_view','view Factory material cost'))return;
+    const key=f$('factoryReportJob')?.value||'';
+    if(!key)return toast('Select a production job');
     const w=window.open('','_blank','width=1100,height=800');
     if(!w)return toast('Allow pop-ups to print the Factory report');
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Factory Job Report</title><style>
       body{font:12px Arial;color:#173439;padding:20px}h1{color:#098f91}.factory-table{width:100%;border-collapse:collapse}.factory-table th,.factory-table td{border:1px solid #dbe6e7;padding:7px;text-align:left}.factory-job-head{margin:12px 0}.factory-job-head b{font-size:18px;display:block}.factory-job-head span{color:#60767b}.factory-cost-total{display:flex;justify-content:flex-end;gap:20px;margin-top:12px;font-size:16px}.btn,.notice{display:none}@page{size:A4 landscape;margin:12mm}
-    </style></head><body><h1>SOFTCREATION · Factory</h1><p>${cost?'MATERIAL COST REPORT':'ACTUAL MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(id,cost,false)}</body></html>`);
+    </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}</body></html>`);
     w.document.close();w.focus();setTimeout(()=>w.print(),250);
   };
+  window.exportFactoryBackup=function(){
+    if(!requirePerm('factory_manage','export Factory backup'))return;
+    const blob=new Blob([JSON.stringify(factoryDb,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='softcreation-factory-backup-'+fToday()+'.json';a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  async function restoreFactoryBackup(e){
+    if(!requirePerm('factory_manage','restore Factory backup'))return;
+    if(!protectedEdit('restore Factory inventory backup')){e.target.value='';return}
+    const file=e.target.files?.[0];if(!file)return;
+    try{
+      const raw=JSON.parse(await file.text());
+      const n=factoryNormalize(raw);
+      for(const k of ['items','suppliers','owners','lots','issues','returns','audit'])if(!Array.isArray(n[k]))throw new Error('Invalid backup');
+      if(!confirm('Replace the current Factory cloud state with this backup?'))return;
+      await factoryCommit('Factory backup restored',d=>{
+        for(const k of ['items','suppliers','owners','lots','issues','returns','audit'])d[k]=JSON.parse(JSON.stringify(n[k]));
+      });
+    }catch(err){toast('Factory restore failed — '+err.message)}
+    finally{e.target.value=''}
+  }
 
   function installFactoryUI(){
     FACTORY_FEATURES.forEach(f=>{if(!USER_FEATURES.some(x=>x[0]===f[0]))USER_FEATURES.push(f)});
@@ -18130,7 +18108,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       section.innerHTML=`
         <div class="panel">
           <div class="panel-title factory-title-row">
-            <div><span>Factory</span><small>Production Material Consumption • Job Usage • Material Cost</small></div>
+            <div><span>Factory</span><small>Raw Material Usage • Production Jobs • Job Cost</small></div>
             <div class="factory-title-actions">
               <span id="factoryCloudStatus" class="factory-cloud-status">Not loaded</span>
               <button class="btn sm" style="background:#fff;color:#087f83" type="button" onclick="loadFactoryCloud(true)">Refresh</button>
@@ -18138,7 +18116,7 @@ window.toggleBpSeparateDeliveryButton = function(){
           </div>
           <div class="panel-body">
             <div id="factorySubnav" class="factory-subnav"></div>
-            <div id="factoryBody"><div class="factory-loading">Open Factory to load material usage.</div></div>
+            <div id="factoryBody"><div class="factory-loading">Open Factory to load inventory.</div></div>
           </div>
         </div>`;
       app.appendChild(section);
@@ -18175,6 +18153,9 @@ window.toggleBpSeparateDeliveryButton = function(){
       try{refreshAll=window.refreshAll}catch(_){}
     }
 
+    window.loadFactoryCloud=loadFactoryCloud;
+
+    try{renderUserPrivilegeEditor(null)}catch(_){}
     try{applyUserAccess()}catch(_){}
   }
 
