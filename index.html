@@ -113,7 +113,6 @@
         <button class="navbtn" data-view="devices">Device Master</button>
         <button class="navbtn" data-view="admin">Admin Panel</button>
         <button class="navbtn" data-view="settings">Settings</button>
-        <button class="navbtn" data-view="factory">Factory</button>
       </nav>
     </div>
 
@@ -573,17 +572,6 @@
 
 </section>
   <section id="devices" class="view"><div class="panel"><div class="panel-title">Device Item Master <button class="btn sm" style="background:#fff;color:#087f83" onclick="openDeviceModal()">+ Device Add</button></div><div class="panel-body"><div class="listbar"><input class="search" id="deviceSearch" placeholder="Search device / model" oninput="renderDevices()"/></div><div id="deviceList" class="device-grid"></div></div></div></section>
-<section id="factory" class="view">
-  <div class="panel factory-host-panel">
-    <div class="panel-title">
-      <span>Factory</span>
-      <span style="font-size:10px;font-weight:650">Raw Material Inventory • Production Usage • Job Cost</span>
-    </div>
-    <div class="factory-frame-wrap">
-      <iframe id="factoryInventoryFrame" class="factory-frame" src="about:blank" data-src="Factory_Inventory.html" title="SoftCreation Factory Inventory"></iframe>
-    </div>
-  </div>
-</section>
   <section id="admin" class="view"><div class="panel"><div class="panel-title">Admin Cost & Profit Control</div><div class="panel-body"><div class="notice"><b>Snapshot control:</b> Rate changes apply only to future calculations. Saved quotations retain their original cost snapshot and profit basis.</div><div class="section">Current Excel Cost Assumptions</div><div class="assumption-grid"><div class="field"><label>TT - LKR / SQM</label><input id="admTT" type="number" step="0.01"></div><div class="field"><label>DT TOP - LKR / SQM</label><input id="admDTTop" type="number" step="0.01"></div><div class="field"><label>PVC - LKR / SQM</label><input id="admPVC" type="number" step="0.01"></div><div class="field"><label>DT ECO - LKR / SQM</label><input id="admDTEco" type="number" step="0.01"></div><div class="field"><label>HIGHSTICK - LKR / SQM</label><input id="admHighstick" type="number" step="0.01"></div><div class="field"><label>Core Cost / Roll</label><input id="admCore" type="number" step="0.01"></div><div class="field"><label>Strapping Roll Cost</label><input id="admStrap" type="number" step="0.01"></div><div class="field"><label>Stretch Film Cost</label><input id="admStretch" type="number" step="0.01"></div><div class="field"><label>Service Charge / SQM</label><input id="admService" type="number" step="0.01"></div><div class="field"><label>Scale Service / SQM</label><input id="admScaleService" type="number" step="0.01"></div><div class="field"><label>VAT %</label><input id="admVat" type="number" step="0.01"></div><div class="field"><label>SSCL Taxable Share %</label><input id="admSsclShare" type="number" step="0.01"></div><div class="field"><label>SSCL Rate %</label><input id="admSsclRate" type="number" step="0.01"></div><div class="field"><label>Default Commission %</label><input id="admCommission" type="number" step="0.01"></div></div><div class="actions"><button class="btn primary" onclick="saveAdminAssumptions()">Save Rates for Future Prices</button></div><div class="section">Quotation Profit Report</div><div class="grid"><div class="field full"><label>Select Saved Quotation / PI</label><select id="profitDoc" onchange="renderProfitReport()"></select></div><div class="field"><label>Commission %</label><input id="profitCommission" type="number" step="0.01" oninput="renderProfitReport()"></div><div class="field"><label>Delivery Expense (LKR)</label><input id="profitDelivery" type="number" step="0.01" value="0" oninput="renderProfitReport()"></div><div class="field"><label>Other Expense (LKR)</label><input id="profitOther" type="number" step="0.01" value="0" oninput="renderProfitReport()"></div></div><div id="profitReport" class="admin-report"></div><div class="actions"><button class="btn green" onclick="downloadProfitReportPDF()">Download Profit Report PDF</button></div></div></div></section>
   <section id="settings" class="view"><div class="panel"><div class="panel-title">System Settings</div><div class="panel-body"><div class="grid">
       <div class="field"><label>Company Prefix</label><input id="setPrefix" value="SC"/></div><div class="field"><label>VAT Rate %</label><input id="setVat" type="number" value="18"/></div>
@@ -2841,7 +2829,7 @@ downloadProfitReportPDF=async function(){const id=$('profitDoc').value,doc=state
 
 /* V6 user-specific feature and price-category privileges */
 const USER_FEATURES=[
- ['dashboard','Dashboard & Reports'],['create_quote','Create / Edit Quotation'],['save_quote','Save Quotation'],['view_quotes','View Quotations'],['quote_pdf','Quotation PDF'],['convert_pi','Convert Quotation to PI'],['view_pi','View / Save PI'],['customers','Customer Master'],['label_pricing','Label Price Calculator'],['label_master','Label Master'],['device_quote','Device Quotation'],['device_master','Device Master'],['product_quote','Ribbon / Paper Quotation'],['product_master','Ribbon / Paper Master'],['products_view','Products — Live Production Summary'],['products_view_jobs','Products — View Product Jobs'],['purchase_orders_view','Purchase Orders — Supplier Procurement'],['factory_view','Factory — Inventory & Job Usage'],['factory_manage','Factory — Admin / Master & Cost'],['price_categories','Price Category Master'],['admin_profit','Cost & Profit Admin Panel'],['settings','System Settings'],['manage_users','User Management'],['delete_docs','Delete / Revise Documents'],['import_export','Backup Import / Export']
+ ['dashboard','Dashboard & Reports'],['create_quote','Create / Edit Quotation'],['save_quote','Save Quotation'],['view_quotes','View Quotations'],['quote_pdf','Quotation PDF'],['convert_pi','Convert Quotation to PI'],['view_pi','View / Save PI'],['customers','Customer Master'],['label_pricing','Label Price Calculator'],['label_master','Label Master'],['device_quote','Device Quotation'],['device_master','Device Master'],['product_quote','Ribbon / Paper Quotation'],['product_master','Ribbon / Paper Master'],['products_view','Products — Live Production Summary'],['products_view_jobs','Products — View Product Jobs'],['purchase_orders_view','Purchase Orders — Supplier Procurement'],['price_categories','Price Category Master'],['admin_profit','Cost & Profit Admin Panel'],['settings','System Settings'],['manage_users','User Management'],['delete_docs','Delete / Revise Documents'],['import_export','Backup Import / Export']
 ];
 const DEFAULT_SALES_PERMS=['dashboard','create_quote','save_quote','view_quotes','quote_pdf','customers','label_pricing','device_quote','product_quote'];
 function userRecord(){return state.users.find(u=>u.id===currentUser?.id)}
@@ -2863,7 +2851,7 @@ renderUsers=function(){const box=$('userList');if(!box)return;box.innerHTML=`<ta
 
 const loginUserV6=loginUser;loginUser=function(){loginUserV6();if(currentUser){const u=userRecord();currentUser={id:u.id,username:u.username,display:u.display,role:u.role,permissions:u.permissions||DEFAULT_SALES_PERMS,priceCategoryIds:u.priceCategoryIds||[]};sessionStorage.setItem('sc_active_user',JSON.stringify(currentUser));applyUserAccess()}};
 const restoreSessionV6=restoreSession;restoreSession=function(){restoreSessionV6();if(currentUser){const u=userRecord();if(u){currentUser={id:u.id,username:u.username,display:u.display,role:u.role,permissions:u.permissions||DEFAULT_SALES_PERMS,priceCategoryIds:u.priceCategoryIds||[]};sessionStorage.setItem('sc_active_user',JSON.stringify(currentUser))}applyUserAccess()}};
-const VIEW_PERMS={dashboard:'dashboard',editor:'create_quote',quotations:'view_quotes',pis:'view_pi',customers:'customers',items:'label_master',devices:'device_master',products:'product_master',categories:'price_categories',admin:'admin_profit',settings:'settings',factory:'factory_view'};
+const VIEW_PERMS={dashboard:'dashboard',editor:'create_quote',quotations:'view_quotes',pis:'view_pi',customers:'customers',items:'label_master',devices:'device_master',products:'product_master',categories:'price_categories',admin:'admin_profit',settings:'settings'};
 const showViewV6=showView;showView=function(id){if(id==='editor'&&(hasPerm('create_quote')||hasPerm('view_pi')))return showViewV6(id);const p=VIEW_PERMS[id];if(p&&!hasPerm(p))return requirePerm(p,`open ${id}`);return showViewV6(id)};
 function applyUserAccess(){document.querySelectorAll('.navbtn[data-view]').forEach(b=>{const p=VIEW_PERMS[b.dataset.view];b.style.display=!p||hasPerm(p)?'inline-block':'none'});const calc=document.querySelector('.price-calc');if(calc&&!hasPerm('label_pricing'))calc.style.display='none';calculateLabelPrice();const active=document.querySelector('.view.active');if(active&&VIEW_PERMS[active.id]&&!hasPerm(VIEW_PERMS[active.id]))showView(hasPerm('dashboard')?'dashboard':hasPerm('view_quotes')?'quotations':'editor')}
 
@@ -17484,92 +17472,717 @@ window.toggleBpSeparateDeliveryButton = function(){
 
 
 <script>
-/* =========================================================
-   FACTORY MODULE BRIDGE
-   - Uses existing user privileges.
-   - Does not modify quotation / PI / production business rules.
-   ========================================================= */
+/* =====================================================================
+   SOFTCREATION NATIVE FACTORY INVENTORY MODULE v1.0
+   Uses the existing BOS shell, currentUser/permissions, productionRequests,
+   Supabase browser key and the already-created factory inventory RPC/tables.
+   No iframe. No second login. No separate app.
+   ===================================================================== */
 (function(){
   'use strict';
 
-  function factoryContext(){
-    const user=currentUser?{
-      id:currentUser.id||'',
-      username:currentUser.username||'',
-      display:currentUser.display||currentUser.username||'',
-      role:currentUser.role||'user',
-      permissions:Array.isArray((typeof userRecord==='function'&&userRecord())?.permissions)
-        ? (userRecord().permissions||[])
-        : (currentUser.permissions||[])
-    }:null;
-    return {
-      type:'SOFTCREATION_FACTORY_CONTEXT',
-      user,
-      canView:typeof hasPerm==='function'?hasPerm('factory_view'):currentUser?.role==='admin',
-      canManage:typeof hasPerm==='function'?hasPerm('factory_manage'):currentUser?.role==='admin'
-    };
-  }
+  const FACTORY_WORKSPACE='softcreation_main';
+  const FACTORY_REST='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
+  const FACTORY_CACHE_KEY='softcreation_factory_inventory_cloud_cache_v1';
+  const FACTORY_FEATURES=[
+    ['factory_view','Factory — Inventory'],
+    ['factory_stock_in','Factory — Stock In'],
+    ['factory_issue','Factory — Issue / Return Materials'],
+    ['factory_reports','Factory — Job & Usage Reports'],
+    ['factory_manage','Factory — Masters / Backup / Admin'],
+    ['factory_cost_view','Factory — Material Cost View']
+  ];
 
-  window.sendFactoryContext=function(){
-    const frame=document.getElementById('factoryInventoryFrame');
-    if(!frame)return;
-    const ctx=factoryContext();
-    if(!ctx.canView)return;
-    const target=frame.dataset.src||'Factory_Inventory.html';
-    if(!frame.dataset.loaded){
-      frame.dataset.loaded='1';
-      frame.src=target;
-      return;
-    }
-    if(!frame.contentWindow)return;
-    try{frame.contentWindow.postMessage(ctx,location.origin)}catch(e){
-      console.warn('Factory context send failed',e);
-    }
+  let factoryDb={
+    version:2,revision:0,items:[],suppliers:[],owners:[],
+    lots:[],issues:[],returns:[],audit:[]
   };
+  let factoryLoaded=false;
+  let factoryLoading=false;
+  let factoryPage='Dashboard';
 
-  const frame=document.getElementById('factoryInventoryFrame');
-  if(frame)frame.addEventListener('load',()=>setTimeout(window.sendFactoryContext,0));
+  const f$=id=>document.getElementById(id);
+  const fEsc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fNum=v=>Number(v);
+  const fQty=v=>Math.round(Number(v||0)*1e6)/1e6;
+  const fFmt=v=>Number(v||0).toLocaleString('en-LK',{maximumFractionDigits:4});
+  const fMoney=v=>'LKR '+Number(v||0).toLocaleString('en-LK',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fToday=()=>new Date().toISOString().slice(0,10);
+  const fUid=()=>typeof uid==='function'?uid('factory'):((crypto.randomUUID&&crypto.randomUUID())||Date.now().toString(36)+Math.random().toString(36).slice(2));
+  const fName=(list,id)=>list.find(x=>x.id===id)?.name||'Unknown';
+  const fCan=p=>currentUser?.role==='admin'||hasPerm(p);
 
-  if(typeof window.showView==='function'){
-    const factoryShowViewBase=window.showView;
-    window.showView=function(id){
-      const result=factoryShowViewBase.apply(this,arguments);
-      if(id==='factory')setTimeout(window.sendFactoryContext,0);
-      return result;
-    };
-    try{showView=window.showView}catch(_){}
+  function factoryBlank(){
+    return {version:2,revision:0,items:[],suppliers:[],owners:[],lots:[],issues:[],returns:[],audit:[]};
   }
-
-  if(typeof window.loginUser==='function'){
-    const factoryLoginBase=window.loginUser;
-    window.loginUser=function(){
-      const result=factoryLoginBase.apply(this,arguments);
-      setTimeout(window.sendFactoryContext,0);
-      return result;
-    };
-    try{loginUser=window.loginUser}catch(_){}
+  function factoryNormalize(raw){
+    const d={...factoryBlank(),...(raw&&typeof raw==='object'?raw:{})};
+    ['items','suppliers','owners','lots','issues','returns','audit'].forEach(k=>{
+      if(!Array.isArray(d[k]))d[k]=[];
+    });
+    d.version=2;
+    d.revision=Number(d.revision||0);
+    delete d.auth;
+    return d;
   }
-
-  if(typeof window.restoreSession==='function'){
-    const factoryRestoreBase=window.restoreSession;
-    window.restoreSession=function(){
-      const result=factoryRestoreBase.apply(this,arguments);
-      setTimeout(window.sendFactoryContext,0);
-      return result;
-    };
-    try{restoreSession=window.restoreSession}catch(_){}
+  function factoryKey(){
+    const key=(localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
+    if(!key)throw new Error('Supabase browser key is not configured on this device.');
+    return key;
   }
-
-  window.addEventListener('message',e=>{
-    if(e.origin!==location.origin)return;
-    if(e.data?.type==='SOFTCREATION_FACTORY_HEIGHT'){
-      const f=document.getElementById('factoryInventoryFrame');
-      if(f){
-        const h=Math.max(720,Math.min(2400,Number(e.data.height)||900));
-        f.style.height=h+'px';
+  async function factoryFetch(path,options={}){
+    const key=factoryKey();
+    const headers={apikey:key,...(options.headers||{})};
+    if(key.startsWith('eyJ'))headers.Authorization='Bearer '+key;
+    const res=await fetch(FACTORY_REST+path,{...options,headers});
+    const txt=await res.text();
+    if(!res.ok)throw new Error(txt||`Factory cloud request failed (${res.status})`);
+    if(!txt)return null;
+    try{return JSON.parse(txt)}catch(_){return txt}
+  }
+  function factoryCache(){
+    try{localStorage.setItem(FACTORY_CACHE_KEY,JSON.stringify(factoryDb))}catch(_){}
+  }
+  async function loadFactoryCloud(force=false){
+    if(factoryLoading)return;
+    if(factoryLoaded&&!force)return;
+    factoryLoading=true;
+    factorySetStatus('Connecting to Factory cloud…','loading');
+    try{
+      const rows=await factoryFetch(`/spgs_factory_inventory_state?workspace=eq.${encodeURIComponent(FACTORY_WORKSPACE)}&select=revision,payload,updated_at,updated_by&limit=1`);
+      if(rows?.length){
+        factoryDb=factoryNormalize(rows[0].payload);
+        factoryDb.revision=Number(rows[0].revision||factoryDb.revision||0);
+      }else{
+        factoryDb=factoryBlank();
+      }
+      factoryLoaded=true;
+      factoryCache();
+      factorySetStatus('Factory inventory is live','ok');
+      renderFactory();
+    }catch(e){
+      console.error('Factory load failed',e);
+      try{
+        const cached=JSON.parse(localStorage.getItem(FACTORY_CACHE_KEY)||'null');
+        if(cached){
+          factoryDb=factoryNormalize(cached);
+          factoryLoaded=true;
+          factorySetStatus('Cloud unavailable — showing last cached data (read only)','warn');
+          renderFactory();
+        }else throw e;
+      }catch(_){
+        factorySetStatus('Factory cloud connection failed','bad');
+        if(f$('factoryBody'))f$('factoryBody').innerHTML=`<div class="notice"><b>Factory cloud unavailable.</b><br>${fEsc(e.message)}</div>`;
+      }
+    }finally{factoryLoading=false}
+  }
+  function factorySetStatus(text,kind=''){
+    const el=f$('factoryCloudStatus');
+    if(!el)return;
+    el.textContent=text;
+    el.className='factory-cloud-status '+kind;
+  }
+  async function factoryCommit(action,mutator){
+    if(!factoryLoaded)return toast('Factory data is not loaded yet');
+    const next=JSON.parse(JSON.stringify(factoryDb));
+    mutator(next);
+    next.version=2;
+    next.audit=next.audit||[];
+    next.audit.push({
+      id:fUid(),
+      at:new Date().toISOString(),
+      user:currentUser?.username||'unknown',
+      display:currentUser?.display||'',
+      action
+    });
+    const expected=Number(factoryDb.revision||0);
+    try{
+      const rows=await factoryFetch('/rpc/spgs_factory_inventory_commit',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          p_workspace:FACTORY_WORKSPACE,
+          p_expected_revision:expected,
+          p_payload:next,
+          p_updated_by:currentUser?.username||'unknown',
+          p_action:action
+        })
+      });
+      const row=Array.isArray(rows)?rows[0]:rows;
+      if(!row)throw new Error('Factory cloud did not return the saved revision');
+      factoryDb=factoryNormalize(row.payload||next);
+      factoryDb.revision=Number(row.revision||factoryDb.revision||expected+1);
+      factoryCache();
+      renderFactory();
+      toast('Factory saved successfully');
+    }catch(e){
+      console.error('Factory save failed',e);
+      if(String(e.message).includes('FACTORY_REVISION_CONFLICT')||String(e.message).includes('40001')){
+        toast('Factory data changed on another device. Latest data has been reloaded.');
+        await loadFactoryCloud(true);
+      }else{
+        toast('Factory save failed — '+e.message);
       }
     }
-  });
+  }
+
+  function factoryProductionJobs(){
+    const allowed=new Set(['Requested','Approved','Planned','In Production','QC Check']);
+    return (state.productionRequests||[])
+      .filter(r=>r?.id&&allowed.has(String(r.status||'Requested')))
+      .sort((a,b)=>String(a.orderNo||'').localeCompare(String(b.orderNo||''),undefined,{numeric:true}));
+  }
+  function factoryProductionById(id){
+    return (state.productionRequests||[]).find(r=>r.id===id)||null;
+  }
+  function factoryReturned(issueId){
+    return (factoryDb.returns||[]).filter(x=>x.issue===issueId).reduce((s,x)=>s+Number(x.qty||0),0);
+  }
+  function factoryOptions(list,placeholder='Select…'){
+    return `<option value="">${fEsc(placeholder)}</option>`+list.map(x=>`<option value="${fEsc(x.id)}">${fEsc(x.name)}</option>`).join('');
+  }
+  function factoryField(label,input){
+    return `<div class="factory-field"><label>${label}</label>${input}</div>`;
+  }
+  function factoryTable(headers,rows){
+    return `<div class="factory-scroll"><table class="factory-table"><thead><tr>${headers.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>'<tr>'+r.map(x=>`<td>${x}</td>`).join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}" class="small">No records yet</td></tr>`}</tbody></table></div>`;
+  }
+
+  function factoryTabs(){
+    const all=[
+      ['Dashboard','factory_view'],
+      ['Stock in','factory_stock_in'],
+      ['Issue to job','factory_issue'],
+      ['Job reports','factory_reports'],
+      ['Masters','factory_manage'],
+      ['History','factory_view'],
+      ['Backup','factory_manage']
+    ];
+    return all.filter(([,p])=>fCan(p));
+  }
+  function factorySetPage(page){
+    if(!factoryTabs().some(x=>x[0]===page))return;
+    factoryPage=page;
+    renderFactory();
+  }
+  window.factorySetPage=factorySetPage;
+
+  function renderFactory(){
+    const body=f$('factoryBody');
+    if(!body)return;
+    if(!fCan('factory_view')){
+      body.innerHTML='<div class="empty">Factory access is not enabled for this user.</div>';
+      return;
+    }
+    const tabs=factoryTabs();
+    if(!tabs.some(x=>x[0]===factoryPage))factoryPage=tabs[0]?.[0]||'Dashboard';
+    const nav=f$('factorySubnav');
+    if(nav)nav.innerHTML=tabs.map(([t])=>`<button type="button" class="factory-subnav-btn ${factoryPage===t?'active':''}" onclick="factorySetPage('${t}')">${t}</button>`).join('');
+
+    if(!factoryLoaded){
+      body.innerHTML='<div class="factory-loading">Loading Factory inventory…</div>';
+      return;
+    }
+
+    let out='';
+    if(factoryPage==='Dashboard')out=factoryDashboardHtml();
+    else if(factoryPage==='Stock in')out=factoryStockInHtml();
+    else if(factoryPage==='Issue to job')out=factoryIssueHtml();
+    else if(factoryPage==='Job reports')out=factoryReportsHtml();
+    else if(factoryPage==='Masters')out=factoryMastersHtml();
+    else if(factoryPage==='History')out=factoryHistoryHtml();
+    else if(factoryPage==='Backup')out=factoryBackupHtml();
+    body.innerHTML=out;
+    bindFactoryForms();
+    if(factoryPage==='Dashboard')renderFactoryStockTable('');
+  }
+  window.renderFactory=renderFactory;
+
+  function factoryDashboardHtml(){
+    const available=(factoryDb.lots||[]).filter(l=>Number(l.remaining)>0);
+    const activeJobs=factoryProductionJobs();
+    return `
+      <div class="factory-kpis">
+        <div class="factory-kpi"><span>Raw Materials</span><b>${factoryDb.items.length}</b><small>material masters</small></div>
+        <div class="factory-kpi"><span>Available Batches</span><b>${available.length}</b><small>stock lots with balance</small></div>
+        <div class="factory-kpi"><span>Linked Production Jobs</span><b>${activeJobs.length}</b><small>current BOS jobs</small></div>
+        <div class="factory-kpi"><span>Issued Jobs</span><b>${new Set(factoryDb.issues.map(x=>x.productionRequestId||x.job)).size}</b><small>jobs with material usage</small></div>
+      </div>
+      <div class="panel factory-inner-panel">
+        <div class="panel-title"><span>Available Raw Material Stock</span><button class="btn ghost sm" type="button" onclick="loadFactoryCloud(true)">Refresh Cloud</button></div>
+        <div class="panel-body">
+          <div class="listbar"><input id="factoryStockSearch" class="search" placeholder="Search item / supplier / ownership / batch" oninput="renderFactoryStockTable(this.value)"></div>
+          <div id="factoryStockTable"></div>
+        </div>
+      </div>`;
+  }
+  function factoryStockInHtml(){
+    if(!fCan('factory_stock_in'))return '<div class="empty">Stock In permission is not enabled.</div>';
+    return `
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Receive Raw Materials</div>
+        <div class="panel-body">
+          <div class="notice"><b>Factory stock receipt:</b> every receipt keeps its Supplier, Raw Material Ownership and batch balance. These lots are used when issuing material to an existing BOS production job.</div>
+          <form id="factoryReceiveForm">
+            <div class="factory-form-grid">
+              ${factoryField('Item *',`<select name="item" required>${factoryOptions(factoryDb.items)}</select>`)}
+              ${factoryField('Supplier *',`<select name="supplier" required>${factoryOptions(factoryDb.suppliers)}</select>`)}
+              ${factoryField('Raw Material Ownership *',`<select name="owner" required>${factoryOptions(factoryDb.owners)}</select>`)}
+              ${factoryField('Quantity *','<input name="quantity" type="number" step="any" min="0.000001" required>')}
+              ${factoryField('Receipt Date *',`<input name="date" type="date" value="${fToday()}" required>`)}
+              ${factoryField('Supplier Invoice / Reference','<input name="reference" maxlength="120">')}
+            </div>
+            <div class="factory-field"><label>Description / Batch Details</label><textarea name="description" maxlength="500"></textarea></div>
+            <div class="actions"><button class="btn primary" type="submit">Save Stock In</button></div>
+          </form>
+        </div>
+      </div>`;
+  }
+  function factoryIssueHtml(){
+    if(!fCan('factory_issue'))return '<div class="empty">Material Issue permission is not enabled.</div>';
+    const lots=(factoryDb.lots||[]).filter(l=>Number(l.remaining)>0).map(l=>{
+      const item=factoryDb.items.find(i=>i.id===l.item);
+      return {
+        id:l.id,
+        name:`${fName(factoryDb.items,l.item)} | ${fName(factoryDb.owners,l.owner)} | ${fName(factoryDb.suppliers,l.supplier)} | ${fFmt(l.remaining)} ${item?.unit||''} | ${l.code}`
+      };
+    });
+    const jobs=factoryProductionJobs().map(r=>({
+      id:r.id,
+      name:`${r.orderNo||r.prodNo||r.id} | ${r.customerName||'-'} | ${r.size||''} ${r.material||''} ${r.layout||''} | ${fFmt(r.requestQty)} ${r.unit||'Rolls'} | ${r.status}`
+    }));
+    return `
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Issue Raw Materials to Production</div>
+        <div class="panel-body">
+          <div class="notice"><b>Integrated production flow:</b> choose the existing production job from the BOS. The Factory issue stores the production request ID and job number together, so material usage stays linked to that production request.</div>
+          <form id="factoryIssueForm">
+            <div class="factory-form-grid">
+              ${factoryField('Available Material Batch *',`<select name="lot" required>${factoryOptions(lots)}</select>`)}
+              ${factoryField('Use Quantity *','<input name="quantity" type="number" step="any" min="0.000001" required>')}
+              ${factoryField('Production Job',`<select name="productionRequestId" id="factoryProductionJob">${factoryOptions(jobs,'Select active production job')}</select>`)}
+              ${factoryField('Issue Date *',`<input name="date" type="date" value="${fToday()}" required>`)}
+            </div>
+            <label class="checkline"><input type="checkbox" name="exception" id="factoryIssueException" onchange="factoryToggleIssueException()"> No production job — Manager/Admin approval</label>
+            <div class="hint">Use this only for genuine exceptions. A reason and manager/admin password approval are mandatory.</div>
+            <div class="factory-field"><label>Purpose / Notes</label><textarea name="notes" maxlength="500"></textarea></div>
+            <div class="actions"><button class="btn primary" type="submit">Issue Material</button></div>
+          </form>
+        </div>
+      </div>`;
+  }
+  window.factoryToggleIssueException=function(){
+    const form=f$('factoryIssueForm'); if(!form)return;
+    const exception=form.elements.exception.checked;
+    const job=form.elements.productionRequestId;
+    job.disabled=exception;
+    if(exception)job.value='';
+  };
+
+  function factoryReportsHtml(){
+    if(!fCan('factory_reports'))return '<div class="empty">Factory report permission is not enabled.</div>';
+    const jobs=[...new Map((factoryDb.issues||[]).map(i=>[i.productionRequestId||i.job,{
+      id:i.productionRequestId||i.job,
+      name:i.productionRequestId?(factoryProductionById(i.productionRequestId)?.orderNo||i.job):i.job
+    }])).values()];
+    return `
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Production Job Material Usage</div>
+        <div class="panel-body">
+          <div class="factory-report-toolbar">
+            <select id="factoryReportJob" onchange="showFactoryJob()">${factoryOptions(jobs,'Select production job')}</select>
+            <button class="btn ghost sm" type="button" onclick="printFactoryJob(false)">Usage PDF</button>
+            ${fCan('factory_cost_view')?'<button class="btn navy sm" type="button" onclick="printFactoryJob(true)">Material Cost PDF</button>':''}
+          </div>
+          <div id="factoryJobDetail"></div>
+        </div>
+      </div>`;
+  }
+  function factoryMastersHtml(){
+    if(!fCan('factory_manage'))return '<div class="empty">Factory master-management permission is not enabled.</div>';
+    return `
+      <div class="factory-master-grid">
+        <div class="panel factory-inner-panel">
+          <div class="panel-title">Suppliers</div>
+          <div class="panel-body">
+            <form id="factorySupplierForm">
+              ${factoryField('Supplier Name *','<input name="name" required maxlength="120">')}
+              ${factoryField('Contact / Description','<input name="description" maxlength="250">')}
+              <div class="actions"><button class="btn primary" type="submit">Create Supplier</button></div>
+            </form>
+            <div class="factory-master-tags">${factoryDb.suppliers.map(x=>`<span class="tag">${fEsc(x.name)}</span>`).join('')||'<span class="small">No suppliers</span>'}</div>
+          </div>
+        </div>
+        <div class="panel factory-inner-panel">
+          <div class="panel-title">Raw Material Ownership</div>
+          <div class="panel-body">
+            <form id="factoryOwnerForm">
+              ${factoryField('Owner Name *','<input name="name" placeholder="SoftCreation / customer name" required maxlength="120">')}
+              ${factoryField('Description','<input name="description" maxlength="250">')}
+              <div class="actions"><button class="btn primary" type="submit">Create Owner</button></div>
+            </form>
+            <div class="factory-master-tags">${factoryDb.owners.map(x=>`<span class="tag">${fEsc(x.name)}</span>`).join('')||'<span class="small">No owners</span>'}</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Raw Materials</div>
+        <div class="panel-body">
+          <form id="factoryItemForm">
+            <div class="factory-form-grid">
+              ${factoryField('Item Name *','<input name="name" required maxlength="120">')}
+              ${factoryField('Description','<input name="description" maxlength="250">')}
+              ${factoryField('Stock Unit *','<input name="unit" required placeholder="m² / metre / roll / pcs" maxlength="30">')}
+              ${factoryField('Unit Price (LKR)','<input name="price" type="number" min="0" step="any" placeholder="Leave blank if unknown">')}
+            </div>
+            <div class="actions"><button class="btn primary" type="submit">Create Material</button></div>
+          </form>
+          ${factoryTable(['Item','Description','Unit','Current Unit Price','Action'],factoryDb.items.map(i=>[
+            fEsc(i.name),fEsc(i.description||''),fEsc(i.unit),
+            i.price===null||i.price===undefined?'<span class="tag amber">Price missing</span>':fMoney(i.price),
+            `<button class="btn ghost sm" type="button" onclick="editFactoryPrice('${i.id}')">Edit Price</button>`
+          ]))}
+          <div class="hint">Unit prices are captured as snapshots when material is issued. Later price changes do not rewrite historical job cost.</div>
+        </div>
+      </div>`;
+  }
+  function factoryHistoryHtml(){
+    const rows=[
+      ...factoryDb.lots.map(l=>({date:l.date,row:[
+        fEsc(l.date),'IN',fEsc(l.code+' '+(l.reference||'')),fEsc(fName(factoryDb.items,l.item)),
+        fEsc(fName(factoryDb.suppliers,l.supplier)),fEsc(fName(factoryDb.owners,l.owner)),
+        fFmt(l.quantity),fEsc(l.description||'')
+      ]})),
+      ...factoryDb.issues.map(i=>{
+        const l=factoryDb.lots.find(l=>l.id===i.lot);
+        return {date:i.date,row:[
+          fEsc(i.date),i.exception?'APPROVED EXCEPTION':'ISSUE',fEsc(i.job),
+          fEsc(i.itemName),fEsc(fName(factoryDb.suppliers,l?.supplier)),fEsc(i.ownerName),
+          fFmt(i.qty),fEsc(i.notes||'')
+        ]};
+      }),
+      ...factoryDb.returns.map(r=>{
+        const i=factoryDb.issues.find(i=>i.id===r.issue);
+        const l=factoryDb.lots.find(l=>l.id===i?.lot);
+        return {date:r.date,row:[
+          fEsc(r.date),'RETURN',fEsc(i?.job||''),fEsc(i?.itemName||''),
+          fEsc(fName(factoryDb.suppliers,l?.supplier)),fEsc(i?.ownerName||''),
+          fFmt(r.qty),fEsc(r.notes||'')
+        ]};
+      })
+    ].sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(x=>x.row);
+    return `
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Factory Stock Movements</div>
+        <div class="panel-body">${factoryTable(['Date','Type','Production / Ref','Item','Supplier','Owner','Qty','Notes'],rows)}</div>
+      </div>
+      ${fCan('factory_manage')?`<div class="panel factory-inner-panel"><div class="panel-title">Factory Audit</div><div class="panel-body">${factoryTable(['Time','User','Action'],factoryDb.audit.slice().reverse().map(a=>[
+        fEsc(new Date(a.at).toLocaleString()),fEsc(a.display||a.user||''),fEsc(a.action)
+      ]))}</div></div>`:''}`;
+  }
+  function factoryBackupHtml(){
+    return `
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Factory Backup</div>
+        <div class="panel-body">
+          <div class="notice">Cloud storage is the live source. Export JSON is provided as an additional offline backup. Restore requires Factory Manage permission and your BOS password.</div>
+          <div class="actions">
+            <button class="btn primary" type="button" onclick="exportFactoryBackup()">Export JSON Backup</button>
+            <label class="btn ghost" style="cursor:pointer">Restore JSON <input id="factoryRestoreFile" type="file" accept=".json" style="display:none"></label>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  window.renderFactoryStockTable=function(search=''){
+    const host=f$('factoryStockTable');if(!host)return;
+    const s=String(search||'').toLowerCase();
+    host.innerHTML=factoryTable(['Item','Description','Supplier','Ownership','Batch','Available','Unit'],
+      factoryDb.lots
+        .filter(l=>Number(l.remaining)>0)
+        .filter(l=>[
+          fName(factoryDb.items,l.item),fName(factoryDb.suppliers,l.supplier),
+          fName(factoryDb.owners,l.owner),l.code,l.description
+        ].join(' ').toLowerCase().includes(s))
+        .map(l=>{
+          const item=factoryDb.items.find(i=>i.id===l.item);
+          return [
+            fEsc(fName(factoryDb.items,l.item)),
+            fEsc(l.description||item?.description||''),
+            fEsc(fName(factoryDb.suppliers,l.supplier)),
+            fEsc(fName(factoryDb.owners,l.owner)),
+            fEsc(l.code),fFmt(l.remaining),fEsc(item?.unit||'')
+          ];
+        })
+    );
+  };
+
+  function bindFactoryForms(){
+    const supplier=f$('factorySupplierForm');
+    if(supplier)supplier.onsubmit=e=>{e.preventDefault();createFactoryMaster('supplier',e.target)};
+    const owner=f$('factoryOwnerForm');
+    if(owner)owner.onsubmit=e=>{e.preventDefault();createFactoryMaster('owner',e.target)};
+    const item=f$('factoryItemForm');
+    if(item)item.onsubmit=e=>{e.preventDefault();createFactoryMaster('item',e.target)};
+
+    const receive=f$('factoryReceiveForm');
+    if(receive)receive.onsubmit=async e=>{
+      e.preventDefault();
+      if(!requirePerm('factory_stock_in','receive factory stock'))return;
+      const f=new FormData(e.target),q=fNum(f.get('quantity'));
+      if(!(q>0&&Number.isFinite(q)))return toast('Quantity must be positive');
+      for(const [k,list] of [['item','items'],['supplier','suppliers'],['owner','owners']]){
+        if(!factoryDb[list].some(x=>x.id===f.get(k)))return toast('Select '+k);
+      }
+      await factoryCommit('Factory stock received',d=>{
+        d.lots.push({
+          id:fUid(),code:'FGRN-'+String(d.lots.length+1).padStart(5,'0'),
+          item:f.get('item'),supplier:f.get('supplier'),owner:f.get('owner'),
+          quantity:q,remaining:q,date:f.get('date'),
+          reference:String(f.get('reference')||'').trim(),
+          description:String(f.get('description')||'').trim(),
+          createdBy:currentUser?.username||'',createdAt:new Date().toISOString()
+        });
+      });
+    };
+
+    const issue=f$('factoryIssueForm');
+    if(issue){
+      factoryToggleIssueException();
+      issue.onsubmit=async e=>{
+        e.preventDefault();
+        if(!requirePerm('factory_issue','issue factory materials'))return;
+        const f=new FormData(e.target);
+        const q=fNum(f.get('quantity'));
+        const lotId=String(f.get('lot')||'');
+        const exception=f.get('exception')==='on';
+        const notes=String(f.get('notes')||'').trim();
+        const productionRequestId=exception?'':String(f.get('productionRequestId')||'');
+        if(!Number.isFinite(q)||q<=0)return toast('Enter a valid issue quantity');
+        if(!exception&&!productionRequestId)return toast('Select a production job');
+        if(exception&&!notes)return toast('Exception reason is mandatory');
+        if(exception&&!managerOK('approve a Factory material issue without a production job'))return toast('Manager/Admin approval required');
+        const lot=factoryDb.lots.find(l=>l.id===lotId);
+        if(!lot||q>Number(lot.remaining)+0.000001)return toast('Quantity exceeds available stock');
+        const item=factoryDb.items.find(i=>i.id===lot.item);
+        const prod=productionRequestId?factoryProductionById(productionRequestId):null;
+        if(!exception&&!prod)return toast('Selected production job is no longer available');
+        const job=exception?`EXCEPTION-${String(factoryDb.issues.length+1).padStart(5,'0')}`:(prod.orderNo||prod.prodNo||prod.id);
+        await factoryCommit(exception?`Approved Factory issue without production job: ${notes}`:`Factory material issued to ${job}`,d=>{
+          const dl=d.lots.find(l=>l.id===lotId);
+          dl.remaining=fQty(Number(dl.remaining)-q);
+          d.issues.push({
+            id:fUid(),job,productionRequestId:prod?.id||'',exception,
+            approvedAt:exception?new Date().toISOString():null,
+            qty:q,date:String(f.get('date')||fToday()),notes,lot:lotId,
+            itemId:item?.id||'',itemName:item?.name||'',unit:item?.unit||'',
+            ownerId:lot.owner,ownerName:fName(factoryDb.owners,lot.owner),
+            price:item?.price??null,
+            productionSnapshot:prod?{
+              orderNo:prod.orderNo||'',piSerial:prod.piSerial||'',
+              customerName:prod.customerName||'',size:prod.size||'',
+              material:prod.material||'',layout:prod.layout||'',
+              pcs:prod.pcs||0,requestQty:prod.requestQty||0,unit:prod.unit||'Rolls'
+            }:null,
+            issuedBy:currentUser?.username||'',issuedAt:new Date().toISOString()
+          });
+        });
+      };
+    }
+
+    const restore=f$('factoryRestoreFile');
+    if(restore)restore.onchange=restoreFactoryBackup;
+  }
+
+  async function createFactoryMaster(kind,form){
+    if(!requirePerm('factory_manage','manage Factory masters'))return;
+    const f=new FormData(form);
+    const name=String(f.get('name')||'').trim();
+    if(!name)return toast('Name is required');
+    const list=kind==='item'?'items':kind==='owner'?'owners':'suppliers';
+    if(factoryDb[list].some(x=>String(x.name).toLowerCase()===name.toLowerCase()))return toast('Name already exists');
+    const entry={id:fUid(),name,description:String(f.get('description')||'').trim()};
+    if(kind==='item'){
+      entry.unit=String(f.get('unit')||'').trim();
+      if(!entry.unit)return toast('Unit is required');
+      const raw=f.get('price');
+      entry.price=raw===''?null:Number(raw);
+      if(entry.price!==null&&(!Number.isFinite(entry.price)||entry.price<0))return toast('Invalid price');
+    }
+    await factoryCommit(`Created Factory ${kind}: ${name}`,d=>d[list].push(entry));
+  }
+
+  window.editFactoryPrice=async function(id){
+    if(!requirePerm('factory_manage','edit Factory material prices'))return;
+    const item=factoryDb.items.find(x=>x.id===id);if(!item)return;
+    if(!protectedEdit('change Factory material price'))return;
+    const v=prompt('Unit price in LKR. Blank = unknown. Applies only to future issues.',item.price??'');
+    if(v===null)return;
+    const p=v.trim()===''?null:Number(v);
+    if(p!==null&&(!Number.isFinite(p)||p<0))return toast('Invalid price');
+    await factoryCommit(`Updated Factory price: ${item.name}`,d=>{d.items.find(x=>x.id===id).price=p});
+  };
+
+  function factoryJobKey(i){return i.productionRequestId||i.job}
+  function factoryJobMarkup(key,showCost=false,interactive=false){
+    const lines=factoryDb.issues.filter(i=>factoryJobKey(i)===key);
+    if(!lines.length)return '<div class="empty">No material issues for this job.</div>';
+    const prodId=lines.find(i=>i.productionRequestId)?.productionRequestId||'';
+    const prod=prodId?factoryProductionById(prodId):null;
+    let unknown=0,total=0;
+    const rows=lines.map(i=>{
+      const returned=factoryReturned(i.id),net=fQty(Number(i.qty)-returned);
+      if(i.price===null&&net>0)unknown++; else total+=net*Number(i.price||0);
+      const lot=factoryDb.lots.find(l=>l.id===i.lot);
+      return [
+        fEsc(i.itemName),fEsc(i.ownerName),fEsc(lot?.code||''),fFmt(i.qty),fFmt(returned),fFmt(net),fEsc(i.unit),
+        ...(showCost?[i.price===null?'PRICE MISSING':fMoney(i.price),i.price===null&&net>0?'UNPRICED':fMoney(net*Number(i.price||0))]:[]),
+        ...(interactive&&fCan('factory_issue')?[`<button class="btn ghost sm" type="button" onclick="returnFactoryStock('${i.id}')" ${net<=0?'disabled':''}>Return</button>`]:[])
+      ];
+    });
+    const heading=prod
+      ? `<div class="factory-job-head"><b>${fEsc(prod.orderNo||prod.prodNo||'Production Job')}</b><span>${fEsc(prod.customerName||'')} • ${fEsc(prod.size||'')} ${fEsc(prod.material||'')} ${fEsc(prod.layout||'')} • Requested ${fFmt(prod.requestQty)} ${fEsc(prod.unit||'Rolls')} • ${fEsc(prod.status||'')}</span></div>`
+      : `<div class="factory-job-head"><b>${fEsc(lines[0].job)}</b><span>${lines.some(i=>i.exception)?'Approved exception without production request':''}</span></div>`;
+    return `${heading}${factoryTable(
+      ['Material','Ownership','Batch','Issued','Returned','Net Used','Unit',...(showCost?['Unit Price','Material Cost']:[]),...(interactive&&fCan('factory_issue')?['Return']:[])],
+      rows
+    )}${showCost?`<div class="factory-cost-total"><span>${unknown?'Known material subtotal':'Total material cost'}</span><b>${fMoney(total)}</b></div>${unknown?`<div class="notice">${unknown} unpriced line(s). Full job material cost is incomplete.</div>`:''}`:''}`;
+  }
+  window.showFactoryJob=function(){
+    const key=f$('factoryReportJob')?.value||'';
+    if(f$('factoryJobDetail'))f$('factoryJobDetail').innerHTML=key?factoryJobMarkup(key,fCan('factory_cost_view'),true):'';
+  };
+  window.returnFactoryStock=async function(issueId){
+    if(!requirePerm('factory_issue','return unused Factory materials'))return;
+    const issue=factoryDb.issues.find(x=>x.id===issueId);if(!issue)return;
+    const available=fQty(Number(issue.qty)-factoryReturned(issueId));
+    const v=prompt(`Unused quantity to return. Maximum ${fFmt(available)} ${issue.unit}`);
+    if(v===null)return;
+    const q=Number(v);
+    const notes=prompt('Return reason');
+    if(notes===null)return;
+    if(!notes.trim())return toast('Return reason is required');
+    if(!Number.isFinite(q)||q<=0||q>available+0.000001)return toast('Invalid return quantity');
+    await factoryCommit(`Factory return from ${issue.job}`,d=>{
+      d.returns.push({id:fUid(),issue:issueId,qty:q,date:fToday(),notes:notes.trim(),returnedBy:currentUser?.username||'',returnedAt:new Date().toISOString()});
+      const lot=d.lots.find(l=>l.id===issue.lot);
+      if(lot)lot.remaining=fQty(Number(lot.remaining)+q);
+    });
+  };
+  window.printFactoryJob=function(cost){
+    if(!requirePerm('factory_reports','print Factory job reports'))return;
+    if(cost&&!requirePerm('factory_cost_view','view Factory material cost'))return;
+    const key=f$('factoryReportJob')?.value||'';
+    if(!key)return toast('Select a production job');
+    const w=window.open('','_blank','width=1100,height=800');
+    if(!w)return toast('Allow pop-ups to print the Factory report');
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Factory Job Report</title><style>
+      body{font:12px Arial;color:#173439;padding:20px}h1{color:#098f91}.factory-table{width:100%;border-collapse:collapse}.factory-table th,.factory-table td{border:1px solid #dbe6e7;padding:7px;text-align:left}.factory-job-head{margin:12px 0}.factory-job-head b{font-size:18px;display:block}.factory-job-head span{color:#60767b}.factory-cost-total{display:flex;justify-content:flex-end;gap:20px;margin-top:12px;font-size:16px}.btn,.notice{display:none}@page{size:A4 landscape;margin:12mm}
+    </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}</body></html>`);
+    w.document.close();w.focus();setTimeout(()=>w.print(),250);
+  };
+  window.exportFactoryBackup=function(){
+    if(!requirePerm('factory_manage','export Factory backup'))return;
+    const blob=new Blob([JSON.stringify(factoryDb,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='softcreation-factory-backup-'+fToday()+'.json';a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  async function restoreFactoryBackup(e){
+    if(!requirePerm('factory_manage','restore Factory backup'))return;
+    if(!protectedEdit('restore Factory inventory backup')){e.target.value='';return}
+    const file=e.target.files?.[0];if(!file)return;
+    try{
+      const raw=JSON.parse(await file.text());
+      const n=factoryNormalize(raw);
+      for(const k of ['items','suppliers','owners','lots','issues','returns','audit'])if(!Array.isArray(n[k]))throw new Error('Invalid backup');
+      if(!confirm('Replace the current Factory cloud state with this backup?'))return;
+      await factoryCommit('Factory backup restored',d=>{
+        for(const k of ['items','suppliers','owners','lots','issues','returns','audit'])d[k]=JSON.parse(JSON.stringify(n[k]));
+      });
+    }catch(err){toast('Factory restore failed — '+err.message)}
+    finally{e.target.value=''}
+  }
+
+  function installFactoryUI(){
+    FACTORY_FEATURES.forEach(f=>{if(!USER_FEATURES.some(x=>x[0]===f[0]))USER_FEATURES.push(f)});
+    VIEW_PERMS.factory='factory_view';
+
+    const nav=document.querySelector('.nav');
+    if(nav&&!nav.querySelector('.navbtn[data-view="factory"]')){
+      const btn=document.createElement('button');
+      btn.className='navbtn';
+      btn.dataset.view='factory';
+      btn.textContent='Factory';
+      btn.onclick=()=>showView('factory');
+      const stores=nav.querySelector('.navbtn[data-view="stores"]');
+      const settings=nav.querySelector('.navbtn[data-view="settings"]');
+      if(stores)stores.insertAdjacentElement('afterend',btn);
+      else if(settings)nav.insertBefore(btn,settings);
+      else nav.appendChild(btn);
+    }
+
+    if(!f$('factory')){
+      const app=document.querySelector('.app');
+      const section=document.createElement('section');
+      section.id='factory';
+      section.className='view';
+      section.innerHTML=`
+        <div class="panel">
+          <div class="panel-title factory-title-row">
+            <div><span>Factory</span><small>Raw Material Inventory • Production Usage • Job Cost</small></div>
+            <div class="factory-title-actions">
+              <span id="factoryCloudStatus" class="factory-cloud-status">Not loaded</span>
+              <button class="btn sm" style="background:#fff;color:#087f83" type="button" onclick="loadFactoryCloud(true)">Refresh</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div id="factorySubnav" class="factory-subnav"></div>
+            <div id="factoryBody"><div class="factory-loading">Open Factory to load inventory.</div></div>
+          </div>
+        </div>`;
+      app.appendChild(section);
+    }
+
+    const baseShow=window.showView;
+    window.showView=function(id){
+      const r=baseShow.apply(this,arguments);
+      if(id==='factory'){
+        if(!fCan('factory_view'))return r;
+        loadFactoryCloud(false);
+        renderFactory();
+      }
+      return r;
+    };
+    try{showView=window.showView}catch(_){}
+
+    const baseAccess=window.applyUserAccess;
+    window.applyUserAccess=function(){
+      const r=baseAccess.apply(this,arguments);
+      const b=document.querySelector('.navbtn[data-view="factory"]');
+      if(b)b.style.display=fCan('factory_view')?'inline-block':'none';
+      return r;
+    };
+    try{applyUserAccess=window.applyUserAccess}catch(_){}
+
+    const baseRefresh=window.refreshAll;
+    if(typeof baseRefresh==='function'){
+      window.refreshAll=function(){
+        const r=baseRefresh.apply(this,arguments);
+        if(f$('factory')?.classList.contains('active')&&factoryLoaded)renderFactory();
+        return r;
+      };
+      try{refreshAll=window.refreshAll}catch(_){}
+    }
+
+    window.loadFactoryCloud=loadFactoryCloud;
+
+    try{renderUserPrivilegeEditor(null)}catch(_){}
+    try{applyUserAccess()}catch(_){}
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installFactoryUI,{once:true});
+  else installFactoryUI();
 })();
 </script>
 
