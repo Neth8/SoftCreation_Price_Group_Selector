@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- SoftCreation v1.0.41 - Performance + Products Logistics Access -->
+<!-- SoftCreation v1.0.40 - Approved Price Add Actions + Grouped Factory QC Flow -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SoftCreation Quotation & Pro Forma System</title>
@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.41</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.0.40</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.41</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.0.40</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -113,6 +113,7 @@
         <button class="navbtn" data-view="devices">Device Master</button>
         <button class="navbtn" data-view="admin">Admin Panel</button>
         <button class="navbtn" data-view="settings">Settings</button>
+        <button class="navbtn" data-view="factory">Factory</button>
       </nav>
     </div>
 
@@ -572,6 +573,17 @@
 
 </section>
   <section id="devices" class="view"><div class="panel"><div class="panel-title">Device Item Master <button class="btn sm" style="background:#fff;color:#087f83" onclick="openDeviceModal()">+ Device Add</button></div><div class="panel-body"><div class="listbar"><input class="search" id="deviceSearch" placeholder="Search device / model" oninput="renderDevices()"/></div><div id="deviceList" class="device-grid"></div></div></div></section>
+<section id="factory" class="view">
+  <div class="panel factory-host-panel">
+    <div class="panel-title">
+      <span>Factory</span>
+      <span style="font-size:10px;font-weight:650">Raw Material Inventory • Production Usage • Job Cost</span>
+    </div>
+    <div class="factory-frame-wrap">
+      <iframe id="factoryInventoryFrame" class="factory-frame" src="about:blank" data-src="Factory_Inventory.html" title="SoftCreation Factory Inventory"></iframe>
+    </div>
+  </div>
+</section>
   <section id="admin" class="view"><div class="panel"><div class="panel-title">Admin Cost & Profit Control</div><div class="panel-body"><div class="notice"><b>Snapshot control:</b> Rate changes apply only to future calculations. Saved quotations retain their original cost snapshot and profit basis.</div><div class="section">Current Excel Cost Assumptions</div><div class="assumption-grid"><div class="field"><label>TT - LKR / SQM</label><input id="admTT" type="number" step="0.01"></div><div class="field"><label>DT TOP - LKR / SQM</label><input id="admDTTop" type="number" step="0.01"></div><div class="field"><label>PVC - LKR / SQM</label><input id="admPVC" type="number" step="0.01"></div><div class="field"><label>DT ECO - LKR / SQM</label><input id="admDTEco" type="number" step="0.01"></div><div class="field"><label>HIGHSTICK - LKR / SQM</label><input id="admHighstick" type="number" step="0.01"></div><div class="field"><label>Core Cost / Roll</label><input id="admCore" type="number" step="0.01"></div><div class="field"><label>Strapping Roll Cost</label><input id="admStrap" type="number" step="0.01"></div><div class="field"><label>Stretch Film Cost</label><input id="admStretch" type="number" step="0.01"></div><div class="field"><label>Service Charge / SQM</label><input id="admService" type="number" step="0.01"></div><div class="field"><label>Scale Service / SQM</label><input id="admScaleService" type="number" step="0.01"></div><div class="field"><label>VAT %</label><input id="admVat" type="number" step="0.01"></div><div class="field"><label>SSCL Taxable Share %</label><input id="admSsclShare" type="number" step="0.01"></div><div class="field"><label>SSCL Rate %</label><input id="admSsclRate" type="number" step="0.01"></div><div class="field"><label>Default Commission %</label><input id="admCommission" type="number" step="0.01"></div></div><div class="actions"><button class="btn primary" onclick="saveAdminAssumptions()">Save Rates for Future Prices</button></div><div class="section">Quotation Profit Report</div><div class="grid"><div class="field full"><label>Select Saved Quotation / PI</label><select id="profitDoc" onchange="renderProfitReport()"></select></div><div class="field"><label>Commission %</label><input id="profitCommission" type="number" step="0.01" oninput="renderProfitReport()"></div><div class="field"><label>Delivery Expense (LKR)</label><input id="profitDelivery" type="number" step="0.01" value="0" oninput="renderProfitReport()"></div><div class="field"><label>Other Expense (LKR)</label><input id="profitOther" type="number" step="0.01" value="0" oninput="renderProfitReport()"></div></div><div id="profitReport" class="admin-report"></div><div class="actions"><button class="btn green" onclick="downloadProfitReportPDF()">Download Profit Report PDF</button></div></div></div></section>
   <section id="settings" class="view"><div class="panel"><div class="panel-title">System Settings</div><div class="panel-body"><div class="grid">
       <div class="field"><label>Company Prefix</label><input id="setPrefix" value="SC"/></div><div class="field"><label>VAT Rate %</label><input id="setVat" type="number" value="18"/></div>
@@ -2829,7 +2841,7 @@ downloadProfitReportPDF=async function(){const id=$('profitDoc').value,doc=state
 
 /* V6 user-specific feature and price-category privileges */
 const USER_FEATURES=[
- ['dashboard','Dashboard & Reports'],['create_quote','Create / Edit Quotation'],['save_quote','Save Quotation'],['view_quotes','View Quotations'],['quote_pdf','Quotation PDF'],['convert_pi','Convert Quotation to PI'],['view_pi','View / Save PI'],['customers','Customer Master'],['label_pricing','Label Price Calculator'],['label_master','Label Master'],['device_quote','Device Quotation'],['device_master','Device Master'],['product_quote','Ribbon / Paper Quotation'],['product_master','Ribbon / Paper Master'],['products_view','Products — Live Production Summary'],['products_view_jobs','Products — View Product Jobs'],['purchase_orders_view','Purchase Orders — Supplier Procurement'],['price_categories','Price Category Master'],['admin_profit','Cost & Profit Admin Panel'],['settings','System Settings'],['manage_users','User Management'],['delete_docs','Delete / Revise Documents'],['import_export','Backup Import / Export']
+ ['dashboard','Dashboard & Reports'],['create_quote','Create / Edit Quotation'],['save_quote','Save Quotation'],['view_quotes','View Quotations'],['quote_pdf','Quotation PDF'],['convert_pi','Convert Quotation to PI'],['view_pi','View / Save PI'],['customers','Customer Master'],['label_pricing','Label Price Calculator'],['label_master','Label Master'],['device_quote','Device Quotation'],['device_master','Device Master'],['product_quote','Ribbon / Paper Quotation'],['product_master','Ribbon / Paper Master'],['products_view','Products — Live Production Summary'],['products_view_jobs','Products — View Product Jobs'],['purchase_orders_view','Purchase Orders — Supplier Procurement'],['factory_view','Factory — Inventory & Job Usage'],['factory_manage','Factory — Admin / Master & Cost'],['price_categories','Price Category Master'],['admin_profit','Cost & Profit Admin Panel'],['settings','System Settings'],['manage_users','User Management'],['delete_docs','Delete / Revise Documents'],['import_export','Backup Import / Export']
 ];
 const DEFAULT_SALES_PERMS=['dashboard','create_quote','save_quote','view_quotes','quote_pdf','customers','label_pricing','device_quote','product_quote'];
 function userRecord(){return state.users.find(u=>u.id===currentUser?.id)}
@@ -2851,7 +2863,7 @@ renderUsers=function(){const box=$('userList');if(!box)return;box.innerHTML=`<ta
 
 const loginUserV6=loginUser;loginUser=function(){loginUserV6();if(currentUser){const u=userRecord();currentUser={id:u.id,username:u.username,display:u.display,role:u.role,permissions:u.permissions||DEFAULT_SALES_PERMS,priceCategoryIds:u.priceCategoryIds||[]};sessionStorage.setItem('sc_active_user',JSON.stringify(currentUser));applyUserAccess()}};
 const restoreSessionV6=restoreSession;restoreSession=function(){restoreSessionV6();if(currentUser){const u=userRecord();if(u){currentUser={id:u.id,username:u.username,display:u.display,role:u.role,permissions:u.permissions||DEFAULT_SALES_PERMS,priceCategoryIds:u.priceCategoryIds||[]};sessionStorage.setItem('sc_active_user',JSON.stringify(currentUser))}applyUserAccess()}};
-const VIEW_PERMS={dashboard:'dashboard',editor:'create_quote',quotations:'view_quotes',pis:'view_pi',customers:'customers',items:'label_master',devices:'device_master',products:'product_master',categories:'price_categories',admin:'admin_profit',settings:'settings'};
+const VIEW_PERMS={dashboard:'dashboard',editor:'create_quote',quotations:'view_quotes',pis:'view_pi',customers:'customers',items:'label_master',devices:'device_master',products:'product_master',categories:'price_categories',admin:'admin_profit',settings:'settings',factory:'factory_view'};
 const showViewV6=showView;showView=function(id){if(id==='editor'&&(hasPerm('create_quote')||hasPerm('view_pi')))return showViewV6(id);const p=VIEW_PERMS[id];if(p&&!hasPerm(p))return requirePerm(p,`open ${id}`);return showViewV6(id)};
 function applyUserAccess(){document.querySelectorAll('.navbtn[data-view]').forEach(b=>{const p=VIEW_PERMS[b.dataset.view];b.style.display=!p||hasPerm(p)?'inline-block':'none'});const calc=document.querySelector('.price-calc');if(calc&&!hasPerm('label_pricing'))calc.style.display='none';calculateLabelPrice();const active=document.querySelector('.view.active');if(active&&VIEW_PERMS[active.id]&&!hasPerm(VIEW_PERMS[active.id]))showView(hasPerm('dashboard')?'dashboard':hasPerm('view_quotes')?'quotations':'editor')}
 
@@ -6326,29 +6338,12 @@ async function spgsStartProductionRealtime(){
     copy.users=(copy.users||[]).map(u=>{const x={...u};delete x.password;return x});
     return copy;
   }
-  /* v1.0.41 performance-safe local backup writer.
-     Business data and cloud sync are unchanged. */
-  let spgsLocalWriteTimerV1041=0;
-  let spgsLocalLastRawV1041='';
-  let spgsLocalPendingV1041=false;
-  function spgsWriteLocalNowV1041(){
-    if(!spgsLocalPendingV1041 && spgsLocalLastRawV1041)return;
-    spgsLocalPendingV1041=false;
-    if(spgsLocalWriteTimerV1041){clearTimeout(spgsLocalWriteTimerV1041);spgsLocalWriteTimerV1041=0}
+  function spgsWriteLocal(){
     try{
       const raw=JSON.stringify(spgsLocalPayload());
-      if(raw===spgsLocalLastRawV1041)return;
-      SPGS_LOCAL_KEYS.forEach(k=>{try{if(localStorage.getItem(k)!==raw)localStorage.setItem(k,raw)}catch(_){}});
-      spgsLocalLastRawV1041=raw;
+      SPGS_LOCAL_KEYS.forEach(k=>localStorage.setItem(k,raw));
     }catch(e){console.warn('SPGS local save failed',e)}
   }
-  function spgsWriteLocal(){
-    spgsLocalPendingV1041=true;
-    if(spgsLocalWriteTimerV1041)return;
-    spgsLocalWriteTimerV1041=setTimeout(spgsWriteLocalNowV1041,60);
-  }
-  window.addEventListener('pagehide',spgsWriteLocalNowV1041);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')spgsWriteLocalNowV1041()});
   function spgsFreshness(x){
     if(!x||typeof x!=='object')return 0;
     let best=0;
@@ -17487,21 +17482,95 @@ window.toggleBpSeparateDeliveryButton = function(){
 })();
 </script>
 
+
 <script>
+/* =========================================================
+   FACTORY MODULE BRIDGE
+   - Uses existing user privileges.
+   - Does not modify quotation / PI / production business rules.
+   ========================================================= */
 (function(){
-'use strict';
-const SC1041=window.SC1041=window.SC1041||{version:'1.0.41',productDispatchModalId:'scProductDispatchChooserV1041'};
-function byId(id){return document.getElementById(id)}
-function activeView(){return document.querySelector('.view.active')?.id||'dashboard'}
-function availableForDispatchV1041(r){try{if(typeof productionAvailableV81==='function')return Number(productionAvailableV81(r)||0)}catch(_){}const dispatched=(r?.dispatches||[]).reduce((n,d)=>n+Number(d?.qty||0),0);return Math.max(0,Number(r?.finishedQty||r?.packing?.total||0)-dispatched)}
-function dispatchableJobsV1041(g){return (g?.jobs||[]).filter(r=>['Finished','Dispatched'].includes(String(r?.status||''))&&availableForDispatchV1041(r)>0)}
-function ensureDispatchChooserV1041(){if(byId(SC1041.productDispatchModalId))return;const host=document.createElement('div');host.id=SC1041.productDispatchModalId;host.className='modal';host.innerHTML=`<div class="modal-card" style="width:min(900px,96vw)"><div class="modal-head"><div><b>Product Dispatch / Logistics</b><div id="scProductDispatchMetaV1041" class="small"></div></div><button class="btn ghost sm" type="button" onclick="closeModal('${SC1041.productDispatchModalId}')">Close</button></div><div id="scProductDispatchBodyV1041" class="panel-body"></div></div>`;document.body.appendChild(host)}
-window.openProductDispatchV1041=function(encodedKey){if(typeof productionProductGroupsV103!=='function')return toast('Products data is not ready yet');const key=decodeURIComponent(encodedKey),g=productionProductGroupsV103().find(x=>x.key===key);if(!g)return toast('Product batch was not found');const jobs=dispatchableJobsV1041(g);if(!jobs.length)return toast('No finished balance is ready for dispatch');if(jobs.length===1&&typeof openDispatchLoadingV81==='function')return openDispatchLoadingV81(jobs[0].id);ensureDispatchChooserV1041();byId('scProductDispatchMetaV1041').textContent=`${g.size} • ${g.material} • ${g.layout} • ${Number(g.pcs||0).toLocaleString()} pcs / ${g.unit}`;byId('scProductDispatchBodyV1041').innerHTML=`<div class="notice" style="margin-bottom:10px">Choose the exact finished production order to dispatch. The existing dispatch workflow and packing balances are used unchanged.</div><div class="sc-product-dispatch-list">${jobs.map(r=>`<div class="sc-product-dispatch-row"><div><b>${typeof esc==='function'?esc(r.orderNo||'-'):(r.orderNo||'-')}</b><div class="small">${typeof esc==='function'?esc(r.customerName||'-'):(r.customerName||'-')} • PI ${typeof esc==='function'?esc(r.piSerial||'-'):(r.piSerial||'-')} • Status ${typeof esc==='function'?esc(r.status||'-'):(r.status||'-')}</div></div><div class="sc-product-dispatch-actions"><span class="tag">Available ${typeof money==='function'?money(availableForDispatchV1041(r)):availableForDispatchV1041(r)} ${typeof esc==='function'?esc(r.unit||'Rolls'):(r.unit||'Rolls')}</span><button class="btn navy sm" type="button" onclick="closeModal('${SC1041.productDispatchModalId}');openDispatchLoadingV81('${r.id}')">Dispatch</button></div></div>`).join('')}</div>`;byId(SC1041.productDispatchModalId).classList.add('show')};
-function enhanceProductCardsV1041(){const grid=byId('productionProductsGrid');if(!grid||typeof productionProductGroupsV103!=='function')return;const groups=productionProductGroupsV103(),q=String(byId('productionProductsSearch')?.value||'').trim().toLowerCase(),material=byId('productionProductsMaterial')?.value||'',filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc,...g.jobs.map(r=>r.customerName||''),...g.jobs.map(r=>r.piSerial||'')].join(' ').toLowerCase().includes(q))),cards=[...grid.querySelectorAll('.pp-card')];cards.forEach((card,index)=>{const g=filtered[index];if(!g)return;const jobs=dispatchableJobsV1041(g);if(!jobs.length)return;const foot=card.querySelector('.pp-card-foot');if(!foot||foot.querySelector('.sc-product-dispatch-btn'))return;const noActive=[...foot.querySelectorAll('.tag')].find(x=>String(x.textContent||'').trim()==='No active work');if(noActive)noActive.remove();const btn=document.createElement('button');btn.className='btn navy sm sc-product-dispatch-btn';btn.type='button';btn.textContent=jobs.length===1?'Dispatch':'Dispatch / Logistics';btn.onclick=()=>window.openProductDispatchV1041(encodeURIComponent(g.key));foot.appendChild(btn)})}
-const productRenderV1041=window.renderProductionProducts;if(typeof productRenderV1041==='function'){window.renderProductionProducts=function(){const r=productRenderV1041.apply(this,arguments);try{enhanceProductCardsV1041()}catch(e){console.warn('Products logistics enhancement failed',e)}return r};try{renderProductionProducts=window.renderProductionProducts}catch(_){}}
-const productGridV1041=byId('productionProductsGrid');if(productGridV1041){let queued=false;const obs=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;try{enhanceProductCardsV1041()}catch(_){}})});obs.observe(productGridV1041,{childList:true})}
-window.refreshAll=function(){try{if(typeof updateStats==='function')updateStats()}catch(_){}try{switch(activeView()){case'dashboard':window.renderDashboardReport?.();window.renderApprovalInbox?.();break;case'editor':window.refreshCustomerPick?.();break;case'quotations':case'pis':window.renderDocLists?.();break;case'customers':window.renderCustomers?.();break;case'items':window.renderItems?.();break;case'devices':window.renderDevices?.();break;case'admin':window.loadAdminPanel?.();break;case'settings':window.renderUsers?.();window.loadSettingsUI?.();window.refreshUserCompanyLinkOptions?.();break;case'categories':window.renderCategories?.();break;case'products':window.renderProducts?.();break;case'production':window.renderProductionBoard?.();break;case'productionproducts':window.renderProductionProducts?.();break;case'stores':window.renderStoresQueueV8?.();break;case'introducers':window.renderIntroducersV84?.();break;case'branchportal':window.renderPortalMasters?.();window.renderBpCart?.();window.renderMyBranchRequests?.();window.refreshBranchCustomerProfiles?.();break;case'quoterequests':window.renderBranchRequests?.();break;case'purchaseorders':window.renderPurchaseOrders?.();break;case'dealerfulfilment':window.renderDealerFulfilment?.();break;case'salesorders':window.renderSalesOrders91?.();break}}catch(e){console.warn('SoftCreation visible-view refresh failed',e)}};try{refreshAll=window.refreshAll}catch(_){}
-ensureDispatchChooserV1041();try{enhanceProductCardsV1041()}catch(_){}
+  'use strict';
+
+  function factoryContext(){
+    const user=currentUser?{
+      id:currentUser.id||'',
+      username:currentUser.username||'',
+      display:currentUser.display||currentUser.username||'',
+      role:currentUser.role||'user',
+      permissions:Array.isArray((typeof userRecord==='function'&&userRecord())?.permissions)
+        ? (userRecord().permissions||[])
+        : (currentUser.permissions||[])
+    }:null;
+    return {
+      type:'SOFTCREATION_FACTORY_CONTEXT',
+      user,
+      canView:typeof hasPerm==='function'?hasPerm('factory_view'):currentUser?.role==='admin',
+      canManage:typeof hasPerm==='function'?hasPerm('factory_manage'):currentUser?.role==='admin'
+    };
+  }
+
+  window.sendFactoryContext=function(){
+    const frame=document.getElementById('factoryInventoryFrame');
+    if(!frame)return;
+    const ctx=factoryContext();
+    if(!ctx.canView)return;
+    const target=frame.dataset.src||'Factory_Inventory.html';
+    if(!frame.dataset.loaded){
+      frame.dataset.loaded='1';
+      frame.src=target;
+      return;
+    }
+    if(!frame.contentWindow)return;
+    try{frame.contentWindow.postMessage(ctx,location.origin)}catch(e){
+      console.warn('Factory context send failed',e);
+    }
+  };
+
+  const frame=document.getElementById('factoryInventoryFrame');
+  if(frame)frame.addEventListener('load',()=>setTimeout(window.sendFactoryContext,0));
+
+  if(typeof window.showView==='function'){
+    const factoryShowViewBase=window.showView;
+    window.showView=function(id){
+      const result=factoryShowViewBase.apply(this,arguments);
+      if(id==='factory')setTimeout(window.sendFactoryContext,0);
+      return result;
+    };
+    try{showView=window.showView}catch(_){}
+  }
+
+  if(typeof window.loginUser==='function'){
+    const factoryLoginBase=window.loginUser;
+    window.loginUser=function(){
+      const result=factoryLoginBase.apply(this,arguments);
+      setTimeout(window.sendFactoryContext,0);
+      return result;
+    };
+    try{loginUser=window.loginUser}catch(_){}
+  }
+
+  if(typeof window.restoreSession==='function'){
+    const factoryRestoreBase=window.restoreSession;
+    window.restoreSession=function(){
+      const result=factoryRestoreBase.apply(this,arguments);
+      setTimeout(window.sendFactoryContext,0);
+      return result;
+    };
+    try{restoreSession=window.restoreSession}catch(_){}
+  }
+
+  window.addEventListener('message',e=>{
+    if(e.origin!==location.origin)return;
+    if(e.data?.type==='SOFTCREATION_FACTORY_HEIGHT'){
+      const f=document.getElementById('factoryInventoryFrame');
+      if(f){
+        const h=Math.max(720,Math.min(2400,Number(e.data.height)||900));
+        f.style.height=h+'px';
+      }
+    }
+  });
 })();
 </script>
+
 </body></html>

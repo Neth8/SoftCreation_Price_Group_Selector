@@ -1,0 +1,200 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Softcreation • Factory Inventory</title><style>
+:root{--brand:#098f91;--ink:#173439;--muted:#698185;--line:#dbe6e7}*{box-sizing:border-box}body{margin:0;background:#f3f7f7;color:var(--ink);font:14px system-ui,Arial}header{background:#12383d;color:white;padding:22px 5%;display:flex;justify-content:space-between;align-items:center}h1{font-size:23px;margin:0}h2{font-size:20px;margin-top:0}small,.muted{color:var(--muted)}header small{color:#b6d6d7}main{max-width:1250px;margin:25px auto;padding:0 20px}nav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:22px}button{border:0;background:var(--brand);color:white;border-radius:8px;padding:11px 16px;cursor:pointer;font-weight:650}button.secondary,nav button{background:white;color:var(--ink);border:1px solid var(--line)}nav button.active{background:var(--brand);color:white}.card{background:white;border:1px solid var(--line);border-radius:13px;padding:22px;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px}.stat b{display:block;font-size:30px;margin-top:8px}label{display:block;font-weight:600;margin-bottom:7px}input,select,textarea{width:100%;padding:11px;border:1px solid #c8d9db;border-radius:7px;font:inherit;background:white;color:var(--ink)}input[type=checkbox]{width:auto}form .grid{margin:16px 0}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line)}th{font-size:12px;color:var(--muted);text-transform:uppercase}.notice{background:#fff4dc;padding:13px;border-radius:8px;line-height:1.6;margin:12px 0}.badge{background:#e2f4f2;padding:4px 9px;border-radius:20px}.error{color:#b52d38}#toast{position:fixed;bottom:25px;right:25px;background:#173439;color:white;padding:15px;border-radius:9px;max-width:85vw;display:none}dialog{border:0;border-radius:14px;padding:28px;max-width:430px;width:90%}dialog::backdrop{background:#12383daa}.hidden{display:none!important}footer{color:var(--muted);font-size:12px;padding:15px 0;line-height:1.7}@media print{body{background:white}header,nav,main,dialog,#toast{display:none!important}#printArea{display:block!important;font-size:11px;padding:15px}#printArea th,#printArea td{white-space:normal;padding:7px}#printArea h1{color:#098f91}thead{display:table-header-group}tr{break-inside:avoid}@page{size:A4 landscape;margin:12mm}}
+.embedded body{background:#f3f7f7}.embedded header{display:none}.embedded main{max-width:none;margin:0;padding:16px}.embedded footer{display:none}.embedded nav{margin-top:0}
+</style><header><div><h1>Factory Inventory</h1><small>SOFTCREATION · Materials → Production → Job cost</small></div><button id="authButton" onclick="auth()">Admin login</button></header><main><nav id="nav"></nav><div id="view"></div><footer>Cloud-synced factory inventory. Production/job number remains mandatory unless a Factory Admin approves an exception. PDF reports use your browser’s Print → Save as PDF.</footer></main><div id="printArea" class="hidden"></div><div id="toast" role="status"></div><dialog id="login"><h2 id="loginTitle">Admin login</h2><p id="loginHint"></p><form id="loginForm"><label>Password</label><input id="password" type="password" minlength="8" required autocomplete="current-password"><p id="loginError" class="error"></p><div class="actions"><button>Continue</button><button type="button" class="secondary" onclick="document.getElementById('login').close()">Cancel</button></div></form></dialog>
+<script>
+'use strict';
+const FACTORY_WORKSPACE='softcreation_main';
+const FACTORY_REST='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
+let embeddedMode=window.parent!==window;
+let factoryContextUser=null;
+let cloudReady=false;
+let cloudBusy=false;
+const KEY='softcreation_factory_inventory_v1';let db;try{db=JSON.parse(localStorage.getItem(KEY))||{version:1,revision:0,items:[],suppliers:[],owners:[],lots:[],issues:[],returns:[],audit:[],auth:null};if(!Array.isArray(db.items))throw Error('Invalid data')}catch(e){document.getElementById('view').textContent='Stored data cannot be read. Do not overwrite it. Restore a valid backup using another browser profile.';throw e}
+let admin=false,page='Dashboard',pendingAuth=null;const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),num=x=>Number(x),fmt=x=>Number(x).toLocaleString('en-LK',{maximumFractionDigits:4}),money=x=>'LKR '+Number(x).toLocaleString('en-LK',{minimumFractionDigits:2,maximumFractionDigits:2}),name=(list,id)=>list.find(x=>x.id===id)?.name||'Unknown',date=()=>new Date().toISOString().slice(0,10),qty=x=>Math.round(x*1e6)/1e6;
+function toast(s){$('toast').textContent=s;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',4500)}
+function commit(action,fn){
+  let stored=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(stored&&stored.revision!==db.revision)throw Error('Data changed in another tab. Reload before saving.');
+  const previousRevision=Number(db.revision||0);
+  let next=JSON.parse(JSON.stringify(db));
+  fn(next);
+  next.revision=previousRevision+1;
+  next.audit.push({
+    id:uid(),
+    at:new Date().toISOString(),
+    role:admin?'Admin':'Stores',
+    user:factoryContextUser?.username||'local',
+    action
+  });
+  localStorage.setItem(KEY,JSON.stringify(next));
+  db=next;
+  render();
+  toast('Saved successfully');
+  if(cloudReady)factoryCloudCommit(next,previousRevision,action);
+}
+function attempt(fn){try{fn()}catch(e){toast(e.message)}}
+async function hash(password,salt){if(!crypto.subtle)throw Error('Password setup needs a browser supporting Web Crypto. Open with Chrome/Edge or via localhost.');let key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);let bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:150000,hash:'SHA-256'},key,256);return Array.from(new Uint8Array(bits)).map(x=>x.toString(16).padStart(2,'0')).join('')}
+function auth(cb=null){
+  if(embeddedMode){
+    if(!admin){toast('Factory admin permission required');return}
+    if(typeof cb==='function')cb();
+    return;
+  }
+  if(admin&&!cb){admin=false;render();return}
+  pendingAuth=cb;
+  $('loginTitle').textContent=db.auth?'Admin login':'Set up admin password';
+  $('loginHint').textContent=db.auth?'Enter admin password to continue.':'First use: create an admin password (minimum 8 characters). Keep it safe; there is no password recovery.';
+  $('password').value='';
+  $('loginError').textContent='';
+  $('login').showModal()
+}
+$('loginForm').onsubmit=async e=>{e.preventDefault();try{let p=$('password').value;if(!db.auth){let salt=uid(),digest=await hash(p,salt);commit('Admin password created',d=>d.auth={salt,digest})}else if(await hash(p,db.auth.salt)!==db.auth.digest)throw Error('Incorrect password');$('login').close();if(pendingAuth){let cb=pendingAuth;pendingAuth=null;cb()}else{admin=true;render()}}catch(e){$('loginError').textContent=e.message}};
+
+function factoryApiKey(){
+  return (localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
+}
+function factoryHeaders(extra={}){
+  const key=factoryApiKey();
+  if(!key)return null;
+  const h={apikey:key,...extra};
+  if(key.startsWith('eyJ'))h.Authorization='Bearer '+key;
+  return h;
+}
+async function factoryFetch(path,options={}){
+  const headers=factoryHeaders(options.headers||{});
+  if(!headers)throw Error('Supabase browser key is not configured.');
+  const res=await fetch(FACTORY_REST+path,{...options,headers});
+  if(!res.ok){
+    const body=await res.text().catch(()=>res.statusText);
+    throw Error(body||('HTTP '+res.status));
+  }
+  if(res.status===204)return null;
+  const text=await res.text();
+  return text?JSON.parse(text):null;
+}
+async function factoryCloudLoad(){
+  const rows=await factoryFetch(`/spgs_factory_inventory_state?workspace=eq.${encodeURIComponent(FACTORY_WORKSPACE)}&select=revision,payload,updated_at,updated_by&limit=1`);
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+async function factoryCloudCommit(next,expectedRevision,action){
+  if(cloudBusy)return;
+  cloudBusy=true;
+  try{
+    const rows=await factoryFetch('/rpc/spgs_factory_inventory_commit',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        p_workspace:FACTORY_WORKSPACE,
+        p_expected_revision:Number(expectedRevision||0),
+        p_payload:next,
+        p_updated_by:factoryContextUser?.username||'local',
+        p_action:String(action||'Factory update')
+      })
+    });
+    const row=Array.isArray(rows)?rows[0]:rows;
+    if(row&&Number(row.revision)!==Number(db.revision)){
+      db={...db,...(row.payload||{}),revision:Number(row.revision||db.revision)};
+      localStorage.setItem(KEY,JSON.stringify(db));
+      render();
+    }
+  }catch(e){
+    console.error('Factory cloud save failed',e);
+    if(String(e.message||'').includes('FACTORY_REVISION_CONFLICT')){
+      try{
+        const cloud=await factoryCloudLoad();
+        if(cloud?.payload){
+          db={...cloud.payload,revision:Number(cloud.revision||0)};
+          localStorage.setItem(KEY,JSON.stringify(db));
+          render();
+          toast('Factory data changed on another device. Latest cloud data was reloaded.');
+        }
+      }catch(reloadError){console.error('Factory reload after conflict failed',reloadError)}
+    }else{
+      toast('Cloud save failed. Local copy kept.');
+    }
+  }finally{
+    cloudBusy=false;
+  }
+}
+async function factoryBootstrapCloud(){
+  if(!factoryApiKey()){
+    console.warn('Factory cloud sync disabled: Supabase browser key not configured.');
+    return;
+  }
+  try{
+    const cloud=await factoryCloudLoad();
+    if(cloud?.payload){
+      db={...cloud.payload,revision:Number(cloud.revision||0)};
+      localStorage.setItem(KEY,JSON.stringify(db));
+    }else{
+      // First cloud initialization uses the local state as revision 0.
+      db.revision=Number(db.revision||0);
+      await factoryCloudCommit(db,0,'Factory inventory cloud initialization');
+    }
+    cloudReady=true;
+    render();
+    toast('Factory cloud sync connected');
+  }catch(e){
+    console.error('Factory cloud bootstrap failed',e);
+    toast('Factory cloud unavailable. Local copy is still available.');
+  }
+}
+function sendFactoryHeight(){
+  if(!embeddedMode)return;
+  requestAnimationFrame(()=>{
+    try{
+      const height=Math.max(
+        document.documentElement.scrollHeight,
+        document.body?.scrollHeight||0,
+        760
+      );
+      parent.postMessage({type:'SOFTCREATION_FACTORY_HEIGHT',height},location.origin);
+    }catch(_){}
+  });
+}
+window.addEventListener('message',e=>{
+  if(e.origin!==location.origin||e.data?.type!=='SOFTCREATION_FACTORY_CONTEXT')return;
+  embeddedMode=true;
+  factoryContextUser=e.data.user||null;
+  admin=!!e.data.canManage;
+  if($('authButton'))$('authButton').style.display='none';
+  document.documentElement.classList.add('embedded');
+  render();
+  sendFactoryHeight();
+});
+
+function options(list,placeholder='Select…'){return '<option value="">'+placeholder+'</option>'+list.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}
+function field(label,input){return `<div><label>${label}</label>${input}</div>`}function table(headers,rows){return `<div class="scroll"><table><thead><tr>${headers.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>'<tr>'+r.map(x=>`<td>${x}</td>`).join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}" class="muted">No records yet</td></tr>`}</tbody></table></div>`}function returned(id){return db.returns.filter(x=>x.issue===id).reduce((s,x)=>s+x.qty,0)}
+const tabs=['Dashboard','Stock in','Issue to job','Job reports','Masters','History','Backup'];
+function render(){ $('authButton').textContent=admin?'Admin · Logout':'Admin login';$('nav').innerHTML=tabs.map(t=>`<button class="${page===t?'active':''}" onclick="page='${t}';render()">${t}</button>`).join('');let html='';
+if(page==='Dashboard'){let available=db.lots.filter(l=>l.remaining>0);html=`<div class="grid"><div class="card stat">Raw materials<b>${db.items.length}</b></div><div class="card stat">Available batches<b>${available.length}</b></div><div class="card stat">Production jobs<b>${new Set(db.issues.map(x=>x.job)).size}</b></div></div><div class="card"><h2>Available stock</h2><input id="search" placeholder="Search item, supplier or owner" oninput="stockTable(this.value)"><div id="stockTable"></div></div>`}
+if(page==='Stock in')html=`<div class="card"><h2>Receive raw materials</h2><p class="muted">Every receipt keeps its supplier and ownership. Create masters first; quantities use the item’s unit.</p><form id="receive"><div class="grid">${field('Item *',`<select name="item" required>${options(db.items)}</select>`)}${field('Supplier *',`<select name="supplier" required>${options(db.suppliers)}</select>`)}${field('Raw material ownership *',`<select name="owner" required>${options(db.owners)}</select>`)}${field('Quantity *','<input name="quantity" type="number" step="any" min="0.000001" required>')}${field('Receipt date *',`<input name="date" type="date" value="${date()}" required>`)}${field('Supplier invoice / reference','<input name="reference" maxlength="120">')}</div><label>Description / batch details</label><textarea name="description" maxlength="500"></textarea><p><button>Save stock in</button></p></form></div>`;
+if(page==='Issue to job')html=`<div class="card"><h2>Issue materials to production</h2><p class="muted">Select the exact ownership batch. Repeat for each material in the same job; all lines appear together in the job report.</p><form id="issue"><div class="grid">${field('Available material batch *',`<select name="lot" required>${options(db.lots.filter(l=>l.remaining>0).map(l=>({id:l.id,name:`${name(db.items,l.item)} | ${name(db.owners,l.owner)} | ${name(db.suppliers,l.supplier)} | ${fmt(l.remaining)} ${db.items.find(i=>i.id===l.item)?.unit} | ${l.date} | ${l.code}`})))}</select>`)}${field('Use quantity *','<input name="quantity" type="number" step="any" min="0.000001" required>')}${field('Production / job number *','<input name="job" maxlength="80" placeholder="e.g. JOB-2026-001">')}${field('Issue date *',`<input name="date" type="date" value="${date()}" required>`)}</div><label><input type="checkbox" name="exception" onchange="this.form.job.required=!this.checked"> No job number — approve with admin password</label><div class="notice">Job number එක නැති issue එකකට admin password සහ හේතුව අනිවාර්යයි. ඒවා EXCEPTION reference එකකින් report වෙනවා.</div><label>Purpose / notes (required for exception)</label><textarea name="notes" maxlength="500"></textarea><p><button>Issue stock</button></p></form></div>`;
+if(page==='Masters')html=`<div class="grid"><div class="card"><h2>Suppliers</h2><form id="supplier"><label>Supplier name *</label><input name="name" required maxlength="120"><p><label>Contact / description</label><input name="description" maxlength="250"></p><button>Create supplier</button></form><p>${db.suppliers.map(x=>esc(x.name)).join(' · ')||'No suppliers'}</p></div><div class="card"><h2>Raw material ownership</h2><form id="owner"><label>Owner name *</label><input name="name" placeholder="Softcreation / customer name" required maxlength="120"><p><label>Description</label><input name="description" maxlength="250"></p><button>Create owner</button></form><p>${db.owners.map(x=>esc(x.name)).join(' · ')||'No owners'}</p></div></div><div class="card"><h2>Raw materials ${admin?'':'<small>· Admin access required</small>'}</h2>${admin?`<form id="item"><div class="grid">${field('Item name *','<input name="name" required maxlength="120">')}${field('Description','<input name="description" maxlength="250">')}${field('Stock unit *','<input name="unit" required placeholder="m² / metre / roll / pcs" maxlength="30">')}${field('Unit price (LKR, optional)','<input name="price" type="number" min="0" step="any" placeholder="Leave blank if unknown">')}</div><button>Create material</button></form>`:'<p>Login as admin to create materials and set prices.</p>'}${table(['Item','Description','Unit',...(admin?['Current unit price','Update price']:[])],db.items.map(i=>[esc(i.name),esc(i.description),esc(i.unit),...(admin?[i.price===null?'<span class="error">Price missing</span>':money(i.price),`<button class="secondary" onclick="editPrice('${i.id}')">Edit price</button>`]:[])]))}<p class="muted">Prices are captured when issuing stock. Later price changes do not rewrite past job costs. Item prices apply to every owner; the cost report shows material value, not necessarily company payable cost.</p></div>`;
+if(page==='Job reports'){let jobs=[...new Set(db.issues.map(i=>i.job))];html=`<div class="card"><h2>Job summary & PDF</h2><div class="actions"><select id="reportJob" style="max-width:350px" onchange="showJob()">${options(jobs.map(j=>({id:esc(j),name:j})),'Select production job')}</select><button onclick="printJob(false)">Usage PDF</button>${admin?'<button onclick="printJob(true)">Admin cost PDF</button>':''}</div><p class="muted">PDF button opens Print. Choose “Save as PDF”. Returns reduce net use and cost. Unit prices are snapshots taken at issue time.</p><div id="jobDetail"></div></div>`}
+if(page==='History')html=`<div class="card"><h2>Stock movements</h2>${table(['Date','Type','Reference / job','Item','Supplier','Owner','Qty','Notes'],[...db.lots.map(l=>({date:l.date,row:[l.date,'IN',esc(l.code+' '+l.reference),esc(name(db.items,l.item)),esc(name(db.suppliers,l.supplier)),esc(name(db.owners,l.owner)),fmt(l.quantity),esc(l.description)]})),...db.issues.map(i=>{let l=db.lots.find(l=>l.id===i.lot);return {date:i.date,row:[i.date,i.exception?'APPROVED EXCEPTION':'ISSUE',esc(i.job),esc(i.itemName),esc(name(db.suppliers,l.supplier)),esc(i.ownerName),fmt(i.qty),esc(i.notes)]}}),...db.returns.map(r=>{let i=db.issues.find(i=>i.id===r.issue),l=db.lots.find(l=>l.id===i.lot);return {date:r.date,row:[r.date,'RETURN',esc(i.job),esc(i.itemName),esc(name(db.suppliers,l.supplier)),esc(i.ownerName),fmt(r.qty),esc(r.notes)]}})].sort((a,b)=>b.date.localeCompare(a.date)).map(x=>x.row))}</div>${admin?`<div class="card"><h2>Audit log</h2>${table(['Time','Role','Action'],db.audit.slice().reverse().map(a=>[esc(new Date(a.at).toLocaleString()),a.role,esc(a.action)]))}</div>`:''}`;
+if(page==='Backup')html=`<div class="card"><h2>Backup & restore</h2><p>Export a JSON backup daily and keep a copy outside this device. Backups contain all data, including prices and the password hash; keep them private.</p><div class="actions">${admin?'<button onclick="backup()">Export full backup</button><label class="secondary">Restore backup <input type="file" id="restore" accept=".json"></label>':'<button onclick="auth()">Admin login for backup / restore</button>'}</div><div class="notice">Restore replaces this browser’s database. Export a backup first. This file does not synchronize across PCs, phones or browser profiles.</div>${admin?'<button class="secondary" onclick="changePassword()">Change admin password</button>':''}</div>`;
+$('view').innerHTML=html;if(page==='Dashboard')stockTable('');bind();sendFactoryHeight();}
+function stockTable(search){let s=search.toLowerCase();$('stockTable').innerHTML=table(['Item','Description','Supplier','Ownership','Batch','Available','Unit'],db.lots.filter(l=>l.remaining>0).filter(l=>[name(db.items,l.item),name(db.suppliers,l.supplier),name(db.owners,l.owner)].join(' ').toLowerCase().includes(s)).map(l=>[esc(name(db.items,l.item)),esc(l.description||db.items.find(i=>i.id===l.item)?.description),esc(name(db.suppliers,l.supplier)),esc(name(db.owners,l.owner)),esc(l.code),fmt(l.remaining),esc(db.items.find(i=>i.id===l.item)?.unit)]))}
+function bind(){for(let kind of ['supplier','owner','item'])if($(kind))$(kind).onsubmit=e=>{e.preventDefault();attempt(()=>{if(kind==='item'&&!admin)throw Error('Admin login required');let f=new FormData(e.target),list=kind==='item'?'items':kind==='owner'?'owners':'suppliers',n=f.get('name').trim();if(!n)throw Error('Name required');if(db[list].some(x=>x.name.toLowerCase()===n.toLowerCase()))throw Error('Name already exists');let entry={id:uid(),name:n,description:f.get('description').trim()};if(kind==='item'){entry.unit=f.get('unit').trim();if(!entry.unit)throw Error('Unit required');entry.price=f.get('price')===''?null:num(f.get('price'));if(entry.price!==null&&(!Number.isFinite(entry.price)||entry.price<0))throw Error('Invalid price')}commit('Created '+kind+': '+n,d=>d[list].push(entry))})};
+if($('receive'))$('receive').onsubmit=e=>{e.preventDefault();attempt(()=>{let f=new FormData(e.target),q=num(f.get('quantity'));if(!(q>0&&Number.isFinite(q)))throw Error('Quantity must be positive');for(let [key,list]of [['item','items'],['supplier','suppliers'],['owner','owners']])if(!db[list].some(x=>x.id===f.get(key)))throw Error('Select '+key);commit('Stock received',d=>d.lots.push({id:uid(),code:'GRN-'+String(d.lots.length+1).padStart(5,'0'),item:f.get('item'),supplier:f.get('supplier'),owner:f.get('owner'),quantity:q,remaining:q,date:f.get('date'),reference:f.get('reference').trim(),description:f.get('description').trim()}))})};
+if($('issue')){$('issue').job.required=true;$('issue').onsubmit=e=>{e.preventDefault();attempt(()=>{let f=new FormData(e.target),q=num(f.get('quantity')),job=f.get('job').trim().toUpperCase(),exception=f.get('exception')==='on',notes=f.get('notes').trim(),lotId=f.get('lot');if(exception&&job)throw Error('Untick exception when a job number is present');if(!job&&!exception)throw Error('Production / job number is mandatory');if(exception&&!notes)throw Error('Enter exception reason');let save=()=>attempt(()=>{let l=db.lots.find(l=>l.id===lotId);if(!l||!Number.isFinite(q)||q<=0||qty(q-l.remaining)>0)throw Error('Quantity exceeds available stock or is invalid');let i=db.items.find(i=>i.id===l.item);commit(exception?'Admin approved issue without job: '+notes:'Issued to '+job,d=>{d.lots.find(l=>l.id===lotId).remaining=qty(l.remaining-q);d.issues.push({id:uid(),job:exception?'EXCEPTION-'+String(d.issues.length+1).padStart(5,'0'):job,exception,approvedAt:exception?new Date().toISOString():null,lot:lotId,qty:q,date:f.get('date'),notes,itemName:i.name,unit:i.unit,ownerName:name(db.owners,l.owner),price:i.price})})});if(exception)auth(save);else save()})}}
+if($('restore'))$('restore').onchange=async e=>{try{let f=e.target.files[0];if(!f)return;let n=JSON.parse(await f.text());validateBackup(n);if(!confirm('Replace all current data with this backup? Export your current backup first.'))return;commit('Backup restored',d=>{for(let k of ['items','suppliers','owners','lots','issues','returns','audit','auth'])d[k]=n[k]});admin=false;render()}catch(e){toast('Restore failed: '+e.message)}};}
+function editPrice(id){if(!admin)return;let i=db.items.find(x=>x.id===id),v=prompt('Unit price in LKR. Blank = unknown. Applies only to future issues.',i.price??'');if(v===null)return;attempt(()=>{let p=v.trim()===''?null:Number(v);if(p!==null&&(!Number.isFinite(p)||p<0))throw Error('Invalid price');commit('Updated price: '+i.name,d=>d.items.find(x=>x.id===id).price=p)})}
+function jobMarkup(job,cost,interactive=false){let lines=db.issues.filter(i=>i.job===job);let unknown=0,total=0;let rows=lines.map(i=>{let r=returned(i.id),net=qty(i.qty-r);if(i.price===null&&net>0)unknown++;else total+=net*(i.price||0);return [esc(i.itemName),esc(i.ownerName),esc(db.lots.find(l=>l.id===i.lot)?.code),fmt(i.qty),fmt(r),fmt(net),esc(i.unit),...(cost?[i.price===null?'PRICE MISSING':money(i.price),i.price===null&&net>0?'UNPRICED':money(net*(i.price||0))]:[]),...(interactive?[`<button class="secondary" onclick="returnStock('${i.id}')" ${net<=0?'disabled':''}>Return</button>`]:[])]});return `<h2>Production job: ${esc(job)}</h2><p>${lines.some(i=>i.exception)?'Admin-approved issue without production number.':''}</p>${table(['Material','Raw material ownership','Batch','Issued','Returned','Net used','Unit',...(cost?['Unit price','Material cost']:[]),...(interactive?['Return unused']:[])],rows)}${cost?`<h3>${unknown?'Known material subtotal':'Total material cost'}: ${money(total)}</h3>${unknown?`<div class="notice">${unknown} unpriced material line(s). Full job material cost is incomplete. Missing prices are not treated as zero.</div>`:''}<p>Material cost only. Labour, overhead, freight and other production costs are excluded. Ownership identifies whose stock was used; this value is not necessarily a cost payable by Softcreation.</p>`:''}<p>Issue notes: ${lines.map(i=>`${esc(i.date)} — ${esc(i.notes||'—')}`).join('<br>')}</p>`}
+function showJob(){let j=$('reportJob').value;$('jobDetail').innerHTML=j?jobMarkup(j,admin,true):''}
+function printJob(cost){let j=$('reportJob').value;if(!j)return toast('Select a job');if(cost&&!admin)return toast('Admin required');$('printArea').innerHTML=`<h1>SOFTCREATION · Factory inventory</h1><p>${cost?'ADMIN MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${esc(new Date().toLocaleString())}</p>`+jobMarkup(j,cost);window.print()}
+function returnStock(id){let i=db.issues.find(x=>x.id===id),available=qty(i.qty-returned(id)),v=prompt('Unused material returned to original owner batch. Maximum '+fmt(available)+' '+i.unit);if(v===null)return;let q=Number(v),notes=prompt('Return reason');if(notes===null)return;attempt(()=>{if(!notes.trim())throw Error('Reason required');if(!Number.isFinite(q)||q<=0||qty(q-available)>0)throw Error('Invalid return quantity');commit('Return from '+i.job,d=>{d.returns.push({id:uid(),issue:id,qty:q,date:date(),notes:notes.trim()});let l=d.lots.find(l=>l.id===i.lot);l.remaining=qty(l.remaining+q)})});if(page==='Job reports'){$('reportJob').value=i.job;showJob()}}
+function backup(){if(!admin)return;let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='factory-inventory-backup-'+date()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function validateBackup(n){if(n.version!==1||!Number.isInteger(n.revision)||!n.auth||typeof n.auth.salt!=='string'||!/^[a-f0-9]{64}$/.test(n.auth.digest))throw Error('Invalid backup format');for(let k of ['items','suppliers','owners','lots','issues','returns','audit']){if(!Array.isArray(n[k]))throw Error('Missing '+k);let ids=new Set();for(let x of n[k]){if(typeof x.id!=='string'||ids.has(x.id))throw Error('Invalid / duplicate record ID');ids.add(x.id)}}const has=(k,id)=>n[k].some(x=>x.id===id),positive=x=>Number.isFinite(x)&&x>0;for(let k of ['items','suppliers','owners'])for(let x of n[k])if(typeof x.name!=='string'||!x.name.trim())throw Error('Invalid master name');for(let i of n.items)if(typeof i.unit!=='string'||!i.unit||!(i.price===null||Number.isFinite(i.price)&&i.price>=0))throw Error('Invalid item');for(let l of n.lots)if(!has('items',l.item)||!has('suppliers',l.supplier)||!has('owners',l.owner)||!positive(l.quantity)||!Number.isFinite(l.remaining)||l.remaining<0)throw Error('Invalid stock batch');for(let i of n.issues)if(!has('lots',i.lot)||!positive(i.qty)||typeof i.job!=='string'||!i.job.trim()||!(i.price===null||Number.isFinite(i.price)&&i.price>=0)||typeof i.itemName!=='string'||typeof i.ownerName!=='string'||typeof i.unit!=='string')throw Error('Invalid issue');for(let r of n.returns)if(!has('issues',r.issue)||!positive(r.qty))throw Error('Invalid return');for(let i of n.issues)if(qty(n.returns.filter(r=>r.issue===i.id).reduce((s,r)=>s+r.qty,0)-i.qty)>0)throw Error('Returns exceed issue');for(let l of n.lots){let issued=n.issues.filter(i=>i.lot===l.id),used=issued.reduce((s,i)=>s+i.qty-n.returns.filter(r=>r.issue===i.id).reduce((s,r)=>s+r.qty,0),0);if(Math.abs(qty(l.quantity-used-l.remaining))>0.000001)throw Error('Stock balance mismatch')}}
+async function changePassword(){if(!admin)return;let p=prompt('New admin password (minimum 8 characters)');if(p===null)return;if(p.length<8)return toast('Minimum 8 characters');try{let salt=uid(),digest=await hash(p,salt);commit('Admin password changed',d=>d.auth={salt,digest})}catch(e){toast(e.message)}}
+window.addEventListener('storage',e=>{if(e.key===KEY){if(!embeddedMode)admin=false;toast('Data changed in another tab. Reload this page before continuing.')}});
+if(embeddedMode){
+  document.documentElement.classList.add('embedded');
+  if($('authButton'))$('authButton').style.display='none';
+}
+render();
+factoryBootstrapCloud();
+
+</script></html>
