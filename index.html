@@ -17486,6 +17486,7 @@ window.toggleBpSeparateDeliveryButton = function(){
   const FACTORY_CACHE_KEY='softcreation_factory_inventory_cloud_cache_v1';
   const FACTORY_FEATURES=[
     ['factory_view','Factory — Raw Material Usage'],
+    ['factory_stock_in','Factory — Stock In'],
     ['factory_issue','Factory — Record Raw Materials Used'],
     ['factory_reports','Factory — Job & Usage Reports'],
     ['factory_manage','Factory — Masters / Admin'],
@@ -17654,6 +17655,7 @@ window.toggleBpSeparateDeliveryButton = function(){
   function factoryTabs(){
     const all=[
       ['Dashboard','factory_view'],
+      ['Stock in','factory_stock_in'],
       ['Issue to job','factory_issue'],
       ['Job reports','factory_reports'],
       ['Masters','factory_manage'],
@@ -17687,6 +17689,7 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     let out='';
     if(factoryPage==='Dashboard')out=factoryDashboardHtml();
+    else if(factoryPage==='Stock in')out=factoryStockInHtml();
     else if(factoryPage==='Issue to job')out=factoryIssueHtml();
     else if(factoryPage==='Job reports')out=factoryReportsHtml();
     else if(factoryPage==='Masters')out=factoryMastersHtml();
@@ -17722,6 +17725,55 @@ window.toggleBpSeparateDeliveryButton = function(){
               `<span class="tag">${fEsc(r.status||'')}</span>`,
               fCan('factory_issue')?`<button class="btn primary sm" type="button" onclick="factoryOpenUsageForJob('${r.id}')">Add Raw Materials</button>`:'-'
             ])
+          )}
+        </div>
+      </div>`;
+  }
+
+
+  function factoryStockInHtml(){
+    if(!fCan('factory_stock_in'))return '<div class="empty">Factory Stock In permission is not enabled.</div>';
+    return `
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Receive Raw Materials</div>
+        <div class="panel-body">
+          <div class="notice"><b>Stock In:</b> Every receipt keeps its Raw Material, Supplier, Ownership and its own batch balance. Create the required Masters first.</div>
+          <form id="factoryReceiveForm">
+            <div class="factory-form-grid">
+              ${factoryField('Item / Raw Material *',`<select name="item" required>${factoryOptions(factoryDb.items)}</select>`)}
+              ${factoryField('Supplier *',`<select name="supplier" required>${factoryOptions(factoryDb.suppliers)}</select>`)}
+              ${factoryField('Raw Material Ownership *',`<select name="owner" required>${factoryOptions(factoryDb.owners)}</select>`)}
+              ${factoryField('Quantity *','<input name="quantity" type="number" step="any" min="0.000001" required>')}
+              ${factoryField('Receipt Date *',`<input name="date" type="date" value="${fToday()}" required>`)}
+              ${factoryField('Supplier Invoice / Reference','<input name="reference" maxlength="120">')}
+            </div>
+            <div class="factory-field">
+              <label>Description / Batch Details</label>
+              <textarea name="description" maxlength="500" placeholder="Optional batch, material or receiving details"></textarea>
+            </div>
+            <div class="actions"><button class="btn primary" type="submit">Save Stock In</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="panel factory-inner-panel">
+        <div class="panel-title">Current Stock In Batches</div>
+        <div class="panel-body">
+          ${factoryTable(
+            ['Batch','Date','Raw Material','Supplier','Ownership','Received','Remaining','Unit','Reference'],
+            (factoryDb.lots||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).map(l=>{
+              const item=factoryDb.items.find(i=>i.id===l.item);
+              return [
+                `<b>${fEsc(l.code||'')}</b>`,
+                fEsc(l.date||''),
+                fEsc(item?.name||'Unknown'),
+                fEsc(fName(factoryDb.suppliers,l.supplier)),
+                fEsc(fName(factoryDb.owners,l.owner)),
+                fFmt(l.quantity),
+                fFmt(l.remaining),
+                fEsc(item?.unit||''),
+                fEsc(l.reference||'')
+              ];
+            })
           )}
         </div>
       </div>`;
@@ -17883,47 +17935,51 @@ window.toggleBpSeparateDeliveryButton = function(){
       </div>`;
   }
   function factoryHistoryHtml(){
-    const usageRows=(factoryDb.issues||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).map(i=>{
-      const cells=[
-        fEsc(i.date||''),'USAGE',fEsc(i.job||''),
-        fEsc(i.itemName||''),fEsc(i.supplierName||fName(factoryDb.suppliers,i.supplierId)),
-        fEsc(i.ownerName||fName(factoryDb.owners,i.ownerId)),
-        `${fFmt(i.qty)} ${fEsc(i.unit||'')}`,fEsc(i.notes||'')
-      ];
-      return cells;
-    });
+    const rows=[
+      ...(factoryDb.lots||[]).map(l=>{
+        const item=factoryDb.items.find(i=>i.id===l.item);
+        return {
+          date:l.date||'',
+          at:l.createdAt||l.date||'',
+          cells:[
+            fEsc(l.date||''),
+            'STOCK IN',
+            `<b>${fEsc(l.code||'')}</b>`,
+            fEsc(item?.name||'Unknown'),
+            fEsc(fName(factoryDb.suppliers,l.supplier)),
+            fEsc(fName(factoryDb.owners,l.owner)),
+            `${fFmt(l.quantity)} ${fEsc(item?.unit||'')}`,
+            fEsc(l.reference||l.description||'')
+          ]
+        };
+      }),
+      ...(factoryDb.issues||[]).map(i=>({
+        date:i.date||'',
+        at:i.issuedAt||i.date||'',
+        cells:[
+          fEsc(i.date||''),
+          'USAGE',
+          `<b>${fEsc(i.job||'')}</b>`,
+          fEsc(i.itemName||''),
+          fEsc(i.supplierName||fName(factoryDb.suppliers,i.supplierId)),
+          fEsc(i.ownerName||fName(factoryDb.owners,i.ownerId)),
+          `${fFmt(i.qty)} ${fEsc(i.unit||'')}`,
+          fEsc(i.notes||'')
+        ]
+      }))
+    ].sort((a,b)=>String(b.at||b.date).localeCompare(String(a.at||a.date))).map(x=>x.cells);
+
     return `
       <div class="panel factory-inner-panel">
-        <div class="panel-title">Factory Raw Material Usage History</div>
-        <div class="panel-body">${factoryTable(['Date','Type','Production','Raw Material','Supplier','Ownership','Qty Used','Notes'],usageRows)}</div>
+        <div class="panel-title">Factory Stock & Raw Material Usage History</div>
+        <div class="panel-body">
+          ${factoryTable(['Date','Type','Reference / Production','Raw Material','Supplier','Ownership','Quantity','Notes'],rows)}
+        </div>
       </div>
       ${fCan('factory_manage')?`<div class="panel factory-inner-panel"><div class="panel-title">Factory Audit</div><div class="panel-body">${factoryTable(['Time','User','Action'],factoryDb.audit.slice().reverse().map(a=>[
         fEsc(new Date(a.at).toLocaleString()),fEsc(a.display||a.user||''),fEsc(a.action)
       ]))}</div></div>`:''}`;
   }
-
-  window.renderFactoryStockTable=function(search=''){
-    const host=f$('factoryStockTable');if(!host)return;
-    const s=String(search||'').toLowerCase();
-    host.innerHTML=factoryTable(['Item','Description','Supplier','Ownership','Batch','Available','Unit'],
-      factoryDb.lots
-        .filter(l=>Number(l.remaining)>0)
-        .filter(l=>[
-          fName(factoryDb.items,l.item),fName(factoryDb.suppliers,l.supplier),
-          fName(factoryDb.owners,l.owner),l.code,l.description
-        ].join(' ').toLowerCase().includes(s))
-        .map(l=>{
-          const item=factoryDb.items.find(i=>i.id===l.item);
-          return [
-            fEsc(fName(factoryDb.items,l.item)),
-            fEsc(l.description||item?.description||''),
-            fEsc(fName(factoryDb.suppliers,l.supplier)),
-            fEsc(fName(factoryDb.owners,l.owner)),
-            fEsc(l.code),fFmt(l.remaining),fEsc(item?.unit||'')
-          ];
-        })
-    );
-  };
 
   function bindFactoryForms(){
     const supplier=f$('factorySupplierForm');
@@ -17932,6 +17988,44 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(owner)owner.onsubmit=e=>{e.preventDefault();createFactoryMaster('owner',e.target)};
     const item=f$('factoryItemForm');
     if(item)item.onsubmit=e=>{e.preventDefault();createFactoryMaster('item',e.target)};
+
+    const receive=f$('factoryReceiveForm');
+    if(receive)receive.onsubmit=async e=>{
+      e.preventDefault();
+      if(!requirePerm('factory_stock_in','receive Factory raw material stock'))return;
+      const f=new FormData(e.target);
+      const q=Number(f.get('quantity'));
+      const itemId=String(f.get('item')||'');
+      const supplierId=String(f.get('supplier')||'');
+      const ownerId=String(f.get('owner')||'');
+      if(!Number.isFinite(q)||q<=0)return toast('Quantity must be positive');
+      const item=factoryDb.items.find(x=>x.id===itemId);
+      if(!item)return toast('Select a raw material');
+      if(!factoryDb.suppliers.some(x=>x.id===supplierId))return toast('Select a supplier');
+      if(!factoryDb.owners.some(x=>x.id===ownerId))return toast('Select raw material ownership');
+
+      await factoryCommit(`Factory stock received: ${item.name}`,d=>{
+        const seq=(d.lots||[]).reduce((m,l)=>{
+          const n=Number(String(l.code||'').replace(/\D/g,''));
+          return Number.isFinite(n)?Math.max(m,n):m;
+        },0)+1;
+        d.lots.push({
+          id:fUid(),
+          code:'FGRN-'+String(seq).padStart(5,'0'),
+          item:itemId,
+          supplier:supplierId,
+          owner:ownerId,
+          quantity:q,
+          remaining:q,
+          date:String(f.get('date')||fToday()),
+          reference:String(f.get('reference')||'').trim(),
+          description:String(f.get('description')||'').trim(),
+          createdBy:currentUser?.username||'',
+          createdByDisplay:currentUser?.display||'',
+          createdAt:new Date().toISOString()
+        });
+      });
+    };
 
     const issue=f$('factoryIssueForm');
     if(issue){
@@ -18108,7 +18202,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       section.innerHTML=`
         <div class="panel">
           <div class="panel-title factory-title-row">
-            <div><span>Factory</span><small>Raw Material Usage • Production Jobs • Job Cost</small></div>
+            <div><span>Factory</span><small>Raw Material Stock • Production Usage • Job Cost</small></div>
             <div class="factory-title-actions">
               <span id="factoryCloudStatus" class="factory-cloud-status">Not loaded</span>
               <button class="btn sm" style="background:#fff;color:#087f83" type="button" onclick="loadFactoryCloud(true)">Refresh</button>
