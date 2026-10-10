@@ -18469,7 +18469,115 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!w)return toast('Allow pop-ups to print the Factory report');
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Factory Job Report</title><style>
       body{font:12px Arial;color:#173439;padding:20px}h1{color:#098f91}.factory-table{width:100%;border-collapse:collapse}.factory-table th,.factory-table td{border:1px solid #dbe6e7;padding:7px;text-align:left}.factory-job-head{margin:12px 0}.factory-job-head b{font-size:18px;display:block}.factory-job-head span{color:#60767b}.factory-cost-total{display:flex;justify-content:flex-end;gap:20px;margin-top:12px;font-size:16px}.btn,.notice{display:none}@page{size:A4 landscape;margin:12mm}
-    </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}
+    </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}</body></html>`);
+    w.document.close();w.focus();setTimeout(()=>w.print(),250);
+  };
+  window.exportFactoryBackup=function(){
+    if(!requirePerm('factory_manage','export Factory backup'))return;
+    const blob=new Blob([JSON.stringify(factoryDb,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='softcreation-factory-backup-'+fToday()+'.json';a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  async function restoreFactoryBackup(e){
+    if(!requirePerm('factory_manage','restore Factory backup'))return;
+    if(!protectedEdit('restore Factory inventory backup')){e.target.value='';return}
+    const file=e.target.files?.[0];if(!file)return;
+    try{
+      const raw=JSON.parse(await file.text());
+      const n=factoryNormalize(raw);
+      for(const k of ['items','suppliers','owners','lots','issues','returns','audit'])if(!Array.isArray(n[k]))throw new Error('Invalid backup');
+      if(!confirm('Replace the current Factory cloud state with this backup?'))return;
+      await factoryCommit('Factory backup restored',d=>{
+        for(const k of ['items','suppliers','owners','lots','issues','returns','audit'])d[k]=JSON.parse(JSON.stringify(n[k]));
+      });
+    }catch(err){toast('Factory restore failed — '+err.message)}
+    finally{e.target.value=''}
+  }
+
+  function installFactoryUI(){
+    FACTORY_FEATURES.forEach(f=>{if(!USER_FEATURES.some(x=>x[0]===f[0]))USER_FEATURES.push(f)});
+    VIEW_PERMS.factory='factory_view';
+
+    const nav=document.querySelector('.nav');
+    if(nav&&!nav.querySelector('.navbtn[data-view="factory"]')){
+      const btn=document.createElement('button');
+      btn.className='navbtn';
+      btn.dataset.view='factory';
+      btn.textContent='Factory';
+      btn.onclick=()=>showView('factory');
+      const stores=nav.querySelector('.navbtn[data-view="stores"]');
+      const settings=nav.querySelector('.navbtn[data-view="settings"]');
+      if(stores)stores.insertAdjacentElement('afterend',btn);
+      else if(settings)nav.insertBefore(btn,settings);
+      else nav.appendChild(btn);
+    }
+
+    if(!f$('factory')){
+      const app=document.querySelector('.app');
+      const section=document.createElement('section');
+      section.id='factory';
+      section.className='view';
+      section.innerHTML=`
+        <div class="panel">
+          <div class="panel-title factory-title-row">
+            <div><span>Factory</span><small>Raw Material Stock • Production Usage • Job Cost</small></div>
+            <div class="factory-title-actions">
+              <span id="factoryCloudStatus" class="factory-cloud-status">Not loaded</span>
+              <button class="btn sm" style="background:#fff;color:#087f83" type="button" onclick="loadFactoryCloud(true)">Refresh</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div id="factorySubnav" class="factory-subnav"></div>
+            <div id="factoryBody"><div class="factory-loading">Open Factory to load inventory.</div></div>
+          </div>
+        </div>`;
+      app.appendChild(section);
+    }
+
+    const baseShow=window.showView;
+    window.showView=function(id){
+      const r=baseShow.apply(this,arguments);
+      if(id==='factory'){
+        if(!fCan('factory_view'))return r;
+        loadFactoryCloud(false);
+        renderFactory();
+      }
+      return r;
+    };
+    try{showView=window.showView}catch(_){}
+
+    const baseAccess=window.applyUserAccess;
+    window.applyUserAccess=function(){
+      const r=baseAccess.apply(this,arguments);
+      const b=document.querySelector('.navbtn[data-view="factory"]');
+      if(b)b.style.display=fCan('factory_view')?'inline-block':'none';
+      return r;
+    };
+    try{applyUserAccess=window.applyUserAccess}catch(_){}
+
+    const baseRefresh=window.refreshAll;
+    if(typeof baseRefresh==='function'){
+      window.refreshAll=function(){
+        const r=baseRefresh.apply(this,arguments);
+        if(f$('factory')?.classList.contains('active')&&factoryLoaded)renderFactory();
+        return r;
+      };
+      try{refreshAll=window.refreshAll}catch(_){}
+    }
+
+    window.loadFactoryCloud=loadFactoryCloud;
+
+    try{renderUserPrivilegeEditor(null)}catch(_){}
+    try{applyUserAccess()}catch(_){}
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installFactoryUI,{once:true});
+  else installFactoryUI();
+})();
+</script>
+
+
 <script>
 /* V1.0.41 - Products > Open Product > JBR In
    Product-production JBR register only. This does NOT use or modify Factory inventory. */
@@ -18944,113 +19052,4 @@ window.toggleBpSeparateDeliveryButton = function(){
   else installJbrInV1050();
 })();
 </script>
-
-</body></html>`);
-    w.document.close();w.focus();setTimeout(()=>w.print(),250);
-  };
-  window.exportFactoryBackup=function(){
-    if(!requirePerm('factory_manage','export Factory backup'))return;
-    const blob=new Blob([JSON.stringify(factoryDb,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;a.download='softcreation-factory-backup-'+fToday()+'.json';a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
-  };
-  async function restoreFactoryBackup(e){
-    if(!requirePerm('factory_manage','restore Factory backup'))return;
-    if(!protectedEdit('restore Factory inventory backup')){e.target.value='';return}
-    const file=e.target.files?.[0];if(!file)return;
-    try{
-      const raw=JSON.parse(await file.text());
-      const n=factoryNormalize(raw);
-      for(const k of ['items','suppliers','owners','lots','issues','returns','audit'])if(!Array.isArray(n[k]))throw new Error('Invalid backup');
-      if(!confirm('Replace the current Factory cloud state with this backup?'))return;
-      await factoryCommit('Factory backup restored',d=>{
-        for(const k of ['items','suppliers','owners','lots','issues','returns','audit'])d[k]=JSON.parse(JSON.stringify(n[k]));
-      });
-    }catch(err){toast('Factory restore failed — '+err.message)}
-    finally{e.target.value=''}
-  }
-
-  function installFactoryUI(){
-    FACTORY_FEATURES.forEach(f=>{if(!USER_FEATURES.some(x=>x[0]===f[0]))USER_FEATURES.push(f)});
-    VIEW_PERMS.factory='factory_view';
-
-    const nav=document.querySelector('.nav');
-    if(nav&&!nav.querySelector('.navbtn[data-view="factory"]')){
-      const btn=document.createElement('button');
-      btn.className='navbtn';
-      btn.dataset.view='factory';
-      btn.textContent='Factory';
-      btn.onclick=()=>showView('factory');
-      const stores=nav.querySelector('.navbtn[data-view="stores"]');
-      const settings=nav.querySelector('.navbtn[data-view="settings"]');
-      if(stores)stores.insertAdjacentElement('afterend',btn);
-      else if(settings)nav.insertBefore(btn,settings);
-      else nav.appendChild(btn);
-    }
-
-    if(!f$('factory')){
-      const app=document.querySelector('.app');
-      const section=document.createElement('section');
-      section.id='factory';
-      section.className='view';
-      section.innerHTML=`
-        <div class="panel">
-          <div class="panel-title factory-title-row">
-            <div><span>Factory</span><small>Raw Material Stock • Production Usage • Job Cost</small></div>
-            <div class="factory-title-actions">
-              <span id="factoryCloudStatus" class="factory-cloud-status">Not loaded</span>
-              <button class="btn sm" style="background:#fff;color:#087f83" type="button" onclick="loadFactoryCloud(true)">Refresh</button>
-            </div>
-          </div>
-          <div class="panel-body">
-            <div id="factorySubnav" class="factory-subnav"></div>
-            <div id="factoryBody"><div class="factory-loading">Open Factory to load inventory.</div></div>
-          </div>
-        </div>`;
-      app.appendChild(section);
-    }
-
-    const baseShow=window.showView;
-    window.showView=function(id){
-      const r=baseShow.apply(this,arguments);
-      if(id==='factory'){
-        if(!fCan('factory_view'))return r;
-        loadFactoryCloud(false);
-        renderFactory();
-      }
-      return r;
-    };
-    try{showView=window.showView}catch(_){}
-
-    const baseAccess=window.applyUserAccess;
-    window.applyUserAccess=function(){
-      const r=baseAccess.apply(this,arguments);
-      const b=document.querySelector('.navbtn[data-view="factory"]');
-      if(b)b.style.display=fCan('factory_view')?'inline-block':'none';
-      return r;
-    };
-    try{applyUserAccess=window.applyUserAccess}catch(_){}
-
-    const baseRefresh=window.refreshAll;
-    if(typeof baseRefresh==='function'){
-      window.refreshAll=function(){
-        const r=baseRefresh.apply(this,arguments);
-        if(f$('factory')?.classList.contains('active')&&factoryLoaded)renderFactory();
-        return r;
-      };
-      try{refreshAll=window.refreshAll}catch(_){}
-    }
-
-    window.loadFactoryCloud=loadFactoryCloud;
-
-    try{renderUserPrivilegeEditor(null)}catch(_){}
-    try{applyUserAccess()}catch(_){}
-  }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installFactoryUI,{once:true});
-  else installFactoryUI();
-})();
-</script>
-
 </body></html>
