@@ -18579,20 +18579,15 @@ window.toggleBpSeparateDeliveryButton = function(){
 
 
 <script>
-/* V1.0.41 - Products > Open Product > JBR In
-   Product-production JBR register only. This does NOT use or modify Factory inventory. */
+/* V1.0.44 - Products > Open Product > JBR In
+   Supabase-backed JBR production register.
+   Separate from Factory inventory. */
 (function(){
-  const JBR_STORE_KEY_V1050='productJbrBatchesV1050';
+  const JBR_TABLE_V1055='spgs_product_jbrs';
+  const JBR_LOCAL_MIGRATION_KEY_V1055='softcreation_product_jbr_batches_v1054';
+  const jbrCloudCacheV1055=new Map();
 
-  function jbrStoreV1050(){
-    if(!window.state)return {};
-    if(!state[JBR_STORE_KEY_V1050] || typeof state[JBR_STORE_KEY_V1050]!=='object'){
-      state[JBR_STORE_KEY_V1050]={};
-    }
-    return state[JBR_STORE_KEY_V1050];
-  }
-
-  function jbrGroupV1050(encodedKey){
+  function jbrGroupV1055(encodedKey){
     const key=decodeURIComponent(encodedKey||'');
     try{
       if(typeof groupByKeyV1040==='function'){
@@ -18605,7 +18600,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     }catch(_){return null}
   }
 
-  function jbrJobsV1050(g){
+  function jbrJobsV1055(g){
     if(!g)return [];
     try{
       if(typeof activeBatchJobsV1040==='function')return activeBatchJobsV1040(g)||[];
@@ -18613,10 +18608,12 @@ window.toggleBpSeparateDeliveryButton = function(){
     try{
       if(typeof activeJobsForGroupV1038==='function')return activeJobsForGroupV1038(g)||[];
     }catch(_){}
-    return Array.isArray(g.jobs)?g.jobs.filter(r=>!['Finished','Dispatched','Received','GRN Closed'].includes(String(r.status||''))):[];
+    return Array.isArray(g.jobs)
+      ? g.jobs.filter(r=>!['Finished','Dispatched','Received','GRN Closed'].includes(String(r.status||'')))
+      : [];
   }
 
-  function jbrFlowIndexV1050(status){
+  function jbrFlowIndexV1055(status){
     try{
       if(typeof idxV1040==='function')return idxV1040(status);
       if(typeof factoryFlowIndexV1038==='function')return factoryFlowIndexV1038(status);
@@ -18626,247 +18623,401 @@ window.toggleBpSeparateDeliveryButton = function(){
     return i<0?0:i;
   }
 
-  function jbrCanOpenV1050(g){
-    const jobs=jbrJobsV1050(g);
-    return jobs.length && jobs.every(r=>jbrFlowIndexV1050(r.status)>=jbrFlowIndexV1050('In Production'));
+  function jbrCanOpenV1055(g){
+    const jobs=jbrJobsV1055(g);
+    return jobs.length && jobs.every(r=>jbrFlowIndexV1055(r.status)>=jbrFlowIndexV1055('In Production'));
   }
 
-  function jbrParseSizeV1050(size){
+  function jbrParseSizeV1055(size){
     const nums=String(size||'').match(/\d+(?:\.\d+)?/g)||[];
+    return {width:Number(nums[0]||0),height:Number(nums[1]||0)};
+  }
+
+  function jbrCodeV1055(row){
+    if(row?.jbr_code)return String(row.jbr_code);
+    if(row?.jbr_seq)return 'JBR-'+String(row.jbr_seq).padStart(5,'0');
+    return 'JBR';
+  }
+
+  function jbrRowToUiV1055(r){
     return {
-      width:Number(nums[0]||0),
-      height:Number(nums[1]||0)
+      id:r.id,
+      code:jbrCodeV1055(r),
+      productKey:r.product_key,
+      productSize:r.product_size,
+      material:r.material,
+      layout:r.layout,
+      requestedPcsPerRoll:Number(r.pcs_per_roll||0),
+      unit:r.unit||'Rolls',
+      jbrWidth:Number(r.jbr_width_mm||0),
+      jbrLengthM:Number(r.jbr_length_m||0),
+      labelWidth:Number(r.label_width_mm||0),
+      labelHeight:Number(r.label_height_mm||0),
+      gap:Number(r.gap_mm||0),
+      pitch:Number(r.pitch_mm||0),
+      lanes:Number(r.lanes||0),
+      labelsPerLane:Number(r.labels_per_lane||0),
+      theoreticalLabels:Number(r.theoretical_labels||0),
+      theoreticalRolls:Number(r.theoretical_rolls||0),
+      actualCutRolls:Number(r.actual_cut_rolls||0),
+      status:r.process_status||'Not Die Cut',
+      note:r.note||'',
+      createdBy:r.created_by_display||r.created_by_username||'User',
+      createdByUser:r.created_by_username||'',
+      createdAt:r.created_at||'',
+      updatedAt:r.updated_at||''
     };
   }
 
-  function jbrEntriesV1050(key){
-    const store=jbrStoreV1050();
-    if(!Array.isArray(store[key]))store[key]=[];
-    return store[key];
+  function jbrWasteV1055(x){
+    if(String(x?.status||'')!=='Fully Die Cut'){
+      return {isWaste:false,wasteRolls:0,wastePct:null,label:'Reusable balance — not waste'};
+    }
+    const max=Math.max(0,Number(x.theoreticalRolls||0));
+    const actual=Math.max(0,Number(x.actualCutRolls||0));
+    const waste=Math.max(0,max-actual);
+    return {
+      isWaste:true,
+      wasteRolls:waste,
+      wastePct:max>0?(waste/max)*100:0,
+      label:`${money(waste)} rolls (${max>0?((waste/max)*100).toFixed(1):'0.0'}%)`
+    };
   }
 
-  function jbrNextNoV1050(){
-    let max=0;
-    const store=jbrStoreV1050();
-    Object.values(store).forEach(arr=>{
-      (Array.isArray(arr)?arr:[]).forEach(x=>{
-        const n=Number(String(x?.code||'').match(/(\d+)$/)?.[1]||0);
-        if(n>max)max=n;
-      });
-    });
-    return 'JBR-'+String(max+1).padStart(5,'0');
-  }
-
-  function jbrCalcV1050(){
-    const jbrWidth=Number($('jbrWidthV1050')?.value||0);
-    const jbrLengthM=Number($('jbrLengthV1050')?.value||0);
-    const labelWidth=Number($('jbrLabelWidthV1050')?.value||0);
-    const labelHeight=Number($('jbrLabelHeightV1050')?.value||0);
-    const gap=Number($('jbrGapV1050')?.value||0);
-    const pcsPerRoll=Number($('jbrPcsV1050')?.value||0);
+  function jbrCalcV1055(){
+    const jbrWidth=Number($('jbrWidthV1055')?.value||0);
+    const jbrLengthM=Number($('jbrLengthV1055')?.value||0);
+    const labelWidth=Number($('jbrLabelWidthV1055')?.value||0);
+    const labelHeight=Number($('jbrLabelHeightV1055')?.value||0);
+    const gap=Number($('jbrGapV1055')?.value||0);
+    const pcsPerRoll=Number($('jbrPcsV1055')?.value||0);
 
     const lanes=(jbrWidth>0&&labelWidth>0)?Math.floor(jbrWidth/labelWidth):0;
-    const pitch=(labelHeight>0)?labelHeight+Math.max(0,gap):0;
+    const pitch=labelHeight>0?labelHeight+Math.max(0,gap):0;
     const labelsPerLane=(jbrLengthM>0&&pitch>0)?Math.floor((jbrLengthM*1000)/pitch):0;
     const theoreticalLabels=lanes*labelsPerLane;
-    const theoreticalRolls=(pcsPerRoll>0)?Math.floor(theoreticalLabels/pcsPerRoll):0;
+    const theoreticalRolls=pcsPerRoll>0?Math.floor(theoreticalLabels/pcsPerRoll):0;
 
-    if($('jbrLanesV1050'))$('jbrLanesV1050').textContent=money(lanes);
-    if($('jbrPitchV1050'))$('jbrPitchV1050').textContent=pitch?`${money(pitch)} mm`:'0';
-    if($('jbrLabelsLaneV1050'))$('jbrLabelsLaneV1050').textContent=money(labelsPerLane);
-    if($('jbrTheoreticalLabelsV1050'))$('jbrTheoreticalLabelsV1050').textContent=money(theoreticalLabels);
-    if($('jbrTheoreticalRollsV1050'))$('jbrTheoreticalRollsV1050').textContent=money(theoreticalRolls);
+    if($('jbrLanesV1055'))$('jbrLanesV1055').textContent=money(lanes);
+    if($('jbrPitchV1055'))$('jbrPitchV1055').textContent=pitch?`${money(pitch)} mm`:'0';
+    if($('jbrLabelsLaneV1055'))$('jbrLabelsLaneV1055').textContent=money(labelsPerLane);
+    if($('jbrTheoreticalLabelsV1055'))$('jbrTheoreticalLabelsV1055').textContent=money(theoreticalLabels);
+    if($('jbrTheoreticalRollsV1055'))$('jbrTheoreticalRollsV1055').textContent=money(theoreticalRolls);
 
     return {jbrWidth,jbrLengthM,labelWidth,labelHeight,gap,pcsPerRoll,lanes,pitch,labelsPerLane,theoreticalLabels,theoreticalRolls};
   }
-  window.jbrCalcV1050=jbrCalcV1050;
+  window.jbrCalcV1055=jbrCalcV1055;
 
-  function ensureJbrModalV1050(){
-    if($('jbrInModalV1050'))return;
+  async function jbrFetchV1055(path,options={}){
+    if(typeof spgsFetch!=='function')throw new Error('Supabase production connection is not available.');
+    return spgsFetch(path,options);
+  }
+
+  async function jbrLoadV1055(productKey,force=false){
+    if(!force && jbrCloudCacheV1055.has(productKey))return jbrCloudCacheV1055.get(productKey);
+    const rows=await jbrFetchV1055(
+      `/${JBR_TABLE_V1055}?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&product_key=eq.${encodeURIComponent(productKey)}&order=created_at.desc&select=*`
+    );
+    const data=(rows||[]).map(jbrRowToUiV1055);
+    jbrCloudCacheV1055.set(productKey,data);
+    return data;
+  }
+
+  async function jbrStatsV1055(productKey,force=true){
+    const rows=await jbrLoadV1055(productKey,force);
+    const actualCut=rows.reduce((n,x)=>n+Math.max(0,Number(x.actualCutRolls||0)),0);
+    const theoretical=rows.reduce((n,x)=>n+Math.max(0,Number(x.theoreticalRolls||0)),0);
+    const full=rows.filter(x=>x.status==='Fully Die Cut');
+    const wasteRolls=full.reduce((n,x)=>n+jbrWasteV1055(x).wasteRolls,0);
+    const reusable=rows.filter(x=>x.status!=='Fully Die Cut').length;
+    return {rows,actualCut,theoretical,wasteRolls,reusable,count:rows.length};
+  }
+  window.jbrCloudStatsV1055=jbrStatsV1055;
+
+  async function jbrMigrateLocalOnceV1055(g){
+    const key='jbr_db_migrated_v1055_'+btoa(unescape(encodeURIComponent(g.key))).replace(/=+$/,'');
+    if(localStorage.getItem(key)==='1')return;
+    let local={};
+    try{local=JSON.parse(localStorage.getItem(JBR_LOCAL_MIGRATION_KEY_V1055)||'{}')||{}}catch(_){}
+    const rows=Array.isArray(local[g.key])?local[g.key]:[];
+    if(!rows.length){localStorage.setItem(key,'1');return}
+
+    const existing=await jbrLoadV1055(g.key,true);
+    const existingIds=new Set(existing.map(x=>x.id));
+    for(const x of rows){
+      if(!x?.id||existingIds.has(x.id))continue;
+      const payload={
+        id:String(x.id),
+        workspace:SPGS_WORKSPACE,
+        product_key:g.key,
+        product_size:String(x.productSize||g.size||''),
+        material:String(x.material||g.material||''),
+        layout:String(x.layout||g.layout||''),
+        pcs_per_roll:Number(x.requestedPcsPerRoll||g.pcs||0),
+        unit:String(x.unit||g.unit||'Rolls'),
+        jbr_width_mm:Number(x.jbrWidth||0),
+        jbr_length_m:Number(x.jbrLengthM||0),
+        label_width_mm:Number(x.labelWidth||0),
+        label_height_mm:Number(x.labelHeight||0),
+        gap_mm:Number(x.gap||0),
+        pitch_mm:Number(x.pitch||0),
+        lanes:Number(x.lanes||0),
+        labels_per_lane:Number(x.labelsPerLane||0),
+        theoretical_labels:Number(x.theoreticalLabels||0),
+        theoretical_rolls:Number(x.theoreticalRolls||0),
+        actual_cut_rolls:Number(x.actualCutRolls||0),
+        process_status:String(x.status||'Not Die Cut'),
+        note:String(x.note||''),
+        created_by_username:String(x.createdByUser||''),
+        created_by_display:String(x.createdBy||''),
+        created_at:x.createdAt||new Date().toISOString()
+      };
+      await jbrFetchV1055(`/${JBR_TABLE_V1055}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify(payload)
+      });
+    }
+    jbrCloudCacheV1055.delete(g.key);
+    localStorage.setItem(key,'1');
+  }
+
+  function ensureJbrModalV1055(){
+    if($('jbrInModalV1055'))return;
     document.body.insertAdjacentHTML('beforeend',`
-      <div id="jbrInModalV1050" class="modal">
-        <div class="modal-card jbr-modal-card-v1050">
+      <div id="jbrInModalV1055" class="modal">
+        <div class="modal-card jbr-modal-card-v1055">
           <div class="modal-head">
             <div>
-              <b>JBR In</b>
-              <div id="jbrModalMetaV1050" class="small"></div>
+              <b id="jbrModalTitleV1055">JBR In</b>
+              <div id="jbrModalMetaV1055" class="small"></div>
             </div>
-            <button class="closex" type="button" onclick="closeModal('jbrInModalV1050')">×</button>
+            <div class="jbr-modal-head-actions-v1055">
+              <button id="jbrViewToggleV1055" class="btn jbr-view-btn-v1055 sm" type="button" onclick="toggleJbrViewV1055()">View JBRs</button>
+              <button class="closex" type="button" onclick="closeModal('jbrInModalV1055')">×</button>
+            </div>
           </div>
           <div class="modal-body">
-            <input id="jbrProductKeyV1050" type="hidden">
+            <input id="jbrProductKeyV1055" type="hidden">
 
-            <div id="jbrBatchSummaryV1050" class="jbr-summary-v1050"></div>
+            <div id="jbrBatchSummaryV1055" class="jbr-summary-v1055"></div>
 
-            <div class="jbr-entry-card-v1050">
-              <div class="jbr-entry-title-v1050">
-                <div><b>Add Jumbo Roll (JBR)</b><span>Enter the actual jumbo details. Calculated output is a planning maximum; Actual Cut Rolls is entered by the operator.</span></div>
-              </div>
-
-              <div class="grid">
-                <div class="field">
-                  <label>JBR Width (mm) *</label>
-                  <input id="jbrWidthV1050" type="number" min="0.01" step="0.01" value="301" oninput="jbrCalcV1050()">
-                </div>
-                <div class="field">
-                  <label>JBR Length (m) *</label>
-                  <input id="jbrLengthV1050" type="number" min="0.01" step="0.01" value="1500" oninput="jbrCalcV1050()">
-                  <div class="hint">Change this for each jumbo. Example: 1500m, 1485m, etc.</div>
+            <div id="jbrAddPaneV1055">
+              <div class="jbr-entry-card-v1055">
+                <div class="jbr-entry-title-v1055">
+                  <div>
+                    <b>Add Jumbo Roll (JBR)</b>
+                    <span>Actual Cut Rolls records what was really produced from this jumbo. Theoretical output is only the planning maximum.</span>
+                  </div>
                 </div>
 
-                <div class="field">
-                  <label>Label Width (mm) *</label>
-                  <input id="jbrLabelWidthV1050" type="number" min="0.01" step="0.01" oninput="jbrCalcV1050()">
-                </div>
-                <div class="field">
-                  <label>Label Height (mm) *</label>
-                  <input id="jbrLabelHeightV1050" type="number" min="0.01" step="0.01" oninput="jbrCalcV1050()">
+                <div class="grid">
+                  <div class="field">
+                    <label>JBR Width (mm) *</label>
+                    <input id="jbrWidthV1055" type="number" min="0.01" step="0.01" value="301" oninput="jbrCalcV1055()">
+                  </div>
+                  <div class="field">
+                    <label>JBR Length (m) *</label>
+                    <input id="jbrLengthV1055" type="number" min="0.01" step="0.01" value="1500" oninput="jbrCalcV1055()">
+                    <div class="hint">Editable for every jumbo roll.</div>
+                  </div>
+
+                  <div class="field">
+                    <label>Label Width (mm) *</label>
+                    <input id="jbrLabelWidthV1055" type="number" min="0.01" step="0.01" oninput="jbrCalcV1055()">
+                  </div>
+                  <div class="field">
+                    <label>Label Height (mm) *</label>
+                    <input id="jbrLabelHeightV1055" type="number" min="0.01" step="0.01" oninput="jbrCalcV1055()">
+                  </div>
+
+                  <div class="field">
+                    <label>Gap Between Labels (mm) *</label>
+                    <input id="jbrGapV1055" type="number" min="0" step="0.01" value="2" oninput="jbrCalcV1055()">
+                  </div>
+                  <div class="field">
+                    <label>Pieces / Finished Roll *</label>
+                    <input id="jbrPcsV1055" type="number" min="1" step="1" oninput="jbrCalcV1055()">
+                  </div>
+
+                  <div class="field">
+                    <label>Actual Cut Rolls</label>
+                    <input id="jbrActualRollsV1055" type="number" min="0" step="1" value="0">
+                    <div class="hint">The packing stage can never exceed the total Actual Cut Rolls from all JBRs.</div>
+                  </div>
+                  <div class="field">
+                    <label>JBR Process Status</label>
+                    <select id="jbrStatusV1055">
+                      <option value="Not Die Cut">Not Die Cut</option>
+                      <option value="Partially Die Cut">Partially Die Cut</option>
+                      <option value="Fully Die Cut">Fully Die Cut</option>
+                    </select>
+                    <div class="hint">Waste is calculated only when the jumbo is Fully Die Cut. Partial / uncut balance remains reusable.</div>
+                  </div>
+
+                  <div class="field full">
+                    <label>JBR Note</label>
+                    <textarea id="jbrNoteV1055" placeholder="Optional note, balance, condition, operator note..."></textarea>
+                  </div>
                 </div>
 
-                <div class="field">
-                  <label>Gap Between Labels (mm) *</label>
-                  <input id="jbrGapV1050" type="number" min="0" step="0.01" value="2" oninput="jbrCalcV1050()">
-                  <div class="hint">Example: 60mm label height + 2mm gap = 62mm pitch.</div>
-                </div>
-                <div class="field">
-                  <label>Pieces / Finished Roll *</label>
-                  <input id="jbrPcsV1050" type="number" min="1" step="1" oninput="jbrCalcV1050()">
+                <div class="jbr-calc-grid-v1055">
+                  <div><span>Across JBR</span><b id="jbrLanesV1055">0</b><small>lanes</small></div>
+                  <div><span>Pitch</span><b id="jbrPitchV1055">0</b><small>height + gap</small></div>
+                  <div><span>Labels / Lane</span><b id="jbrLabelsLaneV1055">0</b><small>theoretical</small></div>
+                  <div><span>Total Labels</span><b id="jbrTheoreticalLabelsV1055">0</b><small>theoretical</small></div>
+                  <div class="strong"><span>Max Full Rolls</span><b id="jbrTheoreticalRollsV1055">0</b><small>planning maximum</small></div>
                 </div>
 
-                <div class="field">
-                  <label>Actual Cut Rolls</label>
-                  <input id="jbrActualRollsV1050" type="number" min="0" step="1" value="0">
-                  <div class="hint">Can be lower than theoretical output. Total production is allowed to exceed the requested quantity.</div>
+                <div class="actions">
+                  <button class="btn primary" type="button" onclick="saveJbrInV1055()">Add JBR</button>
                 </div>
-                <div class="field">
-                  <label>JBR Process Status</label>
-                  <select id="jbrStatusV1050">
-                    <option value="Not Die Cut">Not Die Cut</option>
-                    <option value="Partially Die Cut">Partially Die Cut</option>
-                    <option value="Fully Die Cut">Fully Die Cut</option>
-                  </select>
-                </div>
-
-                <div class="field full">
-                  <label>JBR Note</label>
-                  <textarea id="jbrNoteV1050" placeholder="Optional note, roll condition, balance, operator note..."></textarea>
-                </div>
-              </div>
-
-              <div class="jbr-calc-grid-v1050">
-                <div><span>Across JBR</span><b id="jbrLanesV1050">0</b><small>lanes</small></div>
-                <div><span>Pitch</span><b id="jbrPitchV1050">0</b><small>height + gap</small></div>
-                <div><span>Labels / Lane</span><b id="jbrLabelsLaneV1050">0</b><small>theoretical</small></div>
-                <div><span>Total Labels</span><b id="jbrTheoreticalLabelsV1050">0</b><small>theoretical</small></div>
-                <div class="strong"><span>Max Full Rolls</span><b id="jbrTheoreticalRollsV1050">0</b><small>planning maximum</small></div>
-              </div>
-
-              <div class="actions">
-                <button class="btn primary" type="button" onclick="saveJbrInV1050()">Add JBR</button>
               </div>
             </div>
 
-            <div class="jbr-list-head-v1050">
-              <div><b>Added JBRs</b><span>Every JBR remains separate and can print its own QR identification label.</span></div>
+            <div id="jbrViewPaneV1055" hidden>
+              <div class="jbr-list-head-v1055">
+                <div>
+                  <b>Added JBRs for This Production</b>
+                  <span id="jbrViewProductIdentityV1055"></span>
+                </div>
+              </div>
+              <div id="jbrListV1055"></div>
             </div>
-            <div id="jbrListV1050"></div>
           </div>
         </div>
       </div>`);
   }
 
-  function jbrRenderSummaryV1050(g){
-    const jobs=jbrJobsV1050(g);
+  async function jbrRenderSummaryV1055(g){
+    const jobs=jbrJobsV1055(g);
     const requested=jobs.reduce((n,r)=>n+Number(r.requestQty||0),0);
-    const entries=jbrEntriesV1050(g.key);
-    const actual=entries.reduce((n,x)=>n+Number(x.actualCutRolls||0),0);
-    const diff=actual-requested;
-    const theoretical=entries.reduce((n,x)=>n+Number(x.theoreticalRolls||0),0);
+    const stats=await jbrStatsV1055(g.key,true);
+    const diff=stats.actualCut-requested;
 
-    $('jbrBatchSummaryV1050').innerHTML=`
-      <div class="jbr-summary-stat-v1050"><span>Requested</span><b>${money(requested)}</b><small>${esc(g.unit||'Rolls')}</small></div>
-      <div class="jbr-summary-stat-v1050"><span>JBRs Added</span><b>${entries.length}</b><small>jumbo rolls</small></div>
-      <div class="jbr-summary-stat-v1050"><span>Max Theoretical</span><b>${money(theoretical)}</b><small>finished rolls</small></div>
-      <div class="jbr-summary-stat-v1050 ${diff>0?'over':''}"><span>Actual Cut</span><b>${money(actual)}</b><small>${diff===0?'matches request':diff>0?`+${money(diff)} over request`:`${money(Math.abs(diff))} remaining`}</small></div>`;
+    $('jbrBatchSummaryV1055').innerHTML=`
+      <div class="jbr-summary-stat-v1055"><span>Requested</span><b>${money(requested)}</b><small>${esc(g.unit||'Rolls')}</small></div>
+      <div class="jbr-summary-stat-v1055"><span>JBRs Added</span><b>${stats.count}</b><small>database records</small></div>
+      <div class="jbr-summary-stat-v1055"><span>Actual Cut</span><b>${money(stats.actualCut)}</b><small>${diff===0?'matches request':diff>0?`+${money(diff)} over request`:`${money(Math.abs(diff))} remaining`}</small></div>
+      <div class="jbr-summary-stat-v1055 waste"><span>Confirmed Waste</span><b>${money(stats.wasteRolls)}</b><small>${stats.reusable} JBR${stats.reusable===1?'':'s'} still reusable / incomplete</small></div>`;
   }
 
-  function jbrRenderListV1050(g){
-    const entries=[...jbrEntriesV1050(g.key)].sort((a,b)=>Date.parse(b.createdAt||0)-Date.parse(a.createdAt||0));
+  async function jbrRenderListV1055(g){
+    const entries=await jbrLoadV1055(g.key,true);
     if(!entries.length){
-      $('jbrListV1050').innerHTML='<div class="empty">No JBRs added to this product batch yet.</div>';
-      jbrRenderSummaryV1050(g);
+      $('jbrListV1055').innerHTML=`<div class="empty">No JBRs added yet for ${esc(g.size)} • ${esc(g.material)}.</div>`;
+      await jbrRenderSummaryV1055(g);
       return;
     }
 
-    $('jbrListV1050').innerHTML=`
+    $('jbrListV1055').innerHTML=`
       <div class="tablewrap">
-        <table class="table jbr-table-v1050">
+        <table class="table jbr-table-v1055">
           <thead>
             <tr>
               <th>JBR</th><th>Jumbo Size</th><th>Label / Gap</th><th>Across</th>
-              <th>Max Rolls</th><th>Actual Cut</th><th>Status</th><th>Added</th><th></th>
+              <th>Max Rolls</th><th>Actual Cut</th><th>Waste / Balance</th><th>Status</th><th>Added</th><th></th>
             </tr>
           </thead>
           <tbody>
-            ${entries.map(x=>`
-              <tr>
+            ${entries.map(x=>{
+              const w=jbrWasteV1055(x);
+              return `<tr>
                 <td><b>${esc(x.code)}</b></td>
                 <td>${money(x.jbrWidth)}mm × ${money(x.jbrLengthM)}m</td>
                 <td>${money(x.labelWidth)} × ${money(x.labelHeight)}mm<br><span class="small">Gap ${money(x.gap)}mm</span></td>
                 <td>${money(x.lanes)}</td>
                 <td>${money(x.theoreticalRolls)}</td>
                 <td><b>${money(x.actualCutRolls)}</b></td>
+                <td>${w.isWaste
+                  ? `<span class="jbr-waste-v1055">${esc(w.label)}</span>`
+                  : `<span class="jbr-reusable-v1055">${esc(w.label)}</span>`}</td>
                 <td><span class="tag">${esc(x.status)}</span></td>
                 <td><span class="small">${esc(x.createdBy||'-')}<br>${x.createdAt?new Date(x.createdAt).toLocaleString():'-'}</span></td>
                 <td>
-                  <div class="actions jbr-row-actions-v1050">
-                    <button class="btn ghost sm" type="button" onclick="printJbrLabelV1050('${encodeURIComponent(g.key)}','${x.id}')">Print Label</button>
-                    <button class="btn red sm" type="button" onclick="deleteJbrInV1050('${encodeURIComponent(g.key)}','${x.id}')">Delete</button>
+                  <div class="actions jbr-row-actions-v1055">
+                    <button class="btn ghost sm" type="button" onclick="printJbrLabelV1055('${encodeURIComponent(g.key)}','${x.id}')">Print Label</button>
+                    <button class="btn red sm" type="button" onclick="deleteJbrInV1055('${encodeURIComponent(g.key)}','${x.id}')">Delete</button>
                   </div>
                 </td>
-              </tr>`).join('')}
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>
       </div>`;
-    jbrRenderSummaryV1050(g);
+    await jbrRenderSummaryV1055(g);
   }
 
-  window.openJbrInV1050=function(encodedKey){
-    if(currentUser?.role!=='admin'&&!hasPerm('production_manage'))return requirePerm('production_manage','manage production JBRs');
-    const g=jbrGroupV1050(encodedKey);
-    if(!g)return toast('Product batch not found');
-    if(!jbrCanOpenV1050(g))return toast('Move the full product batch to In Production before adding JBRs');
+  window.toggleJbrViewV1055=async function(forceMode){
+    const addPane=$('jbrAddPaneV1055');
+    const viewPane=$('jbrViewPaneV1055');
+    const btn=$('jbrViewToggleV1055');
+    const title=$('jbrModalTitleV1055');
+    const encodedKey=$('jbrProductKeyV1055')?.value||'';
+    const g=jbrGroupV1055(encodedKey);
+    if(!addPane||!viewPane||!btn)return;
 
-    ensureJbrModalV1050();
-    const size=jbrParseSizeV1050(g.size);
+    const currentlyViewing=!viewPane.hidden;
+    const showView=forceMode==='view'?true:forceMode==='add'?false:!currentlyViewing;
+    addPane.hidden=showView;
+    viewPane.hidden=!showView;
+    btn.textContent=showView?'Add JBR':'View JBRs';
+    if(title)title.textContent=showView?'JBRs — Production View':'JBR In';
 
-    $('jbrProductKeyV1050').value=encodeURIComponent(g.key);
-    $('jbrModalMetaV1050').textContent=`${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs / ${g.unit}`;
-
-    $('jbrWidthV1050').value='301';
-    $('jbrLengthV1050').value='1500';
-    $('jbrLabelWidthV1050').value=size.width||'';
-    $('jbrLabelHeightV1050').value=size.height||'';
-    $('jbrGapV1050').value='2';
-    $('jbrPcsV1050').value=Number(g.pcs||0)||'';
-    $('jbrActualRollsV1050').value='0';
-    $('jbrStatusV1050').value='Not Die Cut';
-    $('jbrNoteV1050').value='';
-
-    jbrCalcV1050();
-    jbrRenderListV1050(g);
-    $('jbrInModalV1050').classList.add('show');
+    if(showView&&g){
+      $('jbrListV1055').innerHTML='<div class="empty">Loading JBRs from database...</div>';
+      try{await jbrRenderListV1055(g)}
+      catch(e){
+        console.error(e);
+        $('jbrListV1055').innerHTML=`<div class="notice"><b>JBR database unavailable:</b> ${esc(e.message)}<br>Run the supplied Supabase migration SQL first.</div>`;
+      }
+    }
   };
 
-  window.saveJbrInV1050=function(){
-    const encodedKey=$('jbrProductKeyV1050')?.value||'';
-    const g=jbrGroupV1050(encodedKey);
+  window.openJbrInV1055=async function(encodedKey){
+    if(currentUser?.role!=='admin'&&!hasPerm('production_manage'))return requirePerm('production_manage','manage production JBRs');
+    const g=jbrGroupV1055(encodedKey);
+    if(!g)return toast('Product batch not found');
+    if(!jbrCanOpenV1055(g))return toast('Move the full product batch to In Production before adding JBRs');
+
+    ensureJbrModalV1055();
+    const size=jbrParseSizeV1055(g.size);
+    $('jbrProductKeyV1055').value=encodeURIComponent(g.key);
+    $('jbrModalMetaV1055').textContent=`${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs / ${g.unit}`;
+    $('jbrViewProductIdentityV1055').textContent=`${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs / ${g.unit}`;
+
+    $('jbrWidthV1055').value='301';
+    $('jbrLengthV1055').value='1500';
+    $('jbrLabelWidthV1055').value=size.width||'';
+    $('jbrLabelHeightV1055').value=size.height||'';
+    $('jbrGapV1055').value='2';
+    $('jbrPcsV1055').value=Number(g.pcs||0)||'';
+    $('jbrActualRollsV1055').value='0';
+    $('jbrStatusV1055').value='Not Die Cut';
+    $('jbrNoteV1055').value='';
+
+    $('jbrInModalV1055').classList.add('show');
+    jbrCalcV1055();
+    await toggleJbrViewV1055('add');
+
+    try{
+      await jbrMigrateLocalOnceV1055(g);
+      await jbrRenderSummaryV1055(g);
+    }catch(e){
+      console.error(e);
+      $('jbrBatchSummaryV1055').innerHTML=`<div class="notice" style="grid-column:1/-1"><b>Database setup required:</b> ${esc(e.message)}<br>Run <b>supabase_jbr_migration.sql</b> once in Supabase SQL Editor.</div>`;
+    }
+  };
+
+  window.saveJbrInV1055=async function(){
+    const encodedKey=$('jbrProductKeyV1055')?.value||'';
+    const g=jbrGroupV1055(encodedKey);
     if(!g)return toast('Product batch not found');
 
-    const calc=jbrCalcV1050();
-    const actual=Math.max(0,Math.floor(Number($('jbrActualRollsV1050')?.value||0)));
-    const status=$('jbrStatusV1050')?.value||'Not Die Cut';
-    const note=String($('jbrNoteV1050')?.value||'').trim();
+    const calc=jbrCalcV1055();
+    const actual=Math.max(0,Math.floor(Number($('jbrActualRollsV1055')?.value||0)));
+    const status=$('jbrStatusV1055')?.value||'Not Die Cut';
+    const note=String($('jbrNoteV1055')?.value||'').trim();
 
     if(!(calc.jbrWidth>0))return toast('Enter JBR width');
     if(!(calc.jbrLengthM>0))return toast('Enter JBR length');
@@ -18876,66 +19027,79 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!(calc.labelsPerLane>0))return toast('JBR length / pitch calculation is zero');
     if(actual>calc.theoreticalRolls)return toast(`Actual Cut Rolls cannot exceed the theoretical maximum of ${calc.theoreticalRolls} for this JBR`);
 
-    const now=new Date().toISOString();
-    const entry={
-      id:typeof uid==='function'?uid('jbr'):('jbr_'+Date.now()),
-      code:jbrNextNoV1050(),
-      productKey:g.key,
-      productSize:g.size,
-      material:g.material,
-      layout:g.layout,
-      requestedPcsPerRoll:Number(g.pcs||0),
-      unit:g.unit||'Rolls',
-      jbrWidth:calc.jbrWidth,
-      jbrLengthM:calc.jbrLengthM,
-      labelWidth:calc.labelWidth,
-      labelHeight:calc.labelHeight,
-      gap:calc.gap,
-      pitch:calc.pitch,
+    const payload={
+      workspace:SPGS_WORKSPACE,
+      product_key:g.key,
+      product_size:String(g.size||''),
+      material:String(g.material||''),
+      layout:String(g.layout||''),
+      pcs_per_roll:Number(g.pcs||0),
+      unit:String(g.unit||'Rolls'),
+      jbr_width_mm:calc.jbrWidth,
+      jbr_length_m:calc.jbrLengthM,
+      label_width_mm:calc.labelWidth,
+      label_height_mm:calc.labelHeight,
+      gap_mm:calc.gap,
+      pitch_mm:calc.pitch,
       lanes:calc.lanes,
-      labelsPerLane:calc.labelsPerLane,
-      theoreticalLabels:calc.theoreticalLabels,
-      theoreticalRolls:calc.theoreticalRolls,
-      actualCutRolls:actual,
-      status,
+      labels_per_lane:calc.labelsPerLane,
+      theoretical_labels:calc.theoreticalLabels,
+      theoretical_rolls:calc.theoreticalRolls,
+      actual_cut_rolls:actual,
+      process_status:status,
       note,
-      createdBy:currentUser?.display||currentUser?.username||'User',
-      createdByUser:currentUser?.username||'',
-      createdAt:now
+      created_by_username:String(currentUser?.username||''),
+      created_by_display:String(currentUser?.display||currentUser?.username||'User')
     };
 
-    jbrEntriesV1050(g.key).push(entry);
+    let saved;
     try{
-      if(typeof audit==='function')audit('PRODUCT_JBR_IN',`${entry.code} | ${g.size}/${g.material} | ${entry.jbrWidth}mm x ${entry.jbrLengthM}m | cut ${actual} rolls`);
+      const rows=await jbrFetchV1055(`/${JBR_TABLE_V1055}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Prefer':'return=representation'},
+        body:JSON.stringify(payload)
+      });
+      saved=Array.isArray(rows)?rows[0]:rows;
+      if(!saved)throw new Error('Database did not return the saved JBR.');
+    }catch(e){
+      console.error(e);
+      return toast(`JBR was NOT saved: ${e.message}`);
+    }
+
+    jbrCloudCacheV1055.delete(g.key);
+    const ui=jbrRowToUiV1055(saved);
+    try{
+      if(typeof audit==='function')audit('PRODUCT_JBR_IN',`${ui.code} | ${g.size}/${g.material} | ${ui.jbrWidth}mm x ${ui.jbrLengthM}m | cut ${actual} rolls`);
     }catch(_){}
-    saveState();
 
-    $('jbrLengthV1050').value='1500';
-    $('jbrActualRollsV1050').value='0';
-    $('jbrStatusV1050').value='Not Die Cut';
-    $('jbrNoteV1050').value='';
-    jbrCalcV1050();
-    jbrRenderListV1050(g);
-    toast(`${entry.code} added`);
+    closeModal('jbrInModalV1055');
+    try{openProductionProductDetailsV103(encodeURIComponent(g.key))}catch(_){}
+    toast(`${ui.code} saved to database. Actual cut: ${money(actual)} rolls.`);
   };
 
-  window.deleteJbrInV1050=function(encodedKey,id){
+  window.deleteJbrInV1055=async function(encodedKey,id){
     if(currentUser?.role!=='admin'&&!hasPerm('production_manage'))return requirePerm('production_manage','delete production JBR');
-    const g=jbrGroupV1050(encodedKey);if(!g)return;
-    const arr=jbrEntriesV1050(g.key);
-    const row=arr.find(x=>x.id===id);
-    if(!row)return;
+    const g=jbrGroupV1055(encodedKey);if(!g)return;
+    const rows=await jbrLoadV1055(g.key,true);
+    const row=rows.find(x=>String(x.id)===String(id));
+    if(!row)return toast('JBR record not found');
     if(!confirm(`Delete ${row.code}?`))return;
-    const store=jbrStoreV1050();
-    store[g.key]=arr.filter(x=>x.id!==id);
-    saveState();
-    jbrRenderListV1050(g);
-    toast(`${row.code} deleted`);
+    try{
+      await jbrFetchV1055(
+        `/${JBR_TABLE_V1055}?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&id=eq.${encodeURIComponent(id)}`,
+        {method:'DELETE',headers:{'Prefer':'return=minimal'}}
+      );
+      jbrCloudCacheV1055.delete(g.key);
+      await jbrRenderListV1055(g);
+      toast(`${row.code} deleted`);
+    }catch(e){toast(`Delete failed: ${e.message}`)}
   };
 
-  window.printJbrLabelV1050=async function(encodedKey,id){
-    const g=jbrGroupV1050(encodedKey);if(!g)return toast('Product batch not found');
-    const row=jbrEntriesV1050(g.key).find(x=>x.id===id);
+  window.printJbrLabelV1055=async function(encodedKey,id){
+    const g=jbrGroupV1055(encodedKey);if(!g)return toast('Product batch not found');
+    let rows;
+    try{rows=await jbrLoadV1055(g.key,true)}catch(e){return toast(`JBR database unavailable: ${e.message}`)}
+    const row=rows.find(x=>String(x.id)===String(id));
     if(!row)return toast('JBR record not found');
 
     const okQ=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',()=>window.QRCode);
@@ -18943,9 +19107,13 @@ window.toggleBpSeparateDeliveryButton = function(){
     const okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);
     if(!okQ||!okC||!okP)return toast('PDF / QR libraries unavailable');
 
+    const w=jbrWasteV1055(row);
     const qrData=JSON.stringify({
       type:'PRODUCT_JBR',
+      dbId:row.id,
       code:row.code,
+      workspace:SPGS_WORKSPACE,
+      productKey:g.key,
       product:`${g.size} | ${g.material} | ${g.layout} | ${g.pcs} pcs`,
       jbrWidthMm:row.jbrWidth,
       jbrLengthM:row.jbrLengthM,
@@ -18954,6 +19122,8 @@ window.toggleBpSeparateDeliveryButton = function(){
       theoreticalRolls:row.theoreticalRolls,
       actualCutRolls:row.actualCutRolls,
       status:row.status,
+      wasteRolls:w.isWaste?w.wasteRolls:null,
+      reusableBalance:!w.isWaste,
       createdAt:row.createdAt
     });
 
@@ -18963,39 +19133,28 @@ window.toggleBpSeparateDeliveryButton = function(){
       <div style="height:100%;border:4px solid #000;border-radius:10px;padding:18px;display:grid;grid-template-columns:1fr 190px;gap:15px;background:#fff">
         <div style="display:flex;flex-direction:column;min-width:0">
           <div style="display:flex;justify-content:space-between;gap:12px;border-bottom:3px solid #000;padding-bottom:8px">
-            <div>
-              <div style="font-size:28px;font-weight:900">SOFTCREATION</div>
-              <div style="font-size:11px;font-weight:900">JUMBO ROLL IDENTIFICATION</div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:10px;font-weight:900">JBR ID</div>
-              <div style="font-size:22px;font-weight:900">${esc(row.code)}</div>
-            </div>
+            <div><div style="font-size:28px;font-weight:900">SOFTCREATION</div><div style="font-size:11px;font-weight:900">JUMBO ROLL IDENTIFICATION</div></div>
+            <div style="text-align:right"><div style="font-size:10px;font-weight:900">JBR ID</div><div style="font-size:22px;font-weight:900">${esc(row.code)}</div></div>
           </div>
-
           <div style="font-size:26px;font-weight:900;margin-top:12px">${esc(g.size)} • ${esc(g.material)}</div>
           <div style="font-size:13px;font-weight:800;margin-top:4px">${esc(g.layout)} • ${money(g.pcs)} pcs / roll</div>
-
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
             <div style="border:2px solid #000;border-radius:7px;padding:8px"><div style="font-size:9px;font-weight:900">JBR SIZE</div><div style="font-size:19px;font-weight:900">${money(row.jbrWidth)}mm × ${money(row.jbrLengthM)}m</div></div>
             <div style="border:2px solid #000;border-radius:7px;padding:8px"><div style="font-size:9px;font-weight:900">STATUS</div><div style="font-size:17px;font-weight:900">${esc(row.status)}</div></div>
             <div style="border:1px solid #777;border-radius:7px;padding:8px"><div style="font-size:9px;font-weight:900">GAP / ACROSS</div><div style="font-size:15px;font-weight:900">${money(row.gap)}mm / ${money(row.lanes)} lanes</div></div>
-            <div style="border:1px solid #777;border-radius:7px;padding:8px"><div style="font-size:9px;font-weight:900">ROLL OUTPUT</div><div style="font-size:15px;font-weight:900">Max ${money(row.theoreticalRolls)} • Cut ${money(row.actualCutRolls)}</div></div>
+            <div style="border:1px solid #777;border-radius:7px;padding:8px"><div style="font-size:9px;font-weight:900">OUTPUT / BALANCE</div><div style="font-size:13px;font-weight:900">Max ${money(row.theoreticalRolls)} • Cut ${money(row.actualCutRolls)}<br>${esc(w.label)}</div></div>
           </div>
-
-          <div style="margin-top:auto;font-size:10px;border-top:2px solid #000;padding-top:6px">
-            Added by ${esc(row.createdBy||'-')} • ${row.createdAt?esc(new Date(row.createdAt).toLocaleString()):'-'}
-          </div>
+          <div style="margin-top:auto;font-size:10px;border-top:2px solid #000;padding-top:6px">Added by ${esc(row.createdBy||'-')} • ${row.createdAt?esc(new Date(row.createdAt).toLocaleString()):'-'}</div>
         </div>
         <div style="border-left:3px solid #000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-left:12px">
-          <div id="jbrQrV1050" style="width:170px;height:170px"></div>
+          <div id="jbrQrV1055" style="width:170px;height:170px"></div>
           <div style="font-size:10px;font-weight:900;margin-top:7px;text-align:center">SCAN JBR QR</div>
         </div>
       </div>`;
     document.body.appendChild(host);
 
     try{
-      new QRCode(host.querySelector('#jbrQrV1050'),{text:qrData,width:170,height:170,correctLevel:QRCode.CorrectLevel.M});
+      new QRCode(host.querySelector('#jbrQrV1055'),{text:qrData,width:170,height:170,correctLevel:QRCode.CorrectLevel.M});
       await new Promise(r=>setTimeout(r,150));
       const canvas=await html2canvas(host,{scale:2.5,backgroundColor:'#fff',useCORS:true,logging:false});
       const {jsPDF}=window.jspdf;
@@ -19006,50 +19165,95 @@ window.toggleBpSeparateDeliveryButton = function(){
     }catch(err){
       console.error(err);
       toast('JBR label PDF failed');
-    }finally{
-      host.remove();
-    }
+    }finally{host.remove()}
   };
 
-  function addJbrButtonV1050(encodedKey){
-    const g=jbrGroupV1050(encodedKey);
-    if(!g||!jbrCanOpenV1050(g))return;
-
+  function addJbrButtonV1055(encodedKey){
+    const g=jbrGroupV1055(encodedKey);
+    if(!g||!jbrCanOpenV1055(g))return;
     const body=$('productionProductDetailBody');
     const actions=body?.querySelector('.actions');
-    if(!actions || actions.querySelector('.jbr-in-btn-v1050'))return;
+    if(!actions||actions.querySelector('.jbr-in-btn-v1055'))return;
 
     const packingBtn=[...actions.querySelectorAll('button')].find(b=>
       String(b.getAttribute('onclick')||'').includes('openGroupedPackingV1040')
     );
-
     const btn=document.createElement('button');
     btn.type='button';
-    btn.className='btn jbr-in-btn-v1050';
+    btn.className='btn jbr-in-btn-v1055';
     btn.textContent='JBR In';
-    btn.setAttribute('onclick',`openJbrInV1050('${encodedKey}')`);
-
+    btn.setAttribute('onclick',`openJbrInV1055('${encodedKey}')`);
     if(packingBtn)actions.insertBefore(btn,packingBtn);
     else actions.insertBefore(btn,actions.querySelector('.btn.ghost')||null);
   }
 
-  function installJbrInV1050(){
-    if(window.__jbrInInstalledV1050)return;
-    window.__jbrInInstalledV1050=true;
+  function installJbrInV1055(){
+    if(window.__jbrInInstalledV1055)return;
+    window.__jbrInInstalledV1055=true;
 
     const baseOpen=window.openProductionProductDetailsV103;
     if(typeof baseOpen==='function'){
       window.openProductionProductDetailsV103=function(encodedKey){
         const result=baseOpen.apply(this,arguments);
-        try{addJbrButtonV1050(encodedKey)}catch(err){console.error('JBR In button',err)}
+        try{addJbrButtonV1055(encodedKey)}catch(err){console.error('JBR In button',err)}
         return result;
       };
       try{openProductionProductDetailsV103=window.openProductionProductDetailsV103}catch(_){}
     }
+
+    /* Packing count is limited by the actual JBR cut quantity. */
+    const baseOpenPacking=window.openGroupedPackingV1040;
+    if(typeof baseOpenPacking==='function'){
+      window.openGroupedPackingV1040=async function(encodedKey){
+        const g=jbrGroupV1055(encodedKey);
+        if(!g)return toast('Product batch not found');
+        let stats;
+        try{stats=await jbrStatsV1055(g.key,true)}
+        catch(e){return toast(`Cannot open packing: JBR database unavailable. ${e.message}`)}
+        if(!(stats.actualCut>0))return toast('Cannot open packing: no Actual Cut Rolls have been recorded in JBR In.');
+        const r=baseOpenPacking.apply(this,arguments);
+        setTimeout(()=>{
+          const modal=$('packingModal');
+          if(!modal?.classList.contains('show'))return;
+          modal.dataset.jbrMaxRolls=String(stats.actualCut);
+          modal.dataset.jbrProductKey=g.key;
+          const notice=modal.querySelector('.notice');
+          if(notice){
+            notice.insertAdjacentHTML('beforeend',`<br><b>JBR production limit:</b> ${money(stats.actualCut)} ${esc(g.unit||'Rolls')} actual cut. Box + loose count cannot exceed this quantity.`);
+          }
+        },0);
+        return r;
+      };
+      try{openGroupedPackingV1040=window.openGroupedPackingV1040}catch(_){}
+    }
+
+    const baseSavePacking=window.savePackingV81;
+    if(typeof baseSavePacking==='function'){
+      window.savePackingV81=async function(){
+        const marker=$('packingReqId')?.value||'';
+        if(marker.startsWith('BATCHV1040::')){
+          const encodedKey=marker.slice('BATCHV1040::'.length);
+          const g=jbrGroupV1055(encodedKey);
+          if(!g)return toast('Product batch not found');
+          let stats;
+          try{stats=await jbrStatsV1055(g.key,true)}
+          catch(e){return toast(`Packing blocked: JBR database unavailable. ${e.message}`)}
+
+          const boxes=readBoxesV81('pack');
+          const loose=Number($('packLoose')?.value||0);
+          const total=boxesTotalV81(boxes)+loose;
+          if(total>stats.actualCut){
+            return toast(`Packing count cannot exceed JBR Actual Cut Rolls. Maximum ${money(stats.actualCut)}, entered ${money(total)}.`);
+          }
+        }
+        return baseSavePacking.apply(this,arguments);
+      };
+      try{savePackingV81=window.savePackingV81}catch(_){}
+    }
   }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installJbrInV1050,{once:true});
-  else installJbrInV1050();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installJbrInV1055,{once:true});
+  else installJbrInV1055();
 })();
 </script>
 </body></html>

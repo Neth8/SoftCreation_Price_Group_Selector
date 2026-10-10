@@ -4883,3 +4883,136 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   .jbr-summary-v1050{grid-template-columns:1fr}
   .jbr-calc-grid-v1050{grid-template-columns:1fr}
 }
+
+/* V1.0.42 - JBR Add / View workflow */
+.jbr-modal-head-actions-v1050{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.btn.jbr-view-btn-v1050{
+  background:#e7f5ff;
+  color:#17627b;
+  border:1px solid #a8d9ee;
+}
+.btn.jbr-view-btn-v1050:hover{
+  background:#d7effb;
+}
+#jbrViewPaneV1050[hidden],
+#jbrAddPaneV1050[hidden]{
+  display:none!important;
+}
+
+/* V1.0.43 - Persistent product-scoped JBR view */
+#jbrViewProductIdentityV1054{
+  font-weight:750;
+  color:#486a76;
+}
+
+/* V1.0.44 - DB-backed JBR production register */
+.btn.jbr-in-btn-v1055{
+  background:#dff4ff;
+  color:#145f78;
+  border:1px solid #9ed8ef;
+}
+.jbr-modal-card-v1055{
+  width:min(1240px,96vw);
+  max-height:92vh;
+  overflow:auto;
+}
+.jbr-modal-head-actions-v1055{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.btn.jbr-view-btn-v1055{
+  background:#e7f5ff;
+  color:#17627b;
+  border:1px solid #a8d9ee;
+}
+.jbr-summary-v1055{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(150px,1fr));
+  gap:9px;
+  margin-bottom:12px;
+}
+.jbr-summary-stat-v1055{
+  border:1px solid #cfe1e5;
+  background:#f8fbfc;
+  border-radius:12px;
+  padding:10px;
+}
+.jbr-summary-stat-v1055.waste{
+  background:#fff9ec;
+  border-color:#edd9a4;
+}
+.jbr-summary-stat-v1055 span{
+  display:block;
+  font-size:9px;
+  color:#687b84;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.jbr-summary-stat-v1055 b{
+  display:block;
+  margin-top:3px;
+  font-size:19px;
+  color:#183b49;
+}
+.jbr-summary-stat-v1055 small{
+  display:block;
+  margin-top:2px;
+  color:#73838b;
+  font-size:9px;
+}
+.jbr-entry-card-v1055{
+  border:1px solid #b9dfe9;
+  background:linear-gradient(135deg,#f4fbfe,#fff);
+  border-radius:15px;
+  padding:14px;
+}
+.jbr-entry-title-v1055{margin-bottom:12px}
+.jbr-entry-title-v1055 b{display:block;color:#14627b;font-size:14px}
+.jbr-entry-title-v1055 span,.jbr-list-head-v1055 span{
+  display:block;
+  margin-top:3px;
+  font-size:10px;
+  color:#687d87;
+}
+.jbr-calc-grid-v1055{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(120px,1fr));
+  gap:8px;
+  margin-top:12px;
+}
+.jbr-calc-grid-v1055>div{
+  border:1px solid #cee0e5;
+  background:#fff;
+  border-radius:10px;
+  padding:9px;
+}
+.jbr-calc-grid-v1055>div.strong{
+  background:#e7f6fb;
+  border-color:#9ed4e6;
+}
+.jbr-calc-grid-v1055 span{
+  display:block;color:#687c85;font-size:9px;font-weight:900;text-transform:uppercase
+}
+.jbr-calc-grid-v1055 b{display:block;margin-top:3px;font-size:17px;color:#173e4c}
+.jbr-calc-grid-v1055 small{display:block;margin-top:2px;font-size:8.5px;color:#7b8a91}
+.jbr-list-head-v1055{margin:15px 0 8px}
+.jbr-list-head-v1055 b{color:#264a57;font-size:13px}
+.jbr-table-v1055{min-width:1180px}
+.jbr-row-actions-v1055{margin:0;flex-wrap:nowrap}
+.jbr-waste-v1055{color:#a23d2e;font-weight:900}
+.jbr-reusable-v1055{color:#147244;font-weight:900}
+#jbrViewPaneV1055[hidden],#jbrAddPaneV1055[hidden]{display:none!important}
+@media(max-width:900px){
+  .jbr-summary-v1055{grid-template-columns:1fr 1fr}
+  .jbr-calc-grid-v1055{grid-template-columns:1fr 1fr}
+}
+@media(max-width:560px){
+  .jbr-summary-v1055{grid-template-columns:1fr}
+  .jbr-calc-grid-v1055{grid-template-columns:1fr}
+}
+
