@@ -20202,7 +20202,7 @@ window.toggleBpSeparateDeliveryButton = function(){
             if(!foot)return;
             foot.querySelectorAll('.product-dispatch-btn-v1059').forEach(x=>x.remove());
             if(balance>0&&(currentUser?.role==='admin'||hasPerm('production_manage'))){
-              const btn=document.createElement('button');btn.type='button';btn.className='btn navy sm product-dispatch-btn-v1059';btn.textContent=`Dispatch ${money(balance)}`;btn.onclick=()=>openProductDispatchV1059(encodeURIComponent(g.key));foot.appendChild(btn);
+              const btn=document.createElement('button');btn.type='button';btn.className='btn navy sm product-dispatch-btn-v1059';btn.textContent=`Dispatch ${money(balance)}`;btn.dataset.productKey=encodeURIComponent(g.key);btn.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();window.openProductDispatchV1059(btn.dataset.productKey)};foot.appendChild(btn);
             }
           });
         }catch(e){console.error('Product dispatch buttons',e)}
@@ -20375,7 +20375,14 @@ window.toggleBpSeparateDeliveryButton = function(){
         btn.type='button';
         btn.className='btn navy sm product-dispatch-btn-v1060';
         btn.textContent=`Dispatch ${money(balance)}`;
-        btn.onclick=()=>openProductDispatchV1059(encodeURIComponent(g.key));
+        btn.dataset.productKey=encodeURIComponent(g.key);
+        btn.setAttribute('aria-label',`Dispatch available ${money(balance)} ${g.unit||'Rolls'} for ${g.size}`);
+        btn.addEventListener('click',function(ev){
+          ev.preventDefault();
+          ev.stopPropagation();
+          ev.stopImmediatePropagation();
+          window.openProductDispatchV1059(this.dataset.productKey);
+        });
         foot.appendChild(btn);
       }
     });
@@ -20450,11 +20457,22 @@ window.toggleBpSeparateDeliveryButton = function(){
       if(status==='Fully Die Cut')jbrWaste+=Math.max(0,max-actual);else reusable++;
     });
 
+    const jbrLengths=jbrSet.rows.reduce((a,j)=>{
+      const m=(typeof jbrMeasuredV1061==='function')
+        ? jbrMeasuredV1061(j,r)
+        : {productiveLengthM:0,consumedLengthM:0,wasteLengthM:0,reusableLengthM:0};
+      a.productive+=Number(m.productiveLengthM||0);
+      a.consumed+=Number(m.consumedLengthM||0);
+      a.waste+=Number(m.wasteLengthM||0);
+      a.reusable+=Number(m.reusableLengthM||0);
+      return a;
+    },{productive:0,consumed:0,waste:0,reusable:0});
+
     return {
       r,jbrSet,packRows,latestPack,produced,packedAllocated,width,coreMm,coreStickLength,
       coreEquivalent,coreSticks,coreBalance,dispatched,
       dispatchBalance:Math.max(0,dispatchProducedQtyV1060(r)-dispatched),
-      jbrActual,jbrTheoretical,jbrWaste,reusable
+      jbrActual,jbrTheoretical,jbrWaste,reusable,jbrLengths
     };
   }
 
@@ -20535,7 +20553,7 @@ window.toggleBpSeparateDeliveryButton = function(){
               <div><span>Requested</span><b>${money(r.requestQty||0)}</b></div>
               <div><span>Finished</span><b>${money(x.produced)}</b></div>
               <div><span>JBR Actual Cut</span><b>${money(x.jbrActual)}</b></div>
-              <div><span>JBR Waste</span><b>${money(x.jbrWaste)}</b></div>
+              <div><span>JBR Productive Length</span><b>${money((x.jbrSet.rows||[]).reduce((n,j)=>n+jbrMeasuredV1061(j,r).productiveLengthM,0))} m</b></div>
               <div><span>Core Used</span><b>${money(x.coreMm)} mm</b></div>
               <div><span>Dispatched</span><b>${money(x.dispatched)}</b></div>
             </div>
@@ -20557,6 +20575,88 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(status!=='Fully Die Cut')return 'Reusable balance — not waste';
     const w=Math.max(0,max-actual);
     return `${money(w)} roll equivalent`;
+  }
+
+  function jbrNumV1061(v,fallback=0){
+    const n=Number(v);
+    return Number.isFinite(n)?n:Number(fallback||0);
+  }
+
+  function jbrProductDimsV1061(j,r){
+    const nums=String(j?.product_size||r?.size||'').match(/\d+(?:\.\d+)?/g)||[];
+    return {
+      width:jbrNumV1061(j?.label_width_mm,nums[0]||0),
+      height:jbrNumV1061(j?.label_height_mm,nums[1]||0)
+    };
+  }
+
+  function jbrMeasuredV1061(j,r){
+    const dims=jbrProductDimsV1061(j,r);
+    const jbrWidth=jbrNumV1061(j?.jbr_width_mm,0);
+    const jbrLengthM=jbrNumV1061(j?.jbr_length_m,0);
+    const gap=Math.max(0,jbrNumV1061(j?.gap_mm,0));
+    const pitchSaved=jbrNumV1061(j?.pitch_mm,0);
+    const pitch=pitchSaved>0?pitchSaved:(dims.height>0?dims.height+gap:0);
+    const lanesSaved=Math.floor(jbrNumV1061(j?.lanes,0));
+    const lanes=lanesSaved>0?lanesSaved:(jbrWidth>0&&dims.width>0?Math.floor(jbrWidth/dims.width):0);
+    const labelsPerLaneSaved=Math.floor(jbrNumV1061(j?.labels_per_lane,0));
+    const labelsPerLane=labelsPerLaneSaved>0?labelsPerLaneSaved:(jbrLengthM>0&&pitch>0?Math.floor((jbrLengthM*1000)/pitch):0);
+    const totalLabelsSaved=Math.floor(jbrNumV1061(j?.theoretical_labels,0));
+    const theoreticalLabels=totalLabelsSaved>0?totalLabelsSaved:lanes*labelsPerLane;
+    const pcsPerRoll=Math.max(0,jbrNumV1061(j?.pcs_per_roll,r?.pcs||0));
+    const theoreticalRollsSaved=Math.floor(jbrNumV1061(j?.theoretical_rolls,0));
+    const theoreticalRolls=theoreticalRollsSaved>0
+      ? theoreticalRollsSaved
+      : (pcsPerRoll>0?Math.floor(theoreticalLabels/pcsPerRoll):0);
+
+    const actualCutRolls=Math.max(0,jbrNumV1061(j?.actual_cut_rolls,0));
+
+    /* Productive parent-web length represented by the actual finished rolls:
+       actual rolls × pcs/roll × pitch ÷ lanes.
+       Example: 154 × 500 × 77mm ÷ 4 = 1,482.25m of parent JBR length. */
+    const productiveLengthM=(lanes>0 && pcsPerRoll>0 && pitch>0)
+      ? (actualCutRolls*pcsPerRoll*pitch)/(lanes*1000)
+      : 0;
+
+    const status=String(j?.process_status||'Not Die Cut');
+    /* Fully die-cut means the whole JBR was processed/consumed.
+       Partial/uncut JBR balance is reusable and must not be called waste. */
+    const consumedLengthM=status==='Fully Die Cut'
+      ? Math.max(0,jbrLengthM)
+      : Math.min(Math.max(0,jbrLengthM),Math.max(0,productiveLengthM));
+
+    const wasteLengthM=status==='Fully Die Cut'
+      ? Math.max(0,jbrLengthM-productiveLengthM)
+      : 0;
+
+    const reusableLengthM=status==='Fully Die Cut'
+      ? 0
+      : Math.max(0,jbrLengthM-consumedLengthM);
+
+    return {
+      labelWidth:dims.width,
+      labelHeight:dims.height,
+      gap,
+      pitch,
+      jbrWidth,
+      jbrLengthM,
+      lanes,
+      labelsPerLane,
+      theoreticalLabels,
+      pcsPerRoll,
+      theoreticalRolls,
+      actualCutRolls,
+      productiveLengthM,
+      consumedLengthM,
+      wasteLengthM,
+      reusableLengthM,
+      processStatus:status
+    };
+  }
+
+  function jbrMeasurementTextV1061(j,r){
+    const m=jbrMeasuredV1061(j,r);
+    return `${money(m.labelWidth)}mm × ${money(m.labelHeight)}mm`;
   }
 
   function usageDetailHtmlV1060(x,forPdf=false){
@@ -20581,17 +20681,94 @@ window.toggleBpSeparateDeliveryButton = function(){
 
         <div class="section">JBR USAGE</div>
         <div class="usage-scope-note-v1060">${esc(x.jbrSet.scope)}. New JBR records are linked to the source production jobs; older JBR records may only be identifiable at consolidated product-batch level.</div>
-        ${jbrRows.length?`<div class="tablewrap"><table class="table usage-table-v1060">
-          <thead><tr><th>JBR</th><th>Jumbo Size</th><th>Max Rolls</th><th>Actual Cut</th><th>Status</th><th>Waste / Balance</th></tr></thead>
-          <tbody>${jbrRows.map(j=>`<tr>
-            <td><b>${esc(j.jbr_code||('JBR-'+String(j.jbr_seq||'').padStart(5,'0')))}</b></td>
-            <td>${money(j.jbr_width_mm)}mm × ${money(j.jbr_length_m)}m</td>
-            <td>${money(j.theoretical_rolls)}</td>
-            <td>${money(j.actual_cut_rolls)}</td>
-            <td>${esc(j.process_status||'-')}</td>
-            <td>${esc(jbrWasteTextV1060(j))}</td>
-          </tr>`).join('')}</tbody>
-        </table></div>`:'<div class="empty">No JBR records available for this job/product.</div>'}
+        ${jbrRows.length?`
+          <div class="jbr-usage-grid-v1061">
+            ${jbrRows.map(j=>{
+              const m=jbrMeasuredV1061(j,r);
+              return `<div class="jbr-usage-card-v1061">
+                <div class="jbr-usage-card-head-v1061">
+                  <div>
+                    <b>${esc(j.jbr_code||('JBR-'+String(j.jbr_seq||'').padStart(5,'0')))}</b>
+                    <span>${esc(j.process_status||'-')}</span>
+                  </div>
+                  <span class="tag">${esc(j.material||r.material||'-')}</span>
+                </div>
+
+                <div class="jbr-measure-strip-v1061">
+                  <div><span>Label Size</span><b>${money(m.labelWidth)} × ${money(m.labelHeight)} mm</b></div>
+                  <div><span>Gap</span><b>${money(m.gap)} mm</b></div>
+                  <div><span>Pitch</span><b>${money(m.pitch)} mm</b></div>
+                  <div><span>Across / Lanes</span><b>${money(m.lanes)}</b></div>
+                </div>
+
+                <div class="jbr-measure-strip-v1061 secondary">
+                  <div><span>JBR Width</span><b>${money(m.jbrWidth)} mm</b></div>
+                  <div><span>JBR Length</span><b>${money(m.jbrLengthM)} m</b></div>
+                  <div><span>Labels / Lane</span><b>${money(m.labelsPerLane)}</b></div>
+                  <div><span>Theoretical Labels</span><b>${money(m.theoreticalLabels)}</b></div>
+                </div>
+
+                <div class="jbr-measure-strip-v1061 output">
+                  <div><span>Pieces / Finished Roll</span><b>${money(m.pcsPerRoll)}</b></div>
+                  <div><span>Max Full Rolls</span><b>${money(m.theoreticalRolls)}</b></div>
+                  <div><span>Actual Cut Rolls</span><b>${money(m.actualCutRolls)}</b></div>
+                  <div><span>Roll Waste / Balance</span><b>${esc(jbrWasteTextV1060({...j,theoretical_rolls:m.theoreticalRolls,actual_cut_rolls:m.actualCutRolls}))}</b></div>
+                </div>
+
+                <div class="jbr-length-usage-v1062">
+                  <div class="productive"><span>Productive Length for Actual Rolls</span><b>${money(m.productiveLengthM)} m</b><small>Actual rolls × pcs/roll × pitch ÷ lanes</small></div>
+                  <div><span>Material Length Consumed</span><b>${money(m.consumedLengthM)} m</b><small>${m.processStatus==='Fully Die Cut'?'Full JBR processed':'Calculated from actual cut output'}</small></div>
+                  <div class="${m.processStatus==='Fully Die Cut'?'waste':'reusable'}"><span>${m.processStatus==='Fully Die Cut'?'Waste Length':'Reusable JBR Balance'}</span><b>${money(m.processStatus==='Fully Die Cut'?m.wasteLengthM:m.reusableLengthM)} m</b><small>${m.processStatus==='Fully Die Cut'?'Consumed but not converted to finished-roll output':'Can be labelled and used later'}</small></div>
+                </div>
+
+                ${j.note?`<div class="jbr-usage-note-v1061"><b>JBR Note:</b> ${esc(j.note)}</div>`:''}
+              </div>`;
+            }).join('')}
+          </div>
+          <div class="tablewrap jbr-usage-detail-table-wrap-v1061">
+            <table class="table usage-table-v1060 jbr-usage-detail-table-v1061">
+              <thead>
+                <tr>
+                  <th>JBR</th>
+                  <th>Label Size</th>
+                  <th>Gap</th>
+                  <th>Pitch</th>
+                  <th>JBR Size</th>
+                  <th>Across</th>
+                  <th>Labels / Lane</th>
+                  <th>Theoretical Labels</th>
+                  <th>Pcs / Roll</th>
+                  <th>Max Rolls</th>
+                  <th>Actual Cut</th>
+                  <th>Productive Length</th>
+                  <th>Consumed Length</th>
+                  <th>Waste / Reusable Length</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${jbrRows.map(j=>{
+                const m=jbrMeasuredV1061(j,r);
+                return `<tr>
+                  <td><b>${esc(j.jbr_code||('JBR-'+String(j.jbr_seq||'').padStart(5,'0')))}</b></td>
+                  <td>${money(m.labelWidth)} × ${money(m.labelHeight)} mm</td>
+                  <td>${money(m.gap)} mm</td>
+                  <td>${money(m.pitch)} mm</td>
+                  <td>${money(m.jbrWidth)}mm × ${money(m.jbrLengthM)}m</td>
+                  <td>${money(m.lanes)}</td>
+                  <td>${money(m.labelsPerLane)}</td>
+                  <td>${money(m.theoreticalLabels)}</td>
+                  <td>${money(m.pcsPerRoll)}</td>
+                  <td>${money(m.theoreticalRolls)}</td>
+                  <td>${money(m.actualCutRolls)}</td>
+                  <td>${money(m.productiveLengthM)} m</td>
+                  <td>${money(m.consumedLengthM)} m</td>
+                  <td>${money(m.processStatus==='Fully Die Cut'?m.wasteLengthM:m.reusableLengthM)} m ${m.processStatus==='Fully Die Cut'?'waste':'reusable'}</td>
+                  <td>${esc(j.process_status||'-')}</td>
+                </tr>`;
+              }).join('')}</tbody>
+            </table>
+          </div>
+        `:'<div class="empty">No JBR records available for this job/product.</div>'}
 
         <div class="section">CORE USAGE</div>
         <div class="finance-detail-grid-v1059 compact">
@@ -20728,6 +20905,19 @@ window.toggleBpSeparateDeliveryButton = function(){
         return r;
       };
       try{showView=window.showView}catch(_){}
+    }
+
+    const productsGrid=$('productionProductsGrid');
+    if(productsGrid && !productsGrid.dataset.dispatchClickV1062){
+      productsGrid.dataset.dispatchClickV1062='1';
+      productsGrid.addEventListener('click',function(ev){
+        const btn=ev.target.closest('.product-dispatch-btn-v1060');
+        if(!btn)return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        const encodedKey=btn.dataset.productKey||'';
+        if(encodedKey)window.openProductDispatchV1059(encodedKey);
+      },true);
     }
 
     try{enhanceProductDispatchCardsV1060()}catch(_){}

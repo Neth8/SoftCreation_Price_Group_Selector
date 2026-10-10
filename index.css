@@ -5405,3 +5405,165 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   .finance-usage-stats-v1060{grid-template-columns:1fr 1fr}
 }
 
+/* V1.0.61 - Finance JBR measurement clarity */
+.jbr-usage-grid-v1061{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  margin:8px 0 10px;
+}
+.jbr-usage-card-v1061{
+  border:1px solid #cfe2e6;
+  border-radius:13px;
+  background:linear-gradient(135deg,#f8fcfd,#fff);
+  padding:11px;
+}
+.jbr-usage-card-head-v1061{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:9px;
+}
+.jbr-usage-card-head-v1061 b{
+  display:block;
+  color:#14546a;
+  font-size:13px;
+}
+.jbr-usage-card-head-v1061 span{
+  display:block;
+  margin-top:2px;
+  font-size:9px;
+  color:#71828a;
+}
+.jbr-measure-strip-v1061{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(115px,1fr));
+  gap:7px;
+  margin-top:7px;
+}
+.jbr-measure-strip-v1061>div{
+  border:1px solid #dce9ec;
+  border-radius:9px;
+  background:#fff;
+  padding:8px;
+}
+.jbr-measure-strip-v1061.secondary>div{
+  background:#f7fbfc;
+}
+.jbr-measure-strip-v1061.output>div{
+  background:#eef9f7;
+  border-color:#c5e5de;
+}
+.jbr-measure-strip-v1061 span{
+  display:block;
+  font-size:7.8px;
+  font-weight:900;
+  color:#73848c;
+  text-transform:uppercase;
+}
+.jbr-measure-strip-v1061 b{
+  display:block;
+  margin-top:2px;
+  color:#244955;
+  font-size:11.5px;
+}
+.jbr-usage-note-v1061{
+  margin-top:8px;
+  padding:7px 9px;
+  border-radius:8px;
+  background:#fff8e7;
+  border:1px solid #eadcae;
+  color:#685813;
+  font-size:9.5px;
+}
+.jbr-usage-detail-table-v1061{
+  min-width:1450px;
+}
+.usage-pdf-paper-v1060 .jbr-usage-card-v1061{
+  break-inside:avoid;
+}
+.usage-pdf-paper-v1060 .jbr-measure-strip-v1061{
+  gap:5px;
+}
+.usage-pdf-paper-v1060 .jbr-measure-strip-v1061>div{
+  padding:5px 6px;
+}
+.usage-pdf-paper-v1060 .jbr-measure-strip-v1061 span{
+  font-size:6.5px;
+}
+.usage-pdf-paper-v1060 .jbr-measure-strip-v1061 b{
+  font-size:8.5px;
+}
+@media(max-width:800px){
+  .jbr-measure-strip-v1061{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .jbr-measure-strip-v1061{grid-template-columns:1fr}
+}
+
+/* V1.0.62 - Actual JBR length usage + robust Product Dispatch */
+.jbr-length-usage-v1062{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(150px,1fr));
+  gap:7px;
+  margin-top:8px;
+}
+.jbr-length-usage-v1062>div{
+  border:1px solid #cfe0e4;
+  border-radius:10px;
+  background:#f8fbfc;
+  padding:9px;
+}
+.jbr-length-usage-v1062>div.productive{
+  background:#edf7fb;
+  border-color:#b9dce8;
+}
+.jbr-length-usage-v1062>div.waste{
+  background:#fff1ef;
+  border-color:#ecc5bf;
+}
+.jbr-length-usage-v1062>div.reusable{
+  background:#edf9f2;
+  border-color:#c5e5d1;
+}
+.jbr-length-usage-v1062 span{
+  display:block;
+  font-size:8px;
+  font-weight:900;
+  text-transform:uppercase;
+  color:#71838b;
+}
+.jbr-length-usage-v1062 b{
+  display:block;
+  margin-top:2px;
+  font-size:13px;
+  color:#214956;
+}
+.jbr-length-usage-v1062 small{
+  display:block;
+  margin-top:3px;
+  font-size:8px;
+  color:#74858d;
+  line-height:1.35;
+}
+.product-dispatch-btn-v1060,
+.product-dispatch-btn-v1059{
+  position:relative;
+  z-index:5;
+  pointer-events:auto!important;
+  cursor:pointer!important;
+}
+.usage-pdf-paper-v1060 .jbr-length-usage-v1062{
+  gap:5px;
+}
+.usage-pdf-paper-v1060 .jbr-length-usage-v1062>div{
+  padding:6px;
+}
+.usage-pdf-paper-v1060 .jbr-length-usage-v1062 b{
+  font-size:9px;
+}
+@media(max-width:700px){
+  .jbr-length-usage-v1062{grid-template-columns:1fr}
+}
+
