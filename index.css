@@ -5016,3 +5016,87 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   .jbr-calc-grid-v1055{grid-template-columns:1fr}
 }
 
+/* V1.0.46 - Packing / Core Usage */
+.pack-live-grid-v1057{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(120px,1fr));
+  gap:8px;
+}
+.pack-live-grid-v1057>div,
+.pack-core-summary-v1057>div{
+  border:1px solid #cfe0e5;
+  background:#fff;
+  border-radius:10px;
+  padding:9px;
+}
+.pack-live-grid-v1057 span,
+.pack-core-summary-v1057 span{
+  display:block;
+  font-size:9px;
+  font-weight:900;
+  color:#687d87;
+  text-transform:uppercase;
+}
+.pack-live-grid-v1057 b,
+.pack-core-summary-v1057 b{
+  display:block;
+  margin-top:3px;
+  font-size:17px;
+  color:#193f4d;
+}
+.pack-live-grid-v1057 small,
+.pack-core-summary-v1057 small{
+  display:block;
+  margin-top:2px;
+  font-size:9px;
+  color:#788991;
+}
+#packGrand.pack-over-v1057{
+  background:#fff0ef;
+  border-color:#efb7b1;
+}
+#packGrand.pack-over-v1057 .pack-live-grid-v1057>div:nth-child(4){
+  border-color:#e18c82;
+  background:#fff3f1;
+}
+.pack-limit-note-v1057{
+  margin:10px 0;
+  padding:9px 11px;
+  border:1px solid #b9dfe2;
+  background:#f3fbfb;
+  border-radius:10px;
+  color:#2e5964;
+  font-size:11px;
+}
+.pack-limit-note-v1057.danger{
+  background:#fff0ef;
+  border-color:#efb7b1;
+  color:#9e3328;
+}
+.pack-loose-action-v1057{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  flex-wrap:wrap;
+  margin:8px 0 2px;
+}
+.pack-loose-action-v1057 span{
+  font-size:10px;
+  color:#72848b;
+}
+.pack-core-inputs-v1057{
+  margin-top:8px;
+}
+.pack-core-summary-v1057{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(130px,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+@media(max-width:850px){
+  .pack-live-grid-v1057,.pack-core-summary-v1057{grid-template-columns:1fr 1fr}
+}
+@media(max-width:520px){
+  .pack-live-grid-v1057,.pack-core-summary-v1057{grid-template-columns:1fr}
+}
+
