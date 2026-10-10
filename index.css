@@ -4576,3 +4576,54 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .factory-job-selected b{display:block;font-size:11px;margin-top:3px}
 @media(max-width:1050px){.factory-usage-row{grid-template-columns:1fr 1fr 1fr}.factory-job-selected{grid-template-columns:1fr 1fr 1fr}}
 @media(max-width:700px){.factory-finished-job-grid,.factory-usage-row,.factory-job-selected{grid-template-columns:1fr}.factory-usage-head{align-items:flex-start;flex-direction:column}.factory-usage-unit{height:auto}}
+
+/* =====================================================================
+   FACTORY TABLET / TOUCH UI + STOCK IN AUTOCOMPLETE
+   ===================================================================== */
+.factory-material-autocomplete{position:relative}
+.factory-autocomplete-list{display:none;position:absolute;left:0;right:0;top:calc(100% - 2px);z-index:120;max-height:340px;overflow:auto;background:#fff;border:1px solid #bcd6db;border-radius:12px;box-shadow:0 14px 34px rgba(20,55,65,.18);padding:6px}
+.factory-autocomplete-list.show{display:block}
+.factory-autocomplete-option{width:100%;min-height:52px;border:0;border-bottom:1px solid #e7eff1;background:#fff;text-align:left;padding:10px 12px;cursor:pointer;border-radius:9px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.factory-autocomplete-option:last-child{border-bottom:0}.factory-autocomplete-option:active{background:#eaf8f8}.factory-autocomplete-option span{font-weight:850;color:#17343a}.factory-autocomplete-option small{color:#6f7f86;font-weight:750}
+.factory-autocomplete-empty{padding:13px 12px;min-height:48px;display:flex;align-items:center;color:#60767d;background:#f7fbfb;border-radius:9px;font-size:12px}
+.factory-jbr-unit-wrap{border:1px solid #b7dedd;background:#f3fbfb;border-radius:12px;padding:12px;margin:8px 0 12px}.factory-big-btn{min-height:48px;padding:12px 18px;font-size:13px}.factory-touch-actions{margin-top:16px}
+@media (pointer:coarse), (max-width:1100px){
+ #factory .factory-subnav-btn,#factory .btn,#factory button{min-height:46px;padding:10px 14px;touch-action:manipulation}
+ #factory input,#factory select,#factory textarea{min-height:48px;font-size:16px;padding:11px 12px}
+ #factory textarea{min-height:96px} #factory .factory-field label{font-size:12px;margin-bottom:2px}
+ #factory .factory-subnav{gap:9px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:10px;-webkit-overflow-scrolling:touch}
+ #factory .factory-subnav-btn{flex:0 0 auto;min-width:112px;font-size:12px}
+ #factory .factory-form-grid,#factory .factory-stockin-grid{grid-template-columns:repeat(2,minmax(220px,1fr));gap:14px}
+ #factory .factory-table th,#factory .factory-table td{padding:12px 11px;font-size:12px}
+ #factory .factory-autocomplete-option{min-height:58px;padding:12px 14px;font-size:14px}
+ #factory .factory-autocomplete-option small{font-size:12px} #factory .factory-autocomplete-list{max-height:420px}
+}
+@media (max-width:720px){#factory .factory-form-grid,#factory .factory-stockin-grid{grid-template-columns:1fr}#factory .panel-body{padding:12px}#factory .factory-kpis{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){#factory .factory-kpis{grid-template-columns:1fr}}
+
+/* Factory stock label action */
+#factory .factory-label-btn{white-space:nowrap;min-width:118px}
+@media (pointer:coarse), (max-width:1100px){
+  #factory .factory-label-btn{min-height:46px;min-width:138px;padding:10px 14px}
+}
+
+/* Factory v2.4 — 75x50 PDF label + typed Stock Unit */
+#factory .factory-bartender-hint{
+  margin:0 0 10px;
+  padding:9px 11px;
+  border:1px solid #cfe2e5;
+  border-radius:10px;
+  background:#f7fbfc;
+  color:#5e717a;
+  line-height:1.45;
+}
+#factory #factoryStockUnit{
+  width:100%;
+}
+@media (pointer:coarse), (max-width:1100px){
+  #factory .factory-bartender-hint{
+    font-size:12px;
+    padding:11px 13px;
+  }
+}
+

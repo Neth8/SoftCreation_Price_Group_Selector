@@ -17500,6 +17500,7 @@ window.toggleBpSeparateDeliveryButton = function(){
   let factoryLoaded=false;
   let factoryLoading=false;
   let factoryPage='Dashboard';
+  let factoryStockSuggestTimer=null;
 
   const f$=id=>document.getElementById(id);
   const fEsc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -17737,47 +17738,225 @@ window.toggleBpSeparateDeliveryButton = function(){
       <div class="panel factory-inner-panel">
         <div class="panel-title">Receive Raw Materials</div>
         <div class="panel-body">
-          <div class="notice"><b>Stock In:</b> Every receipt keeps its Raw Material, Supplier, Ownership and its own batch balance. Create the required Masters first.</div>
+          <div class="notice"><b>Stock In:</b> Type the raw material name. Existing items appear after 2 characters. New names are saved automatically when Stock In is saved.</div>
           <form id="factoryReceiveForm">
-            <div class="factory-form-grid">
-              ${factoryField('Item / Raw Material *',`<select name="item" required>${factoryOptions(factoryDb.items)}</select>`)}
+            <div class="factory-form-grid factory-stockin-grid">
+              <div class="factory-field factory-material-autocomplete">
+                <label>Item / Raw Material *</label>
+                <input id="factoryStockItemName" name="itemName" type="text" required maxlength="160" placeholder="Type at least 2 characters..." autocomplete="off" oninput="factoryStockItemType(this.value)" onfocus="factoryStockItemType(this.value)">
+                <input id="factoryStockItemId" name="itemId" type="hidden">
+                <div id="factoryStockItemSuggestions" class="factory-autocomplete-list"></div>
+                <div class="hint">New item names are saved automatically with the Stock In record.</div>
+              </div>
               ${factoryField('Supplier *',`<select name="supplier" required>${factoryOptions(factoryDb.suppliers)}</select>`)}
               ${factoryField('Raw Material Ownership *',`<select name="owner" required>${factoryOptions(factoryDb.owners)}</select>`)}
-              ${factoryField('Quantity *','<input name="quantity" type="number" step="any" min="0.000001" required>')}
+              ${factoryField('Quantity *','<input name="quantity" type="number" step="any" min="0.000001" inputmode="decimal" required>')}
               ${factoryField('Receipt Date *',`<input name="date" type="date" value="${fToday()}" required>`)}
               ${factoryField('Supplier Invoice / Reference','<input name="reference" maxlength="120">')}
             </div>
-            <div class="factory-field">
-              <label>Description / Batch Details</label>
-              <textarea name="description" maxlength="500" placeholder="Optional batch, material or receiving details"></textarea>
+            <div id="factoryJbrUnitWrap" class="factory-jbr-unit-wrap" hidden>
+              <div class="factory-field">
+                <label>Stock Unit *</label>
+                <input id="factoryStockUnit" name="stockUnit" type="text" maxlength="40"
+                  placeholder="Type unit: m², metre, roll, pcs...">
+                <div class="hint">Required when the item name contains JBR. Type the unit exactly as you use it.</div>
+              </div>
             </div>
-            <div class="actions"><button class="btn primary" type="submit">Save Stock In</button></div>
+            <div class="factory-field"><label>Description / Batch Details</label><textarea name="description" maxlength="500" placeholder="Optional batch, material or receiving details"></textarea></div>
+            <div class="actions factory-touch-actions"><button class="btn primary factory-big-btn" type="submit">Save Stock In</button></div>
           </form>
         </div>
       </div>
       <div class="panel factory-inner-panel">
         <div class="panel-title">Current Stock In Batches</div>
         <div class="panel-body">
-          ${factoryTable(
-            ['Batch','Date','Raw Material','Supplier','Ownership','Received','Remaining','Unit','Reference'],
+          <div class="hint factory-bartender-hint">Generate Label creates a 75mm × 50mm PDF material label with QR code and current stock details.</div>
+          ${factoryTable(['Batch','Date','Raw Material','Supplier','Ownership','Received','Remaining','Unit','Reference','Label'],
             (factoryDb.lots||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).map(l=>{
               const item=factoryDb.items.find(i=>i.id===l.item);
-              return [
-                `<b>${fEsc(l.code||'')}</b>`,
-                fEsc(l.date||''),
-                fEsc(item?.name||'Unknown'),
-                fEsc(fName(factoryDb.suppliers,l.supplier)),
-                fEsc(fName(factoryDb.owners,l.owner)),
-                fFmt(l.quantity),
-                fFmt(l.remaining),
-                fEsc(item?.unit||''),
-                fEsc(l.reference||'')
-              ];
-            })
-          )}
+              return [`<b>${fEsc(l.code||'')}</b>`,fEsc(l.date||''),fEsc(item?.name||l.itemName||'Unknown'),fEsc(fName(factoryDb.suppliers,l.supplier)),fEsc(fName(factoryDb.owners,l.owner)),fFmt(l.quantity),fFmt(l.remaining),fEsc(item?.unit||l.unit||''),fEsc(l.reference||''),`<button class="btn navy sm factory-label-btn" type="button" onclick="generateFactoryStockLabel('${l.id}')">Generate Label</button>`];
+            }))}
         </div>
       </div>`;
   }
+
+
+  window.generateFactoryStockLabel=async function(lotId){
+    const lot=(factoryDb.lots||[]).find(x=>x.id===lotId);
+    if(!lot)return toast('Stock batch not found');
+
+    const item=(factoryDb.items||[]).find(x=>x.id===lot.item);
+    const material=item?.name||lot.itemName||'Raw Material';
+    const unit=item?.unit||lot.unit||'';
+    const supplier=fName(factoryDb.suppliers,lot.supplier);
+    const owner=fName(factoryDb.owners,lot.owner);
+    const batch=lot.code||'';
+    const receivedQty=fFmt(lot.quantity);
+    const remainingQty=fFmt(lot.remaining);
+    const receiptDate=lot.date||'';
+    const reference=lot.reference||'';
+
+    const okQ=await loadScript(
+      'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+      ()=>window.QRCode
+    );
+    const okC=await loadScript(
+      'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+      ()=>window.html2canvas
+    );
+    const okP=await loadScript(
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+      ()=>window.jspdf
+    );
+    if(!okQ||!okC||!okP)return toast('PDF / QR libraries unavailable');
+
+    const qrData=JSON.stringify({
+      batch,
+      material,
+      quantity:Number(lot.quantity||0),
+      remaining:Number(lot.remaining||0),
+      unit,
+      supplier,
+      ownership:owner,
+      receiptDate,
+      reference
+    });
+
+    const host=document.createElement('div');
+    host.style='position:fixed;left:-10000px;top:0;width:900px;height:600px;background:#fff;color:#000;box-sizing:border-box;padding:14px;font-family:Arial,Helvetica,sans-serif;';
+    host.innerHTML=`
+      <div style="height:100%;border:4px solid #000;border-radius:8px;padding:15px;background:#fff;display:grid;grid-template-columns:1fr 190px;gap:15px">
+        <div style="min-width:0;display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;gap:15px;border-bottom:3px solid #000;padding-bottom:7px;margin-bottom:9px">
+            <div>
+              <div style="font-size:25px;font-weight:900;letter-spacing:-1px">SOFTCREATION</div>
+              <div style="font-size:10px;font-weight:800">RAW MATERIAL STOCK LABEL</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:9px;font-weight:900">BATCH / GRN</div>
+              <div style="font-size:18px;font-weight:900">${fEsc(batch||'-')}</div>
+            </div>
+          </div>
+
+          <div style="font-size:28px;font-weight:900;line-height:1.05;word-break:break-word;margin-bottom:9px">${fEsc(material)}</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+            <div style="border:2px solid #000;border-radius:6px;padding:7px">
+              <div style="font-size:8px;font-weight:900">RECEIVED QTY</div>
+              <div style="font-size:18px;font-weight:900">${fEsc(receivedQty)} ${fEsc(unit)}</div>
+            </div>
+            <div style="border:2px solid #000;border-radius:6px;padding:7px">
+              <div style="font-size:8px;font-weight:900">REMAINING</div>
+              <div style="font-size:18px;font-weight:900">${fEsc(remainingQty)} ${fEsc(unit)}</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;margin-top:7px;font-size:10px;line-height:1.2">
+            <div><b>Supplier:</b> ${fEsc(supplier||'-')}</div>
+            <div><b>Owner:</b> ${fEsc(owner||'-')}</div>
+            <div><b>Date:</b> ${fEsc(receiptDate||'-')}</div>
+            <div><b>Ref:</b> ${fEsc(reference||'-')}</div>
+          </div>
+
+          <div style="margin-top:auto;border-top:2px solid #000;padding-top:5px;font-size:8px;font-weight:700">
+            SoftCreation Business Operations System
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;border-left:3px solid #000;padding-left:12px">
+          <div id="factoryPdfQr" style="width:170px;height:170px;display:flex;align-items:center;justify-content:center"></div>
+          <div style="font-size:9px;font-weight:900;margin-top:6px;text-align:center">SCAN MATERIAL QR</div>
+          <div style="font-size:8px;font-weight:800;margin-top:4px;text-align:center">${fEsc(batch||'')}</div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(host);
+
+    try{
+      const qrHost=host.querySelector('#factoryPdfQr');
+      new QRCode(qrHost,{
+        text:qrData,
+        width:170,
+        height:170,
+        correctLevel:QRCode.CorrectLevel.M
+      });
+
+      await new Promise(resolve=>setTimeout(resolve,150));
+
+      const canvas=await html2canvas(host,{
+        scale:2.5,
+        backgroundColor:'#fff',
+        useCORS:true,
+        logging:false
+      });
+
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({
+        orientation:'landscape',
+        unit:'mm',
+        format:[75,50]
+      });
+
+      pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,75,50);
+
+      const safe=String(batch||material||'Factory-Label')
+        .replace(/[\\/:*?"<>|]+/g,'-')
+        .replace(/\s+/g,' ')
+        .trim();
+
+      pdf.save(`${safe}.pdf`);
+      toast('75mm × 50mm stock label PDF generated');
+    }catch(err){
+      console.error('Factory label PDF failed',err);
+      toast('Label PDF failed — '+(err?.message||err));
+    }finally{
+      host.remove();
+    }
+  };
+
+  function factoryIsJbrName(name){ return /\\bjbr\\b/i.test(String(name||'').trim()); }
+  function factoryFindItemByName(name){
+    const q=String(name||'').trim().toLowerCase();
+    return (factoryDb.items||[]).find(x=>String(x.name||'').trim().toLowerCase()===q)||null;
+  }
+  window.factoryStockItemType=function(value){
+    const hidden=f$('factoryStockItemId'), list=f$('factoryStockItemSuggestions'), unitWrap=f$('factoryJbrUnitWrap'), unitSel=f$('factoryStockUnit');
+    if(!hidden||!list)return;
+    const text=String(value||'').trim();
+    const exact=factoryFindItemByName(text);
+    hidden.value=exact?.id||'';
+    if(exact&&unitSel&&exact.unit)unitSel.value=exact.unit;
+    const jbr=factoryIsJbrName(text);
+    if(unitWrap)unitWrap.hidden=!jbr;
+    if(unitSel)unitSel.required=jbr;
+    if(text.length<2){
+      if(factoryStockSuggestTimer){clearTimeout(factoryStockSuggestTimer);factoryStockSuggestTimer=null;}
+      list.innerHTML='';list.classList.remove('show');return;
+    }
+    const q=text.toLowerCase();
+    const matches=(factoryDb.items||[]).filter(x=>String(x.name||'').toLowerCase().includes(q)).slice(0,12);
+    if(!matches.length){
+      if(factoryStockSuggestTimer){clearTimeout(factoryStockSuggestTimer);factoryStockSuggestTimer=null;}
+      list.innerHTML=`<div class="factory-autocomplete-empty">New item — "${fEsc(text)}" will be saved automatically.</div>`;
+      list.classList.add('show');
+      factoryStockSuggestTimer=setTimeout(()=>{
+        list.classList.remove('show');
+        list.innerHTML='';
+        factoryStockSuggestTimer=null;
+      },2000);
+      return;
+    }
+    if(factoryStockSuggestTimer){clearTimeout(factoryStockSuggestTimer);factoryStockSuggestTimer=null;}
+    list.innerHTML=matches.map(x=>`<button type="button" class="factory-autocomplete-option" onclick="factorySelectStockItem('${x.id}')"><span>${fEsc(x.name)}</span><small>${fEsc(x.unit||'Unit not set')}</small></button>`).join('');
+    list.classList.add('show');
+  };
+  window.factorySelectStockItem=function(id){
+    const item=(factoryDb.items||[]).find(x=>x.id===id); if(!item)return;
+    const input=f$('factoryStockItemName'), hidden=f$('factoryStockItemId'), list=f$('factoryStockItemSuggestions'), unitWrap=f$('factoryJbrUnitWrap'), unitSel=f$('factoryStockUnit');
+    if(input)input.value=item.name||''; if(hidden)hidden.value=item.id||''; if(list){list.innerHTML='';list.classList.remove('show');}
+    const jbr=factoryIsJbrName(item.name); if(unitWrap)unitWrap.hidden=!jbr;
+    if(unitSel){unitSel.required=jbr;if(item.unit)unitSel.value=item.unit;}
+  };
 
   let factoryUsageRows=[];
 
@@ -17912,28 +18091,9 @@ window.toggleBpSeparateDeliveryButton = function(){
             <div class="factory-master-tags">${factoryDb.owners.map(x=>`<span class="tag">${fEsc(x.name)}</span>`).join('')||'<span class="small">No owners</span>'}</div>
           </div>
         </div>
-      </div>
-      <div class="panel factory-inner-panel">
-        <div class="panel-title">Raw Materials</div>
-        <div class="panel-body">
-          <form id="factoryItemForm">
-            <div class="factory-form-grid">
-              ${factoryField('Item Name *','<input name="name" required maxlength="120">')}
-              ${factoryField('Description','<input name="description" maxlength="250">')}
-              ${factoryField('Stock Unit *','<input name="unit" required placeholder="m² / metre / roll / pcs" maxlength="30">')}
-              ${factoryField('Unit Price (LKR)','<input name="price" type="number" min="0" step="any" placeholder="Leave blank if unknown">')}
-            </div>
-            <div class="actions"><button class="btn primary" type="submit">Create Material</button></div>
-          </form>
-          ${factoryTable(['Item','Description','Unit','Current Unit Price','Action'],factoryDb.items.map(i=>[
-            fEsc(i.name),fEsc(i.description||''),fEsc(i.unit),
-            i.price===null||i.price===undefined?'<span class="tag amber">Price missing</span>':fMoney(i.price),
-            `<button class="btn ghost sm" type="button" onclick="editFactoryPrice('${i.id}')">Edit Price</button>`
-          ]))}
-          <div class="hint">Unit prices are captured as snapshots when material is issued. Later price changes do not rewrite historical job cost.</div>
-        </div>
       </div>`;
   }
+
   function factoryHistoryHtml(){
     const rows=[
       ...(factoryDb.lots||[]).map(l=>{
@@ -17986,44 +18146,34 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(supplier)supplier.onsubmit=e=>{e.preventDefault();createFactoryMaster('supplier',e.target)};
     const owner=f$('factoryOwnerForm');
     if(owner)owner.onsubmit=e=>{e.preventDefault();createFactoryMaster('owner',e.target)};
-    const item=f$('factoryItemForm');
-    if(item)item.onsubmit=e=>{e.preventDefault();createFactoryMaster('item',e.target)};
 
     const receive=f$('factoryReceiveForm');
     if(receive)receive.onsubmit=async e=>{
       e.preventDefault();
       if(!requirePerm('factory_stock_in','receive Factory raw material stock'))return;
       const f=new FormData(e.target);
-      const q=Number(f.get('quantity'));
-      const itemId=String(f.get('item')||'');
+      const itemName=String(f.get('itemName')||'').trim();
+      const itemId=String(f.get('itemId')||'').trim();
       const supplierId=String(f.get('supplier')||'');
       const ownerId=String(f.get('owner')||'');
+      const q=Number(f.get('quantity'));
+      const stockUnit=String(f.get('stockUnit')||'').trim();
+      if(!itemName)return toast('Enter raw material name');
       if(!Number.isFinite(q)||q<=0)return toast('Quantity must be positive');
-      const item=factoryDb.items.find(x=>x.id===itemId);
-      if(!item)return toast('Select a raw material');
       if(!factoryDb.suppliers.some(x=>x.id===supplierId))return toast('Select a supplier');
       if(!factoryDb.owners.some(x=>x.id===ownerId))return toast('Select raw material ownership');
-
-      await factoryCommit(`Factory stock received: ${item.name}`,d=>{
-        const seq=(d.lots||[]).reduce((m,l)=>{
-          const n=Number(String(l.code||'').replace(/\D/g,''));
-          return Number.isFinite(n)?Math.max(m,n):m;
-        },0)+1;
-        d.lots.push({
-          id:fUid(),
-          code:'FGRN-'+String(seq).padStart(5,'0'),
-          item:itemId,
-          supplier:supplierId,
-          owner:ownerId,
-          quantity:q,
-          remaining:q,
-          date:String(f.get('date')||fToday()),
-          reference:String(f.get('reference')||'').trim(),
-          description:String(f.get('description')||'').trim(),
-          createdBy:currentUser?.username||'',
-          createdByDisplay:currentUser?.display||'',
-          createdAt:new Date().toISOString()
-        });
+      const existing=factoryDb.items.find(x=>x.id===itemId)||factoryFindItemByName(itemName);
+      const isJbr=factoryIsJbrName(itemName);
+      const finalUnit=(existing?.unit||stockUnit||'').trim();
+      if(isJbr&&!finalUnit)return toast('Stock Unit is required for JBR items');
+      await factoryCommit(`Factory stock received: ${itemName}`,d=>{
+        let item=d.items.find(x=>x.id===existing?.id)||d.items.find(x=>String(x.name||'').trim().toLowerCase()===itemName.toLowerCase());
+        if(!item){
+          item={id:fUid(),name:itemName,description:'',unit:finalUnit||'',price:null,autoCreated:true,createdFrom:'Stock In',createdBy:currentUser?.username||'',createdAt:new Date().toISOString()};
+          d.items.push(item);
+        }else if(isJbr&&finalUnit&&!item.unit){ item.unit=finalUnit; }
+        const seq=(d.lots||[]).reduce((m,l)=>{const n=Number(String(l.code||'').replace(/\\D/g,''));return Number.isFinite(n)?Math.max(m,n):m;},0)+1;
+        d.lots.push({id:fUid(),code:'FGRN-'+String(seq).padStart(5,'0'),item:item.id,itemName:item.name,unit:item.unit||finalUnit||'',supplier:supplierId,owner:ownerId,quantity:q,remaining:q,date:String(f.get('date')||fToday()),reference:String(f.get('reference')||'').trim(),description:String(f.get('description')||'').trim(),createdBy:currentUser?.username||'',createdByDisplay:currentUser?.display||'',createdAt:new Date().toISOString()});
       });
     };
 
