@@ -5567,3 +5567,25 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   .jbr-length-usage-v1062{grid-template-columns:1fr}
 }
 
+/* V1.0.63 - Fast Product Dispatch popup */
+.product-dispatch-opening-v1063{
+  min-height:110px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  text-align:center;
+  border:1px solid #d7e7ea;
+  background:#f8fbfc;
+  border-radius:12px;
+  color:#345560;
+}
+.product-dispatch-opening-v1063 b{
+  font-size:13px;
+}
+.product-dispatch-opening-v1063 span{
+  font-size:9.5px;
+  color:#71828a;
+}
+

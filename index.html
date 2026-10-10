@@ -20226,13 +20226,14 @@ window.toggleBpSeparateDeliveryButton = function(){
 
 
 <script>
-/* V1.0.60 - Product Dispatch Availability + Finance Job Usage Reports
+/* V1.0.63 - Fast Product Dispatch + Finance Job Usage Reports
    Finance reports operational usage only. No profit / GP calculation. */
 (function(){
   const USAGE_REST_V1060='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
   const USAGE_WORKSPACE_V1060='softcreation_main';
   const USAGE_KEY_STORE_V1060='spgs_supabase_browser_key_v1';
   const usageCacheV1060={jbr:new Map(),packing:new Map(),loaded:new Map()};
+  const dispatchGroupCacheV1063=new Map();
 
   function usageApiKeyV1060(){
     let key=localStorage.getItem(USAGE_KEY_STORE_V1060)||'';
@@ -20270,7 +20271,30 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   function productGroupV1060(encodedKey){
     const key=decodeURIComponent(encodedKey||'');
+    if(dispatchGroupCacheV1063.has(key))return dispatchGroupCacheV1063.get(key);
     try{return (productionProductGroupsV103()||[]).find(x=>x.key===key)||null}catch(_){return null}
+  }
+
+  function fastProductGroupV1063(key){
+    if(dispatchGroupCacheV1063.has(key))return dispatchGroupCacheV1063.get(key);
+
+    const jobs=(state.productionRequests||[]).filter(r=>{
+      try{return productionProductKeyV103(r)===key}catch(_){return false}
+    });
+    if(!jobs.length)return null;
+
+    const first=jobs[0];
+    const g={
+      key,
+      size:first.size||'-',
+      material:first.material||'-',
+      layout:first.layout||'-',
+      pcs:Number(first.pcs||0),
+      unit:first.unit||'Rolls',
+      jobs
+    };
+    dispatchGroupCacheV1063.set(key,g);
+    return g;
   }
 
   function flowV1060(status){
@@ -20309,40 +20333,71 @@ window.toggleBpSeparateDeliveryButton = function(){
   }
 
   window.openProductDispatchV1059=function(encodedKey){
-    if(currentUser?.role!=='admin'&&!hasPerm('production_manage'))return requirePerm('production_manage','dispatch finished production');
-    const g=productGroupV1060(encodedKey);
-    if(!g)return toast('Product not found');
+    if(currentUser?.role!=='admin'&&!hasPerm('production_manage')){
+      return requirePerm('production_manage','dispatch finished production');
+    }
 
-    const jobs=(g.jobs||[])
-      .filter(r=>dispatchAvailableV1060(r)>0)
-      .sort((a,b)=>Date.parse(b.finishedAt||b._spgsUpdatedAt||0)-Date.parse(a.finishedAt||a._spgsUpdatedAt||0));
+    const key=decodeURIComponent(encodedKey||'');
+    const modal=$('productDispatchModalV1059');
+    const meta=$('productDispatchMetaV1059');
+    const body=$('productDispatchBodyV1059');
 
-    if(!jobs.length)return toast('No Finished production balance is available to dispatch for this product.');
+    /* Show the modal first. The user gets immediate feedback even on a large production dataset. */
+    if(modal)modal.classList.add('show');
+    if(meta)meta.textContent='Opening dispatch…';
+    if(body)body.innerHTML='<div class="product-dispatch-opening-v1063"><b>Loading finished production balance…</b><span>This should take only a moment.</span></div>';
 
-    $('productDispatchMetaV1059').textContent=
-      `${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs/roll • Available ${money(groupDispatchAvailableV1060(g))} ${g.unit}`;
+    /* Use the product object already cached when the Products cards were rendered.
+       Fallback scans only this product's production requests; it does NOT rebuild/sort all groups. */
+    const g=dispatchGroupCacheV1063.get(key)||fastProductGroupV1063(key);
+    if(!g){
+      if(meta)meta.textContent='Product not found';
+      if(body)body.innerHTML='<div class="empty">Product production data is no longer available. Refresh Products and try again.</div>';
+      return;
+    }
 
-    $('productDispatchBodyV1059').innerHTML=`
-      <div class="notice"><b>Select the Finished production job to dispatch.</b> QC Check jobs remain locked until QC approval. Legacy Finished jobs without an explicit finished count use their requested quantity as the dispatchable finished quantity.</div>
-      <div class="product-dispatch-list-v1059">
-        ${jobs.map(r=>{
-          const produced=dispatchProducedQtyV1060(r);
-          const dispatched=dispatchedQtyV1060(r);
-          const avail=dispatchAvailableV1060(r);
-          return `<div class="product-dispatch-row-v1059">
-            <div><b>${esc(r.orderNo)}</b><span>${esc(r.customerName||'-')} • PI ${esc(r.piSerial||'-')} • ${esc(r.status||'-')}</span></div>
-            <div><span>Finished</span><b>${money(produced)}</b></div>
-            <div><span>Dispatched</span><b>${money(dispatched)}</b></div>
-            <div><span>Available</span><b>${money(avail)}</b></div>
-            <button class="btn navy sm" type="button" onclick="closeModal('productDispatchModalV1059');openDispatchLoadingV81('${r.id}')">Dispatch</button>
-          </div>`;
-        }).join('')}
-      </div>`;
-    $('productDispatchModalV1059').classList.add('show');
+    /* Let the modal paint before building the job rows. */
+    requestAnimationFrame(()=>{
+      const jobs=(g.jobs||[])
+        .filter(r=>dispatchAvailableV1060(r)>0)
+        .sort((a,b)=>Date.parse(b.finishedAt||b._spgsUpdatedAt||0)-Date.parse(a.finishedAt||a._spgsUpdatedAt||0));
+
+      const balance=jobs.reduce((n,r)=>n+dispatchAvailableV1060(r),0);
+
+      if(meta){
+        meta.textContent=
+          `${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs/roll • Available ${money(balance)} ${g.unit}`;
+      }
+
+      if(!jobs.length){
+        if(body)body.innerHTML='<div class="empty">No Finished production balance is available to dispatch for this product.</div>';
+        return;
+      }
+
+      if(body)body.innerHTML=`
+        <div class="notice"><b>Select the Finished production job to dispatch.</b> QC Check jobs remain locked until QC approval. Legacy Finished jobs without an explicit finished count use their requested quantity as the dispatchable finished quantity.</div>
+        <div class="product-dispatch-list-v1059">
+          ${jobs.map(r=>{
+            const produced=dispatchProducedQtyV1060(r);
+            const dispatched=dispatchedQtyV1060(r);
+            const avail=dispatchAvailableV1060(r);
+            return `<div class="product-dispatch-row-v1059">
+              <div><b>${esc(r.orderNo)}</b><span>${esc(r.customerName||'-')} • PI ${esc(r.piSerial||'-')} • ${esc(r.status||'-')}</span></div>
+              <div><span>Finished</span><b>${money(produced)}</b></div>
+              <div><span>Dispatched</span><b>${money(dispatched)}</b></div>
+              <div><span>Available</span><b>${money(avail)}</b></div>
+              <button class="btn navy sm" type="button" onclick="closeModal('productDispatchModalV1059');openDispatchLoadingV81('${r.id}')">Dispatch</button>
+            </div>`;
+          }).join('')}
+        </div>`;
+    });
   };
 
   function enhanceProductDispatchCardsV1060(){
     const groups=productionProductGroupsV103()||[];
+    dispatchGroupCacheV1063.clear();
+    groups.forEach(g=>dispatchGroupCacheV1063.set(g.key,g));
+
     const cards=[...document.querySelectorAll('#productionProductsGrid .pp-card')];
     cards.forEach(card=>{
       const title=card.querySelector('.pp-card-title')?.textContent?.trim()||'';
@@ -20380,7 +20435,6 @@ window.toggleBpSeparateDeliveryButton = function(){
         btn.addEventListener('click',function(ev){
           ev.preventDefault();
           ev.stopPropagation();
-          ev.stopImmediatePropagation();
           window.openProductDispatchV1059(this.dataset.productKey);
         });
         foot.appendChild(btn);
@@ -20905,19 +20959,6 @@ window.toggleBpSeparateDeliveryButton = function(){
         return r;
       };
       try{showView=window.showView}catch(_){}
-    }
-
-    const productsGrid=$('productionProductsGrid');
-    if(productsGrid && !productsGrid.dataset.dispatchClickV1062){
-      productsGrid.dataset.dispatchClickV1062='1';
-      productsGrid.addEventListener('click',function(ev){
-        const btn=ev.target.closest('.product-dispatch-btn-v1060');
-        if(!btn)return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        const encodedKey=btn.dataset.productKey||'';
-        if(encodedKey)window.openProductDispatchV1059(encodedKey);
-      },true);
     }
 
     try{enhanceProductDispatchCardsV1060()}catch(_){}
