@@ -19090,6 +19090,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       layout:String(g.layout||''),
       pcs_per_roll:Number(g.pcs||0),
       unit:String(g.unit||'Rolls'),
+      source_job_ids:jbrJobsV1055(g).map(r=>String(r.id)),
       jbr_width_mm:calc.jbrWidth,
       jbr_length_m:calc.jbrLengthM,
       label_width_mm:calc.labelWidth,
@@ -19615,6 +19616,1126 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installPackingV1057,{once:true});
   else installPackingV1057();
+})();
+</script>
+
+
+<script>
+/* V1.0.58 - Packing Count History / View Packed Counts
+   Read-only history for the exact grouped production product. */
+(function(){
+  const PACK_HISTORY_REST_V1058='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
+  const PACK_HISTORY_WORKSPACE_V1058='softcreation_main';
+  const PACK_HISTORY_KEY_STORE_V1058='spgs_supabase_browser_key_v1';
+  const PACK_HISTORY_TABLE_V1058='spgs_product_packing_batches';
+
+  function packHistoryApiKeyV1058(){
+    let key=localStorage.getItem(PACK_HISTORY_KEY_STORE_V1058)||'';
+    if(!key){
+      key=prompt('SoftCreation cloud setup\n\nPaste the FULL Supabase anon / publishable key for qyxgamverzdmhtvezbft:')||'';
+      key=key.trim();
+      if(key)localStorage.setItem(PACK_HISTORY_KEY_STORE_V1058,key);
+    }
+    return key;
+  }
+
+  function packHistoryHeadersV1058(extra={}){
+    const key=packHistoryApiKeyV1058();
+    if(!key)throw new Error('Supabase key is not configured.');
+    const h={apikey:key,...extra};
+    if(key.startsWith('eyJ'))h.Authorization='Bearer '+key;
+    return h;
+  }
+
+  async function packHistoryFetchV1058(path,options={}){
+    const res=await fetch(PACK_HISTORY_REST_V1058+path,{
+      ...options,
+      headers:packHistoryHeadersV1058(options.headers||{})
+    });
+    if(!res.ok){
+      const body=await res.text().catch(()=>res.statusText);
+      throw new Error(`Supabase ${res.status}: ${body.slice(0,500)}`);
+    }
+    if(res.status===204)return null;
+    const text=await res.text();
+    return text?JSON.parse(text):null;
+  }
+
+  function packHistoryGroupV1058(){
+    const marker=$('packingReqId')?.value||'';
+    if(!marker.startsWith('BATCHV1040::'))return null;
+    const encodedKey=marker.slice('BATCHV1040::'.length);
+    const key=decodeURIComponent(encodedKey||'');
+    try{
+      if(typeof groupByKeyV1040==='function'){
+        const g=groupByKeyV1040(encodedKey);
+        if(g)return g;
+      }
+    }catch(_){}
+    try{
+      return (productionProductGroupsV103()||[]).find(x=>x.key===key)||null;
+    }catch(_){return null}
+  }
+
+  function packHistoryBoxesV1058(value){
+    if(Array.isArray(value))return value;
+    if(typeof value==='string'){
+      try{
+        const parsed=JSON.parse(value);
+        return Array.isArray(parsed)?parsed:[];
+      }catch(_){return []}
+    }
+    return [];
+  }
+
+  function packHistoryDateV1058(value){
+    if(!value)return '-';
+    try{return new Date(value).toLocaleString()}catch(_){return String(value)}
+  }
+
+  function ensurePackHistoryModalV1058(){
+    if($('packingHistoryModalV1058'))return;
+    document.body.insertAdjacentHTML('beforeend',`
+      <div id="packingHistoryModalV1058" class="modal">
+        <div class="modal-card pack-history-card-v1058">
+          <div class="modal-head">
+            <div>
+              <b>Packed Count History</b>
+              <div id="packHistoryMetaV1058" class="small"></div>
+            </div>
+            <button class="closex" type="button" onclick="closeModal('packingHistoryModalV1058')">×</button>
+          </div>
+          <div class="modal-body">
+            <div id="packHistorySummaryV1058"></div>
+            <div id="packHistoryListV1058">
+              <div class="empty">Loading packed-count history...</div>
+            </div>
+          </div>
+        </div>
+      </div>`);
+  }
+
+  async function renderPackHistoryV1058(g){
+    const list=$('packHistoryListV1058');
+    const summary=$('packHistorySummaryV1058');
+    if(!list||!summary)return;
+
+    list.innerHTML='<div class="empty">Loading packed-count history from database...</div>';
+    summary.innerHTML='';
+
+    let rows;
+    try{
+      rows=await packHistoryFetchV1058(
+        `/${PACK_HISTORY_TABLE_V1058}?workspace=eq.${encodeURIComponent(PACK_HISTORY_WORKSPACE_V1058)}&product_key=eq.${encodeURIComponent(g.key)}&order=created_at.desc&select=*`
+      );
+    }catch(e){
+      console.error(e);
+      list.innerHTML=`<div class="notice"><b>Could not load packed counts:</b> ${esc(e.message)}</div>`;
+      return;
+    }
+
+    rows=Array.isArray(rows)?rows:[];
+    if(!rows.length){
+      list.innerHTML=`<div class="empty">No saved packing records yet for ${esc(g.size)} • ${esc(g.material)}.</div>`;
+      return;
+    }
+
+    const latest=rows[0]||{};
+    const latestBoxes=packHistoryBoxesV1058(latest.boxes);
+    const latestBoxRolls=latestBoxes.reduce((n,b)=>n+Number(b.roll_count??b.rolls??0),0);
+    const latestLoose=Number(latest.loose_rolls||0);
+    const latestTotal=Number(latest.packed_total||0);
+
+    summary.innerHTML=`
+      <div class="pack-history-summary-v1058">
+        <div><span>Saved Records</span><b>${rows.length}</b><small>packing / QC snapshots</small></div>
+        <div><span>Latest Boxes</span><b>${latestBoxes.length}</b><small>${money(latestBoxRolls)} rolls in boxes</small></div>
+        <div><span>Latest Loose</span><b>${money(latestLoose)}</b><small>rolls</small></div>
+        <div><span>Latest Packed Total</span><b>${money(latestTotal)}</b><small>JBR limit ${money(Number(latest.jbr_actual_cut_rolls||0))}</small></div>
+      </div>`;
+
+    list.innerHTML=rows.map((r,index)=>{
+      const boxes=packHistoryBoxesV1058(r.boxes);
+      const boxRows=boxes.length
+        ? boxes.map((b,i)=>`
+            <tr>
+              <td>${esc(String(b.box_no??b.boxNo??String(i+1).padStart(2,'0')))}</td>
+              <td class="num"><b>${money(Number(b.roll_count??b.rolls??0))}</b></td>
+              <td>${esc(String(b.note||''))}</td>
+            </tr>`).join('')
+        : `<tr><td colspan="3" class="small">No cartons recorded in this snapshot.</td></tr>`;
+
+      const total=Number(r.packed_total||0);
+      const jbr=Number(r.jbr_actual_cut_rolls||0);
+      const remaining=Math.max(0,jbr-total);
+
+      return `
+        <div class="pack-history-entry-v1058">
+          <div class="pack-history-entry-head-v1058">
+            <div>
+              <b>${esc(String(r.stage||'Packing Snapshot'))}</b>
+              <span>${packHistoryDateV1058(r.created_at)} • ${esc(String(r.packed_by_display||r.packed_by_username||'-'))}</span>
+            </div>
+            <span class="tag">${esc(String(r.qc_result||'-'))}</span>
+          </div>
+
+          <div class="pack-history-kpis-v1058">
+            <div><span>Boxes</span><b>${money(Number(r.box_count??boxes.length))}</b></div>
+            <div><span>Box Rolls</span><b>${money(Number(r.box_rolls||0))}</b></div>
+            <div><span>Loose</span><b>${money(Number(r.loose_rolls||0))}</b></div>
+            <div><span>Packed Total</span><b>${money(total)}</b></div>
+            <div><span>JBR Actual Cut</span><b>${money(jbr)}</b></div>
+            <div><span>Remaining</span><b>${money(remaining)}</b></div>
+          </div>
+
+          <div class="tablewrap">
+            <table class="table pack-history-table-v1058">
+              <thead><tr><th>Box</th><th>Rolls</th><th>Note</th></tr></thead>
+              <tbody>${boxRows}</tbody>
+            </table>
+          </div>
+
+          <div class="pack-history-core-v1058">
+            <div><span>Roll Core Width</span><b>${money(Number(r.roll_width_mm||0))} mm</b></div>
+            <div><span>Core Stick Length</span><b>${money(Number(r.core_stick_length_mm||0))} mm</b></div>
+            <div><span>Core Used</span><b>${money(Number(r.core_mm_used||0))} mm</b></div>
+            <div><span>Core Sticks</span><b>${money(Number(r.core_sticks_required||0))}</b></div>
+            <div><span>Reusable Balance</span><b>${money(Number(r.core_balance_mm||0))} mm</b></div>
+          </div>
+
+          ${r.note?`<div class="prod-summary-note"><b>Note:</b> ${esc(String(r.note))}</div>`:''}
+        </div>`;
+    }).join('');
+  }
+
+  window.openPackingHistoryV1058=async function(){
+    const g=packHistoryGroupV1058();
+    if(!g)return toast('Packed count history is available only for a grouped production batch.');
+    ensurePackHistoryModalV1058();
+    $('packHistoryMetaV1058').textContent=`${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs / ${g.unit}`;
+    $('packingHistoryModalV1058').classList.add('show');
+    await renderPackHistoryV1058(g);
+  };
+
+  function ensurePackHistoryButtonV1058(){
+    const modal=$('packingModal');
+    if(!modal)return;
+    const head=modal.querySelector('.modal-head');
+    if(!head||head.querySelector('.pack-history-view-btn-v1058'))return;
+
+    const close=head.querySelector('.closex');
+    const wrap=document.createElement('div');
+    wrap.className='pack-history-head-actions-v1058';
+
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='btn pack-history-view-btn-v1058 sm';
+    btn.textContent='View Packed Counts';
+    btn.onclick=()=>openPackingHistoryV1058();
+
+    if(close){
+      head.insertBefore(wrap,close);
+      wrap.appendChild(btn);
+      wrap.appendChild(close);
+    }else{
+      wrap.appendChild(btn);
+      head.appendChild(wrap);
+    }
+  }
+
+  function installPackingHistoryV1058(){
+    if(window.__packingHistoryV1058Installed)return;
+    window.__packingHistoryV1058Installed=true;
+
+    const baseOpen=window.openGroupedPackingV1040;
+    if(typeof baseOpen==='function'){
+      window.openGroupedPackingV1040=async function(){
+        const r=await baseOpen.apply(this,arguments);
+        setTimeout(()=>{
+          const modal=$('packingModal');
+          if(!modal?.classList.contains('show'))return;
+          ensurePackHistoryButtonV1058();
+        },30);
+        return r;
+      };
+      try{openGroupedPackingV1040=window.openGroupedPackingV1040}catch(_){}
+    }
+
+    // Also install immediately in case the packing modal already exists.
+    ensurePackHistoryButtonV1058();
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installPackingHistoryV1058,{once:true});
+  else installPackingHistoryV1058();
+})();
+</script>
+
+<script>
+/* V1.0.59 - Product Dispatch + Finance Job Costing
+   Moves dispatch actions to Products cards and adds permission-controlled live Finance costing. */
+(function(){
+  const FIN_REST_V1059='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
+  const FIN_WORKSPACE_V1059='softcreation_main';
+  const FIN_KEY_STORE_V1059='spgs_supabase_browser_key_v1';
+  const FIN_ADJ_TABLE_V1059='spgs_finance_job_cost_adjustments';
+  let financeTimerV1059=null;
+  let financeCloudCacheV1059={jbr:new Map(),packing:new Map(),adjustments:new Map(),loadedAt:0};
+
+  function finApiKeyV1059(){
+    let key=localStorage.getItem(FIN_KEY_STORE_V1059)||'';
+    if(!key){
+      key=prompt('SoftCreation cloud setup\n\nPaste the FULL Supabase anon / publishable key for qyxgamverzdmhtvezbft:')||'';
+      key=key.trim();
+      if(key)localStorage.setItem(FIN_KEY_STORE_V1059,key);
+    }
+    return key;
+  }
+  function finHeadersV1059(extra={}){
+    const key=finApiKeyV1059();
+    if(!key)throw new Error('Supabase key is not configured.');
+    const h={apikey:key,...extra};
+    if(key.startsWith('eyJ'))h.Authorization='Bearer '+key;
+    return h;
+  }
+  async function finFetchV1059(path,options={}){
+    const res=await fetch(FIN_REST_V1059+path,{...options,headers:finHeadersV1059(options.headers||{})});
+    if(!res.ok){
+      const body=await res.text().catch(()=>res.statusText);
+      throw new Error(`Supabase ${res.status}: ${body.slice(0,500)}`);
+    }
+    if(res.status===204)return null;
+    const text=await res.text();
+    return text?JSON.parse(text):null;
+  }
+
+  /* ---------------------------- Permissions ---------------------------- */
+  function installFinancePermissionsV1059(){
+    if(Array.isArray(window.USER_FEATURES||null)){
+      if(!USER_FEATURES.some(x=>x[0]==='finance_view'))USER_FEATURES.push(['finance_view','Finance — View Job Costing']);
+      if(!USER_FEATURES.some(x=>x[0]==='finance_cost_edit'))USER_FEATURES.push(['finance_cost_edit','Finance — Edit Cost Adjustments']);
+    }else{
+      try{
+        if(typeof USER_FEATURES!=='undefined'){
+          if(!USER_FEATURES.some(x=>x[0]==='finance_view'))USER_FEATURES.push(['finance_view','Finance — View Job Costing']);
+          if(!USER_FEATURES.some(x=>x[0]==='finance_cost_edit'))USER_FEATURES.push(['finance_cost_edit','Finance — Edit Cost Adjustments']);
+        }
+      }catch(_){ }
+    }
+    try{VIEW_PERMS.finance='finance_view'}catch(_){ }
+    try{renderUserPrivilegeEditor(null)}catch(_){ }
+  }
+
+  /* ---------------------------- Finance UI ---------------------------- */
+  function ensureFinanceUiV1059(){
+    if($('finance'))return;
+    const nav=document.querySelector('.nav');
+    const settings=document.querySelector('.navbtn[data-view="settings"]');
+    if(nav){
+      const b=document.createElement('button');
+      b.className='navbtn';b.dataset.view='finance';b.textContent='Finance';b.onclick=()=>showView('finance');
+      nav.insertBefore(b,settings||null);
+    }
+    const host=document.querySelector('main')||document.querySelector('.container')||document.querySelector('.app');
+    const firstModal=document.querySelector('.modal');
+    const section=`<section id="finance" class="view">
+      <div class="panel">
+        <div class="panel-title">
+          <span>Finance — Live Job Costing</span>
+          <button class="btn sm" style="background:#fff;color:#087f83" type="button" onclick="renderFinanceV1059(true)">Refresh</button>
+        </div>
+        <div class="panel-body">
+          <div class="notice" style="margin-bottom:12px"><b>Realtime costing:</b> combines quotation/PI cost snapshots, actual production, JBR yield/waste, packing/core usage, dispatch movement and finance cost adjustments. Values refresh automatically while this tab is open.</div>
+          <div id="financeKpisV1059" class="finance-kpis-v1059"></div>
+          <div class="finance-filter-v1059">
+            <input id="financeSearchV1059" class="search" placeholder="Search production / PI / customer / size / material" oninput="renderFinanceV1059(false)">
+            <select id="financeStatusV1059" onchange="renderFinanceV1059(false)"><option value="">All statuses</option><option>Requested</option><option>Approved</option><option>Planned</option><option>In Production</option><option>QC Check</option><option>Finished</option><option>Dispatched</option><option>Received</option><option>GRN Closed</option></select>
+            <select id="financeMarginV1059" onchange="renderFinanceV1059(false)"><option value="">All margins</option><option value="profit">Profit</option><option value="loss">Loss</option><option value="unknown">Cost unavailable</option></select>
+          </div>
+          <div id="financeStatusNoteV1059" class="small" style="margin:8px 0"></div>
+          <div id="financeJobsV1059"></div>
+        </div>
+      </div>
+    </section>`;
+    if(firstModal)firstModal.insertAdjacentHTML('beforebegin',section); else host?.insertAdjacentHTML('beforeend',section);
+
+    document.body.insertAdjacentHTML('beforeend',`
+      <div id="financeJobModalV1059" class="modal"><div class="modal-card finance-job-modal-v1059">
+        <div class="modal-head"><div><b>Finance Job Costing</b><div id="financeJobMetaV1059" class="small"></div></div><button class="closex" onclick="closeModal('financeJobModalV1059')">×</button></div>
+        <div id="financeJobBodyV1059" class="modal-body"></div>
+      </div>
+      <div id="productDispatchModalV1059" class="modal"><div class="modal-card" style="max-width:980px">
+        <div class="modal-head"><div><b>Product Dispatch</b><div id="productDispatchMetaV1059" class="small"></div></div><button class="closex" onclick="closeModal('productDispatchModalV1059')">×</button></div>
+        <div id="productDispatchBodyV1059" class="modal-body"></div>
+      </div>`);
+  }
+
+  /* ------------------------- Dispatch relocation ------------------------ */
+  function availableForDispatchV1059(r){
+    try{return typeof productionAvailableV81==='function'?Math.max(0,Number(productionAvailableV81(r)||0)):Math.max(0,Number(r.finishedQty||0)-(r.dispatches||[]).reduce((n,d)=>n+Number(d.qty||0),0))}catch(_){return 0}
+  }
+  function groupDispatchBalanceV1059(g){return (g?.jobs||[]).reduce((n,r)=>n+availableForDispatchV1059(r),0)}
+
+  window.openProductDispatchV1059=function(encodedKey){
+    if(currentUser?.role!=='admin'&&!hasPerm('production_manage'))return requirePerm('production_manage','dispatch finished production');
+    const key=decodeURIComponent(encodedKey||'');
+    const g=(productionProductGroupsV103()||[]).find(x=>x.key===key);
+    if(!g)return toast('Product not found');
+    const jobs=(g.jobs||[]).filter(r=>availableForDispatchV1059(r)>0).sort((a,b)=>Date.parse(b.finishedAt||b._spgsUpdatedAt||0)-Date.parse(a.finishedAt||a._spgsUpdatedAt||0));
+    if(!jobs.length)return toast('No finished balance is available to dispatch for this product.');
+    $('productDispatchMetaV1059').textContent=`${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs/roll • Available ${money(groupDispatchBalanceV1059(g))} ${g.unit}`;
+    $('productDispatchBodyV1059').innerHTML=`<div class="notice"><b>Select the production job to dispatch.</b> Dispatch remains job/carton specific even though this product card is consolidated.</div><div class="product-dispatch-list-v1059">${jobs.map(r=>{
+      const avail=availableForDispatchV1059(r);
+      const dispatched=(r.dispatches||[]).reduce((n,d)=>n+Number(d.qty||0),0);
+      return `<div class="product-dispatch-row-v1059"><div><b>${esc(r.orderNo)}</b><span>${esc(r.customerName||'-')} • PI ${esc(r.piSerial||'-')}</span></div><div><span>Finished</span><b>${money(r.finishedQty||r.packing?.total||0)}</b></div><div><span>Dispatched</span><b>${money(dispatched)}</b></div><div><span>Available</span><b>${money(avail)}</b></div><button class="btn navy sm" type="button" onclick="closeModal('productDispatchModalV1059');openDispatchLoadingV81('${r.id}')">Dispatch</button></div>`;
+    }).join('')}</div>`;
+    $('productDispatchModalV1059').classList.add('show');
+  };
+
+  function stripDispatchFromProductionCardV1059(html){
+    if(!html)return html;
+    html=html.replace(/<button[^>]*onclick="openDispatchLoadingV81\('[^']+'\)"[^>]*>.*?<\/button>/g,'');
+    html=html.replace(/<button[^>]*onclick="openDispatchV8\('[^']+'\)"[^>]*>.*?<\/button>/g,'');
+    return html;
+  }
+
+  /* -------------------------- Finance costing -------------------------- */
+  function finLineForJobV1059(r){
+    const doc=(state.docs||[]).find(d=>d.id===r.piId)||null;
+    let line=null;
+    if(doc){
+      if(Number.isInteger(Number(r.lineIndex)))line=(doc.lines||[])[Number(r.lineIndex)]||null;
+      if(!line&&r.itemId)line=(doc.lines||[]).find(l=>l.itemId===r.itemId)||null;
+      if(!line)line=(doc.lines||[]).find(l=>String(l.size||'')===String(r.size||'')&&String(l.material||'')===String(r.material||'')&&Number(l.pcs||0)===Number(r.pcs||0))||null;
+    }
+    return {doc,line};
+  }
+  function finUnitCostV1059(r,line){
+    const snap=line?.costSnapshot || (state.items||[]).find(i=>i.id===r.itemId)?.costSnapshot || null;
+    return {snap,costPerRoll:Number(snap?.costPerRoll||0),materialCost:Number(snap?.materialCost||0),coreCost:Number(snap?.coreCost||0),packingCost:Number(snap?.packingCost||0),serviceCost:Number(snap?.serviceCost||0)};
+  }
+  function finRevenueV1059(r,line){
+    const price=Number(line?.price||0);
+    const ordered=Number(r.requestQty||line?.qty||0);
+    return {unitPrice:price,orderedQty:ordered,orderedRevenue:price*ordered,actualRevenue:price*Math.max(0,Number(r.finishedQty||0))};
+  }
+
+  async function finLoadCloudForProductV1059(productKey,force=false){
+    const now=Date.now();
+    if(!force && financeCloudCacheV1059.jbr.has(productKey) && now-financeCloudCacheV1059.loadedAt<15000)return;
+    try{
+      const [jbr,packing]=await Promise.all([
+        finFetchV1059(`/spgs_product_jbrs?workspace=eq.${encodeURIComponent(FIN_WORKSPACE_V1059)}&product_key=eq.${encodeURIComponent(productKey)}&select=*`),
+        finFetchV1059(`/spgs_product_packing_batches?workspace=eq.${encodeURIComponent(FIN_WORKSPACE_V1059)}&product_key=eq.${encodeURIComponent(productKey)}&order=created_at.desc&select=*`)
+      ]);
+      financeCloudCacheV1059.jbr.set(productKey,Array.isArray(jbr)?jbr:[]);
+      financeCloudCacheV1059.packing.set(productKey,Array.isArray(packing)?packing:[]);
+      financeCloudCacheV1059.loadedAt=now;
+    }catch(e){console.warn('Finance cloud product load',e)}
+  }
+  async function finLoadAdjustmentsV1059(force=false){
+    const now=Date.now();
+    if(!force && financeCloudCacheV1059.adjustments.size && now-financeCloudCacheV1059.loadedAt<15000)return;
+    try{
+      const rows=await finFetchV1059(`/spgs_finance_job_cost_adjustments?workspace=eq.${encodeURIComponent(FIN_WORKSPACE_V1059)}&select=*`);
+      const m=new Map();
+      (Array.isArray(rows)?rows:[]).forEach(x=>{if(!m.has(x.production_job_id))m.set(x.production_job_id,[]);m.get(x.production_job_id).push(x)});
+      financeCloudCacheV1059.adjustments=m;
+      financeCloudCacheV1059.loadedAt=now;
+    }catch(e){console.warn('Finance adjustments load',e)}
+  }
+  function finProductKeyV1059(r){try{return productionProductKeyV103(r)}catch(_){return [r.size,r.material,r.layout,r.pcs,r.unit].join('|').toUpperCase()}}
+  function finJbrStatsV1059(r){
+    const rows=financeCloudCacheV1059.jbr.get(finProductKeyV1059(r))||[];
+    let actual=0,theoretical=0,waste=0,reusable=0;
+    rows.forEach(x=>{
+      const a=Number(x.actual_cut_rolls||0),t=Number(x.theoretical_rolls||0),st=String(x.process_status||'');
+      actual+=a;theoretical+=t;
+      if(st==='Fully Die Cut')waste+=Math.max(0,t-a);else reusable++;
+    });
+    return {count:rows.length,actual,theoretical,waste,reusable};
+  }
+  function finPackStatsV1059(r){
+    const rows=financeCloudCacheV1059.packing.get(finProductKeyV1059(r))||[];
+    const p=rows[0]||null;
+    return {records:rows.length,latest:p,packed:Number(p?.packed_total||r.finishedQty||0),boxes:Number(p?.box_count||0),loose:Number(p?.loose_rolls||0),coreMm:Number(p?.core_mm_used||0),coreSticks:Number(p?.core_sticks_required||0),coreBalance:Number(p?.core_balance_mm||0)};
+  }
+  function finAdjustmentStatsV1059(r){
+    const rows=financeCloudCacheV1059.adjustments.get(String(r.id))||[];
+    const total=rows.reduce((n,x)=>n+Number(x.amount||0),0);
+    return {rows,total};
+  }
+  function finJobV1059(r){
+    const {doc,line}=finLineForJobV1059(r);
+    const cost=finUnitCostV1059(r,line),rev=finRevenueV1059(r,line),jbr=finJbrStatsV1059(r),pack=finPackStatsV1059(r),adj=finAdjustmentStatsV1059(r);
+    const actualQty=Math.max(0,Number(r.finishedQty||pack.packed||0));
+    const productionCost=cost.costPerRoll>0?cost.costPerRoll*actualQty:0;
+    const totalCost=productionCost+adj.total;
+    const revenue=rev.unitPrice*actualQty;
+    const gp=revenue-totalCost;
+    const gpPct=revenue>0?gp/revenue*100:null;
+    const dispatched=(r.dispatches||[]).reduce((n,d)=>n+Number(d.qty||0),0);
+    return {r,doc,line,cost,rev,jbr,pack,adj,actualQty,productionCost,totalCost,revenue,gp,gpPct,dispatched,dispatchBalance:Math.max(0,actualQty-dispatched)};
+  }
+
+  async function financeDatasetV1059(force=false){
+    const jobs=(state.productionRequests||[]).slice();
+    const keys=[...new Set(jobs.map(finProductKeyV1059))];
+    await Promise.all(keys.map(k=>finLoadCloudForProductV1059(k,force)));
+    await finLoadAdjustmentsV1059(force);
+    return jobs.map(finJobV1059);
+  }
+
+  window.renderFinanceV1059=async function(force=false){
+    if(!$('financeJobsV1059'))return;
+    if(currentUser?.role!=='admin'&&!hasPerm('finance_view')){
+      $('financeJobsV1059').innerHTML='<div class="empty">Finance access is not enabled for this user.</div>';return;
+    }
+    $('financeStatusNoteV1059').textContent='Updating live costing…';
+    let rows;
+    try{rows=await financeDatasetV1059(force)}catch(e){$('financeJobsV1059').innerHTML=`<div class="notice"><b>Finance data error:</b> ${esc(e.message)}</div>`;return}
+    const q=String($('financeSearchV1059')?.value||'').trim().toLowerCase();
+    const sf=$('financeStatusV1059')?.value||'',mf=$('financeMarginV1059')?.value||'';
+    rows=rows.filter(x=>(!sf||x.r.status===sf)&&(!q||[x.r.orderNo,x.r.piSerial,x.r.customerName,x.r.size,x.r.material,x.r.layout].join(' ').toLowerCase().includes(q))).filter(x=>{
+      if(!mf)return true;if(mf==='unknown')return !(x.cost.costPerRoll>0);if(!(x.cost.costPerRoll>0))return false;return mf==='profit'?x.gp>=0:x.gp<0;
+    });
+    const totals=rows.reduce((a,x)=>{a.jobs++;a.revenue+=x.revenue;a.cost+=x.totalCost;a.gp+=x.gp;a.finished+=x.actualQty;a.waste+=x.jbr.waste;return a},{jobs:0,revenue:0,cost:0,gp:0,finished:0,waste:0});
+    $('financeKpisV1059').innerHTML=`
+      <div><span>Jobs</span><b>${money(totals.jobs)}</b><small>filtered production jobs</small></div>
+      <div><span>Actual Revenue</span><b>LKR ${money(totals.revenue)}</b><small>finished qty × selling price</small></div>
+      <div><span>Estimated Cost</span><b>LKR ${money(totals.cost)}</b><small>cost snapshot + adjustments</small></div>
+      <div class="${totals.gp<0?'loss':''}"><span>Gross Profit</span><b>LKR ${money(totals.gp)}</b><small>${totals.revenue>0?(totals.gp/totals.revenue*100).toFixed(1):'0.0'}% GP</small></div>
+      <div><span>JBR Waste</span><b>${money(totals.waste)}</b><small>confirmed full-die-cut roll equivalent</small></div>`;
+    $('financeJobsV1059').innerHTML=rows.length?`<div class="tablewrap"><table class="table finance-table-v1059"><thead><tr><th>Job / Customer</th><th>Product</th><th>Status</th><th>Requested</th><th>Finished</th><th>Sell / Roll</th><th>Cost / Roll</th><th>Adjust.</th><th>Total Cost</th><th>Revenue</th><th>GP</th><th>Ops</th><th></th></tr></thead><tbody>${rows.map(x=>`<tr>
+      <td><b>${esc(x.r.orderNo)}</b><div class="small">${esc(x.r.customerName||'-')} • PI ${esc(x.r.piSerial||'-')}</div></td>
+      <td>${esc(x.r.size)}<div class="small">${esc(x.r.material)} • ${esc(x.r.layout)} • ${money(x.r.pcs)} pcs</div></td>
+      <td><span class="tag">${esc(x.r.status||'-')}</span></td>
+      <td>${money(x.r.requestQty)} ${esc(x.r.unit||'')}</td><td>${money(x.actualQty)}</td>
+      <td>LKR ${x.rev.unitPrice>0?money(x.rev.unitPrice):'-'}</td><td>LKR ${x.cost.costPerRoll>0?money(x.cost.costPerRoll):'-'}</td>
+      <td>LKR ${money(x.adj.total)}</td><td><b>LKR ${money(x.totalCost)}</b></td><td><b>LKR ${money(x.revenue)}</b></td>
+      <td class="${x.gp<0?'finance-loss-v1059':'finance-profit-v1059'}"><b>LKR ${money(x.gp)}</b><div class="small">${x.gpPct==null?'-':x.gpPct.toFixed(1)+'%'}</div></td>
+      <td><div class="small">JBR ${money(x.jbr.actual)} cut / ${money(x.jbr.waste)} waste<br>${money(x.pack.boxes)} boxes • Core ${money(x.pack.coreSticks)} sticks<br>Dispatch ${money(x.dispatched)} / Bal ${money(x.dispatchBalance)}</div></td>
+      <td><button class="btn ghost sm" onclick="openFinanceJobV1059('${x.r.id}')">View</button></td>
+    </tr>`).join('')}</tbody></table></div>`:'<div class="empty">No matching finance jobs.</div>';
+    $('financeStatusNoteV1059').textContent=`Last updated ${new Date().toLocaleTimeString()} • auto refresh every 20 seconds while Finance is open`;
+  };
+
+  window.openFinanceJobV1059=async function(id){
+    if(currentUser?.role!=='admin'&&!hasPerm('finance_view'))return requirePerm('finance_view','view finance costing');
+    await financeDatasetV1059(true);
+    const r=(state.productionRequests||[]).find(x=>x.id===id);if(!r)return toast('Production job not found');
+    const x=finJobV1059(r),snap=x.cost.snap||{};
+    $('financeJobMetaV1059').textContent=`${r.orderNo} • ${r.customerName||'-'} • ${r.size} • ${r.material}`;
+    $('financeJobBodyV1059').innerHTML=`
+      <div class="finance-detail-grid-v1059">
+        <div><span>Requested</span><b>${money(r.requestQty)} ${esc(r.unit||'')}</b></div><div><span>Finished</span><b>${money(x.actualQty)}</b></div><div><span>Selling Price / Roll</span><b>LKR ${money(x.rev.unitPrice)}</b></div><div><span>Cost / Roll</span><b>LKR ${x.cost.costPerRoll>0?money(x.cost.costPerRoll):'Unavailable'}</b></div>
+        <div><span>Production Cost</span><b>LKR ${money(x.productionCost)}</b></div><div><span>Extra Costs</span><b>LKR ${money(x.adj.total)}</b></div><div><span>Total Cost</span><b>LKR ${money(x.totalCost)}</b></div><div><span>Actual Revenue</span><b>LKR ${money(x.revenue)}</b></div>
+        <div class="${x.gp<0?'loss':''}"><span>Gross Profit</span><b>LKR ${money(x.gp)}</b></div><div><span>GP %</span><b>${x.gpPct==null?'-':x.gpPct.toFixed(2)+'%'}</b></div><div><span>Dispatch Balance</span><b>${money(x.dispatchBalance)}</b></div><div><span>Status</span><b>${esc(r.status||'-')}</b></div>
+      </div>
+      <div class="section">COST SNAPSHOT / ROLL</div>
+      <div class="finance-detail-grid-v1059 compact"><div><span>Material</span><b>LKR ${money(x.cost.materialCost)}</b></div><div><span>Core</span><b>LKR ${money(x.cost.coreCost)}</b></div><div><span>Packing</span><b>LKR ${money(x.cost.packingCost)}</b></div><div><span>Service</span><b>LKR ${money(x.cost.serviceCost)}</b></div></div>
+      <div class="section">PRODUCTION REALITY</div>
+      <div class="finance-detail-grid-v1059 compact"><div><span>JBRs</span><b>${money(x.jbr.count)}</b></div><div><span>JBR Actual Cut</span><b>${money(x.jbr.actual)}</b></div><div><span>Confirmed Waste</span><b>${money(x.jbr.waste)}</b></div><div><span>Reusable Incomplete JBRs</span><b>${money(x.jbr.reusable)}</b></div><div><span>Packed</span><b>${money(x.pack.packed)}</b></div><div><span>Boxes</span><b>${money(x.pack.boxes)}</b></div><div><span>Loose</span><b>${money(x.pack.loose)}</b></div><div><span>Core Used</span><b>${money(x.pack.coreMm)} mm / ${money(x.pack.coreSticks)} sticks</b></div></div>
+      <div class="section">FINANCE COST ADJUSTMENTS</div>
+      <div id="financeAdjustmentsV1059">${x.adj.rows.length?`<table class="table"><thead><tr><th>Type</th><th>Description</th><th>Amount</th><th>By / Date</th></tr></thead><tbody>${x.adj.rows.map(a=>`<tr><td>${esc(a.cost_type||'Other')}</td><td>${esc(a.description||'')}</td><td>LKR ${money(a.amount)}</td><td>${esc(a.created_by_display||a.created_by_username||'-')}<div class="small">${a.created_at?new Date(a.created_at).toLocaleString():'-'}</div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">No extra finance costs.</div>'}</div>
+      ${(currentUser?.role==='admin'||hasPerm('finance_cost_edit'))?`<div class="finance-adjust-form-v1059"><div class="field"><label>Cost Type</label><select id="finAdjTypeV1059"><option>Labour</option><option>Electricity</option><option>Transport</option><option>Rework</option><option>Machine / Service</option><option>Other</option></select></div><div class="field"><label>Amount (LKR)</label><input id="finAdjAmountV1059" type="number" min="0" step="0.01"></div><div class="field full"><label>Description</label><input id="finAdjDescV1059" placeholder="Reason / reference"></div><button class="btn primary" type="button" onclick="saveFinanceAdjustmentV1059('${r.id}')">Add Cost Adjustment</button></div>`:''}`;
+    $('financeJobModalV1059').classList.add('show');
+  };
+
+  window.saveFinanceAdjustmentV1059=async function(jobId){
+    if(currentUser?.role!=='admin'&&!hasPerm('finance_cost_edit'))return requirePerm('finance_cost_edit','edit finance job costs');
+    const r=(state.productionRequests||[]).find(x=>x.id===jobId);if(!r)return toast('Production job not found');
+    const amount=Number($('finAdjAmountV1059')?.value||0),costType=$('finAdjTypeV1059')?.value||'Other',description=String($('finAdjDescV1059')?.value||'').trim();
+    if(!(amount>0))return toast('Enter a cost amount greater than zero');
+    const payload={workspace:FIN_WORKSPACE_V1059,production_job_id:String(r.id),production_no:String(r.orderNo||''),pi_id:String(r.piId||''),pi_serial:String(r.piSerial||''),product_key:finProductKeyV1059(r),cost_type:costType,description,amount,created_by_username:String(currentUser?.username||''),created_by_display:String(currentUser?.display||currentUser?.username||'User')};
+    try{
+      await finFetchV1059(`/${FIN_ADJ_TABLE_V1059}`,{method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      financeCloudCacheV1059.adjustments.clear();
+      await openFinanceJobV1059(jobId);await renderFinanceV1059(true);toast('Finance cost adjustment saved');
+    }catch(e){toast(`Cost adjustment was NOT saved: ${e.message}`)}
+  };
+
+  function startFinanceRealtimeV1059(){
+    if(financeTimerV1059)clearInterval(financeTimerV1059);
+    financeTimerV1059=setInterval(()=>{if($('finance')?.classList.contains('active'))renderFinanceV1059(true)},20000);
+  }
+
+  function installV1059(){
+    if(window.__v1059Installed)return;window.__v1059Installed=true;
+    ensureFinanceUiV1059();installFinancePermissionsV1059();
+
+    /* Hide Finance nav immediately when permission is absent. */
+    const baseAccess=window.applyUserAccess;
+    if(typeof baseAccess==='function'){
+      window.applyUserAccess=function(){const r=baseAccess.apply(this,arguments);const b=document.querySelector('.navbtn[data-view="finance"]');if(b)b.style.display=(currentUser?.role==='admin'||hasPerm('finance_view'))?'inline-block':'none';return r};
+      try{applyUserAccess=window.applyUserAccess}catch(_){ }
+    }
+
+    /* Finance activation + realtime refresh. */
+    const baseShow=window.showView;
+    if(typeof baseShow==='function'){
+      window.showView=function(id){if(id==='finance'&&currentUser?.role!=='admin'&&!hasPerm('finance_view'))return requirePerm('finance_view','open Finance');const r=baseShow.apply(this,arguments);if(id==='finance')renderFinanceV1059(true);return r};
+      try{showView=window.showView}catch(_){ }
+    }
+
+    /* Remove Dispatch from Production summary/job cards. */
+    const baseProdCard=window.productionCardV8||((typeof productionCardV8==='function')?productionCardV8:null);
+    if(typeof baseProdCard==='function'){
+      window.productionCardV8=function(r){return stripDispatchFromProductionCardV1059(baseProdCard(r))};
+      try{productionCardV8=window.productionCardV8}catch(_){ }
+    }
+
+    /* Add Dispatch to each Products consolidated card. */
+    const baseRenderProducts=window.renderProductionProducts||((typeof renderProductionProducts==='function')?renderProductionProducts:null);
+    if(typeof baseRenderProducts==='function'){
+      window.renderProductionProducts=function(){
+        const r=baseRenderProducts.apply(this,arguments);
+        try{
+          const groups=productionProductGroupsV103();
+          const cards=[...document.querySelectorAll('#productionProductsGrid .pp-card')];
+          cards.forEach(card=>{
+            const title=card.querySelector('.pp-card-title')?.textContent?.trim()||'';
+            const spec=card.querySelector('.pp-spec')?.textContent||'';
+            const g=groups.find(x=>String(x.size).trim()===title && spec.includes(String(x.material)) && spec.includes(String(x.layout)) && spec.includes(String(x.pcs)));
+            if(!g)return;
+            const balance=groupDispatchBalanceV1059(g);
+            const foot=card.querySelector('.pp-card-foot');
+            if(!foot)return;
+            foot.querySelectorAll('.product-dispatch-btn-v1059').forEach(x=>x.remove());
+            if(balance>0&&(currentUser?.role==='admin'||hasPerm('production_manage'))){
+              const btn=document.createElement('button');btn.type='button';btn.className='btn navy sm product-dispatch-btn-v1059';btn.textContent=`Dispatch ${money(balance)}`;btn.onclick=()=>openProductDispatchV1059(encodeURIComponent(g.key));foot.appendChild(btn);
+            }
+          });
+        }catch(e){console.error('Product dispatch buttons',e)}
+        return r;
+      };
+      try{renderProductionProducts=window.renderProductionProducts}catch(_){ }
+    }
+
+    const baseRefresh=window.refreshAll;
+    if(typeof baseRefresh==='function'){
+      window.refreshAll=function(){const r=baseRefresh.apply(this,arguments);if($('finance')?.classList.contains('active'))renderFinanceV1059(true);return r};
+      try{refreshAll=window.refreshAll}catch(_){ }
+    }
+    try{applyUserAccess()}catch(_){ }
+    startFinanceRealtimeV1059();
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installV1059,{once:true});else installV1059();
+})();
+</script>
+
+
+<script>
+/* V1.0.60 - Product Dispatch Availability + Finance Job Usage Reports
+   Finance reports operational usage only. No profit / GP calculation. */
+(function(){
+  const USAGE_REST_V1060='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
+  const USAGE_WORKSPACE_V1060='softcreation_main';
+  const USAGE_KEY_STORE_V1060='spgs_supabase_browser_key_v1';
+  const usageCacheV1060={jbr:new Map(),packing:new Map(),loaded:new Map()};
+
+  function usageApiKeyV1060(){
+    let key=localStorage.getItem(USAGE_KEY_STORE_V1060)||'';
+    if(!key){
+      key=prompt('SoftCreation cloud setup\n\nPaste the FULL Supabase anon / publishable key for qyxgamverzdmhtvezbft:')||'';
+      key=key.trim();
+      if(key)localStorage.setItem(USAGE_KEY_STORE_V1060,key);
+    }
+    return key;
+  }
+
+  function usageHeadersV1060(extra={}){
+    const key=usageApiKeyV1060();
+    if(!key)throw new Error('Supabase key is not configured.');
+    const h={apikey:key,...extra};
+    if(key.startsWith('eyJ'))h.Authorization='Bearer '+key;
+    return h;
+  }
+
+  async function usageFetchV1060(path,options={}){
+    const res=await fetch(USAGE_REST_V1060+path,{...options,headers:usageHeadersV1060(options.headers||{})});
+    if(!res.ok){
+      const body=await res.text().catch(()=>res.statusText);
+      throw new Error(`Supabase ${res.status}: ${body.slice(0,500)}`);
+    }
+    if(res.status===204)return null;
+    const text=await res.text();
+    return text?JSON.parse(text):null;
+  }
+
+  function productKeyV1060(r){
+    try{return productionProductKeyV103(r)}
+    catch(_){return [r.size,r.material,r.layout,r.pcs,r.unit].join('|').toUpperCase()}
+  }
+
+  function productGroupV1060(encodedKey){
+    const key=decodeURIComponent(encodedKey||'');
+    try{return (productionProductGroupsV103()||[]).find(x=>x.key===key)||null}catch(_){return null}
+  }
+
+  function flowV1060(status){
+    const flow=['Requested','Approved','Planned','In Production','QC Check','Finished','Dispatched','Received','GRN Closed'];
+    const i=flow.indexOf(String(status||'Requested'));
+    return i<0?0:i;
+  }
+
+  function dispatchProducedQtyV1060(r){
+    const explicit=Number(r?.finishedQty||0);
+    if(explicit>0)return explicit;
+    const packing=Number(r?.packing?.total||0);
+    if(packing>0)return packing;
+    const batch=Number(r?.batchPackingV1040?.total||0);
+    if(batch>0 && Array.isArray(r?.packing?.boxes)){
+      const alloc=(r.packing.boxes||[]).reduce((n,b)=>n+Number(b.rolls||0),0)+Number(r.packing.loose||0);
+      if(alloc>0)return alloc;
+    }
+    /* Legacy Finished records may not have finishedQty saved. */
+    if(flowV1060(r?.status)>=flowV1060('Finished'))return Math.max(0,Number(r?.requestQty||0));
+    return 0;
+  }
+
+  function dispatchedQtyV1060(r){
+    return (r?.dispatches||[]).reduce((n,d)=>n+Number(d.qty||0),0);
+  }
+
+  function dispatchAvailableV1060(r){
+    /* Do not dispatch while still in QC Check. */
+    if(flowV1060(r?.status)<flowV1060('Finished'))return 0;
+    return Math.max(0,dispatchProducedQtyV1060(r)-dispatchedQtyV1060(r));
+  }
+
+  function groupDispatchAvailableV1060(g){
+    return (g?.jobs||[]).reduce((n,r)=>n+dispatchAvailableV1060(r),0);
+  }
+
+  window.openProductDispatchV1059=function(encodedKey){
+    if(currentUser?.role!=='admin'&&!hasPerm('production_manage'))return requirePerm('production_manage','dispatch finished production');
+    const g=productGroupV1060(encodedKey);
+    if(!g)return toast('Product not found');
+
+    const jobs=(g.jobs||[])
+      .filter(r=>dispatchAvailableV1060(r)>0)
+      .sort((a,b)=>Date.parse(b.finishedAt||b._spgsUpdatedAt||0)-Date.parse(a.finishedAt||a._spgsUpdatedAt||0));
+
+    if(!jobs.length)return toast('No Finished production balance is available to dispatch for this product.');
+
+    $('productDispatchMetaV1059').textContent=
+      `${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs/roll • Available ${money(groupDispatchAvailableV1060(g))} ${g.unit}`;
+
+    $('productDispatchBodyV1059').innerHTML=`
+      <div class="notice"><b>Select the Finished production job to dispatch.</b> QC Check jobs remain locked until QC approval. Legacy Finished jobs without an explicit finished count use their requested quantity as the dispatchable finished quantity.</div>
+      <div class="product-dispatch-list-v1059">
+        ${jobs.map(r=>{
+          const produced=dispatchProducedQtyV1060(r);
+          const dispatched=dispatchedQtyV1060(r);
+          const avail=dispatchAvailableV1060(r);
+          return `<div class="product-dispatch-row-v1059">
+            <div><b>${esc(r.orderNo)}</b><span>${esc(r.customerName||'-')} • PI ${esc(r.piSerial||'-')} • ${esc(r.status||'-')}</span></div>
+            <div><span>Finished</span><b>${money(produced)}</b></div>
+            <div><span>Dispatched</span><b>${money(dispatched)}</b></div>
+            <div><span>Available</span><b>${money(avail)}</b></div>
+            <button class="btn navy sm" type="button" onclick="closeModal('productDispatchModalV1059');openDispatchLoadingV81('${r.id}')">Dispatch</button>
+          </div>`;
+        }).join('')}
+      </div>`;
+    $('productDispatchModalV1059').classList.add('show');
+  };
+
+  function enhanceProductDispatchCardsV1060(){
+    const groups=productionProductGroupsV103()||[];
+    const cards=[...document.querySelectorAll('#productionProductsGrid .pp-card')];
+    cards.forEach(card=>{
+      const title=card.querySelector('.pp-card-title')?.textContent?.trim()||'';
+      const spec=card.querySelector('.pp-spec')?.textContent||'';
+      const g=groups.find(x=>
+        String(x.size).trim()===title &&
+        spec.includes(String(x.material)) &&
+        spec.includes(String(x.layout)) &&
+        spec.includes(String(x.pcs))
+      );
+      if(!g)return;
+
+      const foot=card.querySelector('.pp-card-foot');
+      if(!foot)return;
+      foot.querySelectorAll('.product-dispatch-btn-v1059,.product-dispatch-btn-v1060').forEach(x=>x.remove());
+
+      const balance=groupDispatchAvailableV1060(g);
+      const hasQC=(g.jobs||[]).some(r=>String(r.status)==='QC Check');
+      const hasFinished=(g.jobs||[]).some(r=>flowV1060(r.status)>=flowV1060('Finished'));
+
+      /* "No active work" is misleading when the product is sitting in QC / Finished. */
+      [...foot.querySelectorAll('.tag')].forEach(tag=>{
+        if(tag.textContent.trim()==='No active work'){
+          tag.textContent=balance>0?'Finished — Dispatch Ready':hasQC?'QC Check':hasFinished?'Finished / Logistics':'No active work';
+        }
+      });
+
+      if(balance>0&&(currentUser?.role==='admin'||hasPerm('production_manage'))){
+        const btn=document.createElement('button');
+        btn.type='button';
+        btn.className='btn navy sm product-dispatch-btn-v1060';
+        btn.textContent=`Dispatch ${money(balance)}`;
+        btn.onclick=()=>openProductDispatchV1059(encodeURIComponent(g.key));
+        foot.appendChild(btn);
+      }
+    });
+  }
+
+  async function usageLoadProductV1060(productKey,force=false){
+    const now=Date.now(),last=usageCacheV1060.loaded.get(productKey)||0;
+    if(!force && usageCacheV1060.jbr.has(productKey) && now-last<15000)return;
+    const [jbr,packing]=await Promise.all([
+      usageFetchV1060(`/spgs_product_jbrs?workspace=eq.${encodeURIComponent(USAGE_WORKSPACE_V1060)}&product_key=eq.${encodeURIComponent(productKey)}&order=created_at.asc&select=*`),
+      usageFetchV1060(`/spgs_product_packing_batches?workspace=eq.${encodeURIComponent(USAGE_WORKSPACE_V1060)}&product_key=eq.${encodeURIComponent(productKey)}&order=created_at.desc&select=*`)
+    ]);
+    usageCacheV1060.jbr.set(productKey,Array.isArray(jbr)?jbr:[]);
+    usageCacheV1060.packing.set(productKey,Array.isArray(packing)?packing:[]);
+    usageCacheV1060.loaded.set(productKey,now);
+  }
+
+  function jsonArrayV1060(v){
+    if(Array.isArray(v))return v.map(String);
+    if(typeof v==='string'){
+      try{const x=JSON.parse(v);return Array.isArray(x)?x.map(String):[]}catch(_){return []}
+    }
+    return [];
+  }
+
+  function usageJbrRowsV1060(r){
+    const all=usageCacheV1060.jbr.get(productKeyV1060(r))||[];
+    const exact=all.filter(x=>jsonArrayV1060(x.source_job_ids).includes(String(r.id)));
+    if(exact.length)return {rows:exact,scope:'Exact job-linked JBR records'};
+    /* Older JBRs were saved before source_job_ids existed. */
+    const legacy=all.filter(x=>jsonArrayV1060(x.source_job_ids).length===0);
+    return {rows:legacy.length?legacy:all,scope:'Shared product-batch JBR records (legacy / not individually allocated)'};
+  }
+
+  function usagePackingRowsV1060(r){
+    const all=usageCacheV1060.packing.get(productKeyV1060(r))||[];
+    const exact=all.filter(x=>jsonArrayV1060(x.source_job_ids).includes(String(r.id)));
+    return exact.length?exact:all;
+  }
+
+  function parseBoxesV1060(v){
+    if(Array.isArray(v))return v;
+    if(typeof v==='string'){
+      try{const x=JSON.parse(v);return Array.isArray(x)?x:[]}catch(_){return []}
+    }
+    return [];
+  }
+
+  function rollWidthV1060(r){
+    const nums=String(r?.size||'').match(/\d+(?:\.\d+)?/g)||[];
+    return Number(nums[0]||0);
+  }
+
+  function usageForJobV1060(r){
+    const jbrSet=usageJbrRowsV1060(r);
+    const packRows=usagePackingRowsV1060(r);
+    const latestPack=packRows[0]||null;
+    const produced=Math.max(0,Number(r.finishedQty||r.packing?.total||0));
+    const packedAllocated=Math.max(0,Number(r.packing?.total||produced||0));
+    const width=rollWidthV1060(r);
+    const coreMm=packedAllocated*width;
+    const coreStickLength=Number(latestPack?.core_stick_length_mm||1000);
+    const coreEquivalent=coreStickLength>0?coreMm/coreStickLength:0;
+    const coreSticks=coreMm>0?Math.ceil(coreMm/coreStickLength):0;
+    const coreBalance=coreSticks>0?Math.max(0,coreSticks*coreStickLength-coreMm):0;
+    const dispatched=dispatchedQtyV1060(r);
+
+    let jbrActual=0,jbrTheoretical=0,jbrWaste=0,reusable=0;
+    jbrSet.rows.forEach(x=>{
+      const actual=Number(x.actual_cut_rolls||0),max=Number(x.theoretical_rolls||0),status=String(x.process_status||'');
+      jbrActual+=actual;jbrTheoretical+=max;
+      if(status==='Fully Die Cut')jbrWaste+=Math.max(0,max-actual);else reusable++;
+    });
+
+    return {
+      r,jbrSet,packRows,latestPack,produced,packedAllocated,width,coreMm,coreStickLength,
+      coreEquivalent,coreSticks,coreBalance,dispatched,
+      dispatchBalance:Math.max(0,dispatchProducedQtyV1060(r)-dispatched),
+      jbrActual,jbrTheoretical,jbrWaste,reusable
+    };
+  }
+
+  async function usageDatasetV1060(force=false){
+    const jobs=(state.productionRequests||[]).slice();
+    const keys=[...new Set(jobs.map(productKeyV1060))];
+    await Promise.all(keys.map(k=>usageLoadProductV1060(k,force)));
+    return jobs.map(usageForJobV1060);
+  }
+
+  function tuneFinanceUiV1060(){
+    const title=document.querySelector('#finance .panel-title span');
+    if(title)title.textContent='Finance — Live Job Usage & Costing Support';
+
+    const notice=document.querySelector('#finance .panel-body > .notice');
+    if(notice)notice.innerHTML='<b>Operational usage report:</b> Finance shows what each production job actually used and produced. Profit / GP is intentionally not calculated here. Use the PDF report as the production-usage basis for your own costing.';
+
+    const margin=$('financeMarginV1059');
+    if(margin)margin.remove();
+
+    const modalTitle=$('financeJobModalV1059')?.querySelector('.modal-head b');
+    if(modalTitle)modalTitle.textContent='Production Job Usage';
+  }
+
+  window.renderFinanceV1059=async function(force=false){
+    tuneFinanceUiV1060();
+    if(!$('financeJobsV1059'))return;
+    if(currentUser?.role!=='admin'&&!hasPerm('finance_view')){
+      $('financeJobsV1059').innerHTML='<div class="empty">Finance access is not enabled for this user.</div>';
+      return;
+    }
+
+    $('financeStatusNoteV1059').textContent='Updating live job usage…';
+    let rows;
+    try{rows=await usageDatasetV1060(force)}
+    catch(e){
+      $('financeJobsV1059').innerHTML=`<div class="notice"><b>Usage data error:</b> ${esc(e.message)}</div>`;
+      return;
+    }
+
+    const q=String($('financeSearchV1059')?.value||'').trim().toLowerCase();
+    const sf=$('financeStatusV1059')?.value||'';
+    rows=rows.filter(x=>
+      (!sf||x.r.status===sf) &&
+      (!q||[x.r.orderNo,x.r.piSerial,x.r.customerName,x.r.size,x.r.material,x.r.layout].join(' ').toLowerCase().includes(q))
+    );
+
+    const totals=rows.reduce((a,x)=>{
+      a.jobs++;
+      a.requested+=Number(x.r.requestQty||0);
+      a.finished+=Number(x.produced||0);
+      a.coreMm+=Number(x.coreMm||0);
+      a.jbrWaste+=Number(x.jbrWaste||0);
+      a.dispatched+=Number(x.dispatched||0);
+      return a;
+    },{jobs:0,requested:0,finished:0,coreMm:0,jbrWaste:0,dispatched:0});
+
+    $('financeKpisV1059').innerHTML=`
+      <div><span>Jobs</span><b>${money(totals.jobs)}</b><small>filtered production jobs</small></div>
+      <div><span>Requested Rolls</span><b>${money(totals.requested)}</b><small>job demand</small></div>
+      <div><span>Finished Rolls</span><b>${money(totals.finished)}</b><small>recorded job output</small></div>
+      <div><span>Core Usage</span><b>${money(totals.coreMm)} mm</b><small>job-equivalent core usage</small></div>
+      <div><span>Confirmed JBR Waste</span><b>${money(totals.jbrWaste)}</b><small>fully die-cut JBR roll equivalent</small></div>`;
+
+    $('financeJobsV1059').innerHTML=rows.length
+      ? `<div class="finance-usage-cards-v1060">${rows.map(x=>{
+          const r=x.r;
+          return `<div class="finance-usage-card-v1060">
+            <div class="finance-usage-card-head-v1060">
+              <div>
+                <b>${esc(r.orderNo||'-')}</b>
+                <span>${esc(r.customerName||'-')} • PI ${esc(r.piSerial||'-')}</span>
+              </div>
+              <span class="tag">${esc(r.status||'-')}</span>
+            </div>
+            <div class="finance-usage-product-v1060">${esc(r.size||'-')} • ${esc(r.material||'-')} • ${esc(r.layout||'-')} • ${money(r.pcs)} pcs / ${esc(r.unit||'Rolls')}</div>
+            <div class="finance-usage-stats-v1060">
+              <div><span>Requested</span><b>${money(r.requestQty||0)}</b></div>
+              <div><span>Finished</span><b>${money(x.produced)}</b></div>
+              <div><span>JBR Actual Cut</span><b>${money(x.jbrActual)}</b></div>
+              <div><span>JBR Waste</span><b>${money(x.jbrWaste)}</b></div>
+              <div><span>Core Used</span><b>${money(x.coreMm)} mm</b></div>
+              <div><span>Dispatched</span><b>${money(x.dispatched)}</b></div>
+            </div>
+            <div class="finance-usage-scope-v1060">${esc(x.jbrSet.scope)}</div>
+            <div class="actions">
+              <button class="btn ghost sm" type="button" onclick="openFinanceJobV1059('${r.id}')">View Usage</button>
+              <button class="btn navy sm" type="button" onclick="generateJobUsagePdfV1060('${r.id}')">Generate PDF</button>
+            </div>
+          </div>`;
+        }).join('')}</div>`
+      : '<div class="empty">No matching production jobs.</div>';
+
+    $('financeStatusNoteV1059').textContent=
+      `Last updated ${new Date().toLocaleTimeString()} • operational usage only • auto refresh every 20 seconds while Finance is open`;
+  };
+
+  function jbrWasteTextV1060(x){
+    const max=Number(x.theoretical_rolls||0),actual=Number(x.actual_cut_rolls||0),status=String(x.process_status||'');
+    if(status!=='Fully Die Cut')return 'Reusable balance — not waste';
+    const w=Math.max(0,max-actual);
+    return `${money(w)} roll equivalent`;
+  }
+
+  function usageDetailHtmlV1060(x,forPdf=false){
+    const r=x.r;
+    const jbrRows=x.jbrSet.rows||[];
+    const latestPack=x.latestPack;
+    const batchBoxes=parseBoxesV1060(latestPack?.boxes);
+    const history=[...(r.history||[])].slice(-12);
+
+    return `
+      <div class="${forPdf?'usage-pdf-body-v1060':''}">
+        <div class="finance-detail-grid-v1059">
+          <div><span>Production No.</span><b>${esc(r.orderNo||'-')}</b></div>
+          <div><span>Status</span><b>${esc(r.status||'-')}</b></div>
+          <div><span>Requested</span><b>${money(r.requestQty||0)} ${esc(r.unit||'')}</b></div>
+          <div><span>Finished / Recorded</span><b>${money(x.produced)}</b></div>
+          <div><span>Job Packed Allocation</span><b>${money(x.packedAllocated)}</b></div>
+          <div><span>Dispatched</span><b>${money(x.dispatched)}</b></div>
+          <div><span>Dispatch Balance</span><b>${money(x.dispatchBalance)}</b></div>
+          <div><span>Priority / Shift</span><b>${esc(r.priority||'-')} / ${esc(r.shift||'-')}</b></div>
+        </div>
+
+        <div class="section">JBR USAGE</div>
+        <div class="usage-scope-note-v1060">${esc(x.jbrSet.scope)}. New JBR records are linked to the source production jobs; older JBR records may only be identifiable at consolidated product-batch level.</div>
+        ${jbrRows.length?`<div class="tablewrap"><table class="table usage-table-v1060">
+          <thead><tr><th>JBR</th><th>Jumbo Size</th><th>Max Rolls</th><th>Actual Cut</th><th>Status</th><th>Waste / Balance</th></tr></thead>
+          <tbody>${jbrRows.map(j=>`<tr>
+            <td><b>${esc(j.jbr_code||('JBR-'+String(j.jbr_seq||'').padStart(5,'0')))}</b></td>
+            <td>${money(j.jbr_width_mm)}mm × ${money(j.jbr_length_m)}m</td>
+            <td>${money(j.theoretical_rolls)}</td>
+            <td>${money(j.actual_cut_rolls)}</td>
+            <td>${esc(j.process_status||'-')}</td>
+            <td>${esc(jbrWasteTextV1060(j))}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`:'<div class="empty">No JBR records available for this job/product.</div>'}
+
+        <div class="section">CORE USAGE</div>
+        <div class="finance-detail-grid-v1059 compact">
+          <div><span>Finished Roll Width</span><b>${money(x.width)} mm</b></div>
+          <div><span>Job Core Used</span><b>${money(x.coreMm)} mm</b></div>
+          <div><span>Core Stick Length</span><b>${money(x.coreStickLength)} mm</b></div>
+          <div><span>Equivalent Core</span><b>${x.coreEquivalent.toFixed(3)}</b></div>
+          <div><span>Core Sticks Required</span><b>${money(x.coreSticks)}</b></div>
+          <div><span>Reusable Core Balance</span><b>${money(x.coreBalance)} mm</b></div>
+        </div>
+
+        <div class="section">PACKING</div>
+        <div class="finance-detail-grid-v1059 compact">
+          <div><span>Job Packed Allocation</span><b>${money(x.packedAllocated)}</b></div>
+          <div><span>Batch Packing Records</span><b>${money(x.packRows.length)}</b></div>
+          <div><span>Latest Batch Boxes</span><b>${money(latestPack?.box_count||0)}</b></div>
+          <div><span>Latest Batch Loose</span><b>${money(latestPack?.loose_rolls||0)}</b></div>
+          <div><span>Latest Batch Packed Total</span><b>${money(latestPack?.packed_total||0)}</b></div>
+          <div><span>QC Result</span><b>${esc(latestPack?.qc_result||'-')}</b></div>
+        </div>
+        ${batchBoxes.length?`<div class="tablewrap"><table class="table usage-table-v1060"><thead><tr><th>Batch Box</th><th>Rolls</th><th>Note</th></tr></thead><tbody>${batchBoxes.map((b,i)=>`<tr><td>${esc(String(b.box_no??b.boxNo??i+1))}</td><td>${money(Number(b.roll_count??b.rolls??0))}</td><td>${esc(String(b.note||''))}</td></tr>`).join('')}</tbody></table></div>`:''}
+
+        <div class="section">DISPATCH MOVEMENT</div>
+        ${(r.dispatches||[]).length?`<div class="tablewrap"><table class="table usage-table-v1060"><thead><tr><th>Dispatch</th><th>Qty</th><th>Date</th><th>Carrier / Note</th></tr></thead><tbody>${(r.dispatches||[]).map(d=>`<tr><td>${esc(d.dispatchNo||d.id||'-')}</td><td>${money(d.qty||0)}</td><td>${esc(d.date||d.dispatchDate||'-')}</td><td>${esc(d.carrier||d.note||'-')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No dispatch movement recorded.</div>'}
+
+        <div class="section">JOB HISTORY</div>
+        ${history.length?`<div class="tablewrap"><table class="table usage-table-v1060"><thead><tr><th>Status</th><th>By</th><th>Date / Time</th><th>Note</th></tr></thead><tbody>${history.map(h=>`<tr><td>${esc(h.status||'-')}</td><td>${esc(h.by||h.username||'-')}</td><td>${h.at?esc(new Date(h.at).toLocaleString()):'-'}</td><td>${esc(h.note||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No job history available.</div>'}
+      </div>`;
+  }
+
+  window.openFinanceJobV1059=async function(id){
+    if(currentUser?.role!=='admin'&&!hasPerm('finance_view'))return requirePerm('finance_view','view job usage');
+    const r=(state.productionRequests||[]).find(x=>x.id===id);
+    if(!r)return toast('Production job not found');
+    try{await usageLoadProductV1060(productKeyV1060(r),true)}
+    catch(e){return toast(`Usage data unavailable: ${e.message}`)}
+    const x=usageForJobV1060(r);
+
+    $('financeJobMetaV1059').textContent=`${r.orderNo} • ${r.customerName||'-'} • ${r.size} • ${r.material}`;
+    $('financeJobBodyV1059').innerHTML=
+      usageDetailHtmlV1060(x,false)+
+      `<div class="actions"><button class="btn navy" type="button" onclick="generateJobUsagePdfV1060('${r.id}')">Generate Job Usage PDF</button></div>`;
+    $('financeJobModalV1059').classList.add('show');
+  };
+
+  function usagePdfPaperV1060(x){
+    const r=x.r;
+    return `<div class="usage-pdf-paper-v1060">
+      <div class="usage-pdf-head-v1060">
+        <div><div class="usage-pdf-brand-v1060">Soft<span>Creation</span></div><div>Production Job Usage Report</div></div>
+        <div class="usage-pdf-ref-v1060"><small>PRODUCTION NO.</small><b>${esc(r.orderNo||'-')}</b><small>Generated ${esc(new Date().toLocaleString())}</small></div>
+      </div>
+      <div class="usage-pdf-meta-v1060">
+        <div><span>Customer</span><b>${esc(r.customerName||'-')}</b></div>
+        <div><span>PI</span><b>${esc(r.piSerial||'-')}</b></div>
+        <div><span>Product</span><b>${esc(r.size||'-')} • ${esc(r.material||'-')}</b></div>
+        <div><span>Specification</span><b>${esc(r.layout||'-')} • ${money(r.pcs)} pcs / ${esc(r.unit||'Rolls')}</b></div>
+      </div>
+      ${usageDetailHtmlV1060(x,true)}
+      <div class="usage-pdf-foot-v1060">Computer-generated operational usage report • No profit or GP calculation is included.</div>
+    </div>`;
+  }
+
+  window.generateJobUsagePdfV1060=async function(id){
+    if(currentUser?.role!=='admin'&&!hasPerm('finance_view'))return requirePerm('finance_view','generate job usage PDF');
+    const r=(state.productionRequests||[]).find(x=>x.id===id);
+    if(!r)return toast('Production job not found');
+
+    try{await usageLoadProductV1060(productKeyV1060(r),true)}
+    catch(e){return toast(`Usage data unavailable: ${e.message}`)}
+    const x=usageForJobV1060(r);
+
+    const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas);
+    const okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);
+    if(!okC||!okP)return toast('PDF libraries unavailable');
+
+    const host=document.createElement('div');
+    host.className='usage-pdf-capture-v1060';
+    host.innerHTML=usagePdfPaperV1060(x);
+    document.body.appendChild(host);
+
+    try{
+      const paper=host.querySelector('.usage-pdf-paper-v1060');
+      const canvas=await html2canvas(paper,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      const pageW=210,pageH=297,margin=8,usableW=pageW-margin*2,usableH=pageH-margin*2;
+      const imgW=usableW;
+      const imgH=canvas.height*imgW/canvas.width;
+      const pageCanvasHeight=Math.floor(canvas.width*(usableH/imgW));
+
+      let sourceY=0,page=0;
+      while(sourceY<canvas.height){
+        const sliceH=Math.min(pageCanvasHeight,canvas.height-sourceY);
+        const slice=document.createElement('canvas');
+        slice.width=canvas.width;slice.height=sliceH;
+        const ctx=slice.getContext('2d');
+        ctx.drawImage(canvas,0,sourceY,canvas.width,sliceH,0,0,canvas.width,sliceH);
+        const sliceMmH=sliceH*imgW/canvas.width;
+        if(page>0)pdf.addPage();
+        pdf.addImage(slice.toDataURL('image/png'),'PNG',margin,margin,imgW,sliceMmH);
+        sourceY+=sliceH;page++;
+      }
+      pdf.save(`${String(r.orderNo||'Production').replace(/[\/\\]/g,'-')}-Usage-Report.pdf`);
+      toast('Job usage PDF generated');
+    }catch(e){
+      console.error(e);
+      toast(`PDF generation failed: ${e.message}`);
+    }finally{host.remove()}
+  };
+
+  function installV1060(){
+    if(window.__v1060Installed)return;
+    window.__v1060Installed=true;
+    tuneFinanceUiV1060();
+
+    /* Re-wrap the final Products renderer so Finished legacy jobs always get Dispatch. */
+    const baseProducts=window.renderProductionProducts;
+    if(typeof baseProducts==='function'){
+      window.renderProductionProducts=function(){
+        const r=baseProducts.apply(this,arguments);
+        setTimeout(enhanceProductDispatchCardsV1060,0);
+        return r;
+      };
+      try{renderProductionProducts=window.renderProductionProducts}catch(_){}
+    }
+
+    const baseShow=window.showView;
+    if(typeof baseShow==='function'){
+      window.showView=function(id){
+        const r=baseShow.apply(this,arguments);
+        if(id==='productionproducts')setTimeout(enhanceProductDispatchCardsV1060,20);
+        if(id==='finance')setTimeout(()=>renderFinanceV1059(true),20);
+        return r;
+      };
+      try{showView=window.showView}catch(_){}
+    }
+
+    try{enhanceProductDispatchCardsV1060()}catch(_){}
+    if($('finance')?.classList.contains('active'))renderFinanceV1059(true);
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installV1060,{once:true});
+  else installV1060();
 })();
 </script>
 

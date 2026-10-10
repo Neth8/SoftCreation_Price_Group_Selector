@@ -5100,3 +5100,308 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   .pack-live-grid-v1057,.pack-core-summary-v1057{grid-template-columns:1fr}
 }
 
+/* V1.0.58 - Packed Count History */
+.pack-history-head-actions-v1058{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.btn.pack-history-view-btn-v1058{
+  background:#e7f5ff;
+  color:#17627b;
+  border:1px solid #a8d9ee;
+}
+.btn.pack-history-view-btn-v1058:hover{
+  background:#d8eef9;
+}
+.pack-history-card-v1058{
+  width:min(1180px,96vw);
+  max-height:92vh;
+  overflow:auto;
+}
+.pack-history-summary-v1058{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(150px,1fr));
+  gap:9px;
+  margin-bottom:14px;
+}
+.pack-history-summary-v1058>div,
+.pack-history-kpis-v1058>div,
+.pack-history-core-v1058>div{
+  border:1px solid #d3e3e7;
+  border-radius:10px;
+  background:#f9fcfd;
+  padding:9px;
+}
+.pack-history-summary-v1058 span,
+.pack-history-kpis-v1058 span,
+.pack-history-core-v1058 span{
+  display:block;
+  color:#6a7c85;
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.pack-history-summary-v1058 b{
+  display:block;
+  margin-top:3px;
+  font-size:18px;
+  color:#173f4d;
+}
+.pack-history-summary-v1058 small{
+  display:block;
+  margin-top:2px;
+  font-size:8.5px;
+  color:#788890;
+}
+.pack-history-entry-v1058{
+  border:1px solid #d4e3e7;
+  border-radius:14px;
+  background:#fff;
+  padding:12px;
+  margin-bottom:12px;
+}
+.pack-history-entry-head-v1058{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:10px;
+}
+.pack-history-entry-head-v1058 b{
+  display:block;
+  color:#174f62;
+  font-size:13px;
+}
+.pack-history-entry-head-v1058 span{
+  display:block;
+  margin-top:2px;
+  font-size:9.5px;
+  color:#708089;
+}
+.pack-history-kpis-v1058{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(110px,1fr));
+  gap:7px;
+  margin-bottom:10px;
+}
+.pack-history-kpis-v1058 b,
+.pack-history-core-v1058 b{
+  display:block;
+  margin-top:2px;
+  font-size:14px;
+  color:#244856;
+}
+.pack-history-table-v1058{
+  min-width:650px;
+}
+.pack-history-core-v1058{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(120px,1fr));
+  gap:7px;
+  margin-top:10px;
+}
+@media(max-width:900px){
+  .pack-history-summary-v1058{grid-template-columns:1fr 1fr}
+  .pack-history-kpis-v1058{grid-template-columns:1fr 1fr 1fr}
+  .pack-history-core-v1058{grid-template-columns:1fr 1fr}
+}
+@media(max-width:560px){
+  .pack-history-summary-v1058,
+  .pack-history-kpis-v1058,
+  .pack-history-core-v1058{grid-template-columns:1fr}
+}
+
+/* V1.0.59 - Product Dispatch + Finance Job Costing */
+.product-dispatch-list-v1059{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.product-dispatch-row-v1059{display:grid;grid-template-columns:minmax(240px,1.7fr) repeat(3,minmax(90px,.6fr)) auto;gap:8px;align-items:center;border:1px solid #d6e5e8;border-radius:12px;padding:10px;background:#fff}
+.product-dispatch-row-v1059>div:first-child b{display:block;color:#184958}.product-dispatch-row-v1059>div:first-child span{display:block;font-size:9px;color:#72828a;margin-top:2px}.product-dispatch-row-v1059>div:not(:first-child) span{display:block;font-size:8px;color:#75858d;text-transform:uppercase;font-weight:900}.product-dispatch-row-v1059>div:not(:first-child) b{display:block;margin-top:2px;font-size:14px}
+.finance-kpis-v1059{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:9px;margin-bottom:12px}.finance-kpis-v1059>div{border:1px solid #d3e3e7;border-radius:13px;background:#f9fcfd;padding:11px}.finance-kpis-v1059>div.loss{background:#fff0f0;border-color:#efc0c0}.finance-kpis-v1059 span{display:block;font-size:8.5px;font-weight:900;text-transform:uppercase;color:#6e8088}.finance-kpis-v1059 b{display:block;font-size:17px;margin-top:3px;color:#183f4c}.finance-kpis-v1059 small{display:block;font-size:8px;color:#7c8a91;margin-top:2px}
+.finance-filter-v1059{display:grid;grid-template-columns:minmax(320px,1fr) 190px 180px;gap:8px;align-items:center}.finance-filter-v1059 select{border:1px solid #cfdde2;border-radius:10px;background:#fbfdfe;padding:9px 10px}
+.finance-table-v1059{min-width:1700px}.finance-profit-v1059{color:#147244}.finance-loss-v1059{color:#b42318}.finance-job-modal-v1059{width:min(1200px,96vw);max-height:92vh;overflow:auto}.finance-detail-grid-v1059{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:8px}.finance-detail-grid-v1059.compact{margin-top:8px}.finance-detail-grid-v1059>div{border:1px solid #d7e5e8;border-radius:10px;background:#f9fcfd;padding:9px}.finance-detail-grid-v1059>div.loss{background:#fff0f0;border-color:#efc0c0}.finance-detail-grid-v1059 span{display:block;font-size:8px;font-weight:900;text-transform:uppercase;color:#71828a}.finance-detail-grid-v1059 b{display:block;margin-top:2px;font-size:14px;color:#214955}.finance-adjust-form-v1059{display:grid;grid-template-columns:220px 180px 1fr auto;gap:8px;align-items:end;border:1px solid #bddfe3;background:#f4fbfc;border-radius:12px;padding:11px;margin-top:10px}.finance-adjust-form-v1059 .full{grid-column:auto}.product-dispatch-btn-v1059{white-space:nowrap}
+@media(max-width:1000px){.finance-kpis-v1059{grid-template-columns:1fr 1fr}.finance-detail-grid-v1059{grid-template-columns:1fr 1fr}.finance-adjust-form-v1059{grid-template-columns:1fr 1fr}.finance-adjust-form-v1059 .full{grid-column:1/-1}.product-dispatch-row-v1059{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.finance-kpis-v1059,.finance-detail-grid-v1059,.finance-filter-v1059,.finance-adjust-form-v1059{grid-template-columns:1fr}.product-dispatch-row-v1059{grid-template-columns:1fr}}
+
+/* V1.0.60 - Finance Job Usage + PDF */
+.finance-usage-cards-v1060{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.finance-usage-card-v1060{
+  border:1px solid #d4e4e7;
+  background:#fff;
+  border-radius:15px;
+  padding:13px;
+}
+.finance-usage-card-head-v1060{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+}
+.finance-usage-card-head-v1060 b{
+  display:block;
+  color:#174e61;
+  font-size:14px;
+}
+.finance-usage-card-head-v1060 span{
+  display:block;
+  margin-top:2px;
+  font-size:9.5px;
+  color:#71818a;
+}
+.finance-usage-product-v1060{
+  margin:9px 0;
+  padding:8px 10px;
+  border-radius:9px;
+  background:#f4f9fa;
+  color:#365965;
+  font-size:10.5px;
+  font-weight:800;
+}
+.finance-usage-stats-v1060{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(100px,1fr));
+  gap:7px;
+}
+.finance-usage-stats-v1060>div{
+  border:1px solid #deeaec;
+  border-radius:9px;
+  padding:8px;
+  background:#fbfdfd;
+}
+.finance-usage-stats-v1060 span{
+  display:block;
+  font-size:8px;
+  font-weight:900;
+  color:#788891;
+  text-transform:uppercase;
+}
+.finance-usage-stats-v1060 b{
+  display:block;
+  margin-top:2px;
+  font-size:13px;
+  color:#294b57;
+}
+.finance-usage-scope-v1060{
+  margin-top:8px;
+  font-size:9px;
+  color:#71818a;
+}
+.usage-scope-note-v1060{
+  padding:8px 10px;
+  background:#fff8df;
+  border:1px solid #ead89f;
+  color:#6b590f;
+  border-radius:9px;
+  font-size:9.5px;
+  margin:8px 0;
+}
+.usage-table-v1060{
+  min-width:760px;
+}
+.usage-pdf-capture-v1060{
+  position:fixed;
+  left:-12000px;
+  top:0;
+  width:794px;
+  z-index:-1;
+  background:#fff;
+}
+.usage-pdf-paper-v1060{
+  width:794px;
+  min-height:1123px;
+  background:#fff;
+  color:#17243c;
+  padding:34px 38px 42px;
+  font-family:Inter,Segoe UI,Arial,sans-serif;
+}
+.usage-pdf-head-v1060{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:20px;
+  padding-bottom:15px;
+  border-bottom:4px solid #078f92;
+}
+.usage-pdf-brand-v1060{
+  font-size:27px;
+  font-weight:1000;
+  letter-spacing:-1.5px;
+  color:#078f92;
+}
+.usage-pdf-brand-v1060 span{color:#111}
+.usage-pdf-head-v1060>div>div:last-child:not(.usage-pdf-brand-v1060){
+  margin-top:3px;
+  font-size:12px;
+  font-weight:900;
+  color:#4d626c;
+}
+.usage-pdf-ref-v1060{
+  text-align:right;
+}
+.usage-pdf-ref-v1060 small{
+  display:block;
+  font-size:8px;
+  color:#78858c;
+  font-weight:900;
+}
+.usage-pdf-ref-v1060 b{
+  display:block;
+  font-size:17px;
+  margin:3px 0 5px;
+}
+.usage-pdf-meta-v1060{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin:14px 0;
+}
+.usage-pdf-meta-v1060>div{
+  border:1px solid #d5e3e6;
+  border-radius:8px;
+  padding:8px 10px;
+}
+.usage-pdf-meta-v1060 span{
+  display:block;
+  font-size:7.5px;
+  font-weight:900;
+  text-transform:uppercase;
+  color:#75858c;
+}
+.usage-pdf-meta-v1060 b{
+  display:block;
+  margin-top:2px;
+  font-size:10.5px;
+}
+.usage-pdf-paper-v1060 .section{
+  margin-top:13px;
+  padding-top:8px;
+  font-size:9px;
+}
+.usage-pdf-paper-v1060 .finance-detail-grid-v1059{
+  box-shadow:none;
+}
+.usage-pdf-paper-v1060 .table{
+  font-size:8px;
+}
+.usage-pdf-paper-v1060 .table th,
+.usage-pdf-paper-v1060 .table td{
+  padding:5px;
+}
+.usage-pdf-foot-v1060{
+  margin-top:18px;
+  padding-top:8px;
+  border-top:1px solid #d6e3e6;
+  font-size:7.5px;
+  color:#74848b;
+  text-align:center;
+}
+@media(max-width:850px){
+  .finance-usage-cards-v1060{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  .finance-usage-stats-v1060{grid-template-columns:1fr 1fr}
+}
+
