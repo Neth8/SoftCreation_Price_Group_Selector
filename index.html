@@ -18579,13 +18579,34 @@ window.toggleBpSeparateDeliveryButton = function(){
 
 
 <script>
-/* V1.0.44 - Products > Open Product > JBR In
+/* V1.0.45 - Products > Open Product > JBR In
    Supabase-backed JBR production register.
    Separate from Factory inventory. */
 (function(){
   const JBR_TABLE_V1055='spgs_product_jbrs';
+  const JBR_REST_V1056='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1';
+  const JBR_WORKSPACE_V1056='softcreation_main';
+  const JBR_KEY_STORE_V1056='spgs_supabase_browser_key_v1';
   const JBR_LOCAL_MIGRATION_KEY_V1055='softcreation_product_jbr_batches_v1054';
   const jbrCloudCacheV1055=new Map();
+
+  function jbrApiKeyV1056(){
+    let key=localStorage.getItem(JBR_KEY_STORE_V1056)||'';
+    if(!key){
+      key=prompt('SoftCreation cloud setup\n\nPaste the FULL Supabase anon / publishable key for qyxgamverzdmhtvezbft:')||'';
+      key=key.trim();
+      if(key)localStorage.setItem(JBR_KEY_STORE_V1056,key);
+    }
+    return key;
+  }
+
+  function jbrHeadersV1056(extra={}){
+    const key=jbrApiKeyV1056();
+    if(!key)throw new Error('Supabase key is not configured.');
+    const h={apikey:key,...extra};
+    if(key.startsWith('eyJ'))h.Authorization='Bearer '+key;
+    return h;
+  }
 
   function jbrGroupV1055(encodedKey){
     const key=decodeURIComponent(encodedKey||'');
@@ -18709,14 +18730,23 @@ window.toggleBpSeparateDeliveryButton = function(){
   window.jbrCalcV1055=jbrCalcV1055;
 
   async function jbrFetchV1055(path,options={}){
-    if(typeof spgsFetch!=='function')throw new Error('Supabase production connection is not available.');
-    return spgsFetch(path,options);
+    const res=await fetch(JBR_REST_V1056+path,{
+      ...options,
+      headers:jbrHeadersV1056(options.headers||{})
+    });
+    if(!res.ok){
+      const body=await res.text().catch(()=>res.statusText);
+      throw new Error(`Supabase ${res.status}: ${body.slice(0,500)}`);
+    }
+    if(res.status===204)return null;
+    const text=await res.text();
+    return text?JSON.parse(text):null;
   }
 
   async function jbrLoadV1055(productKey,force=false){
     if(!force && jbrCloudCacheV1055.has(productKey))return jbrCloudCacheV1055.get(productKey);
     const rows=await jbrFetchV1055(
-      `/${JBR_TABLE_V1055}?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&product_key=eq.${encodeURIComponent(productKey)}&order=created_at.desc&select=*`
+      `/${JBR_TABLE_V1055}?workspace=eq.${encodeURIComponent(JBR_WORKSPACE_V1056)}&product_key=eq.${encodeURIComponent(productKey)}&order=created_at.desc&select=*`
     );
     const data=(rows||[]).map(jbrRowToUiV1055);
     jbrCloudCacheV1055.set(productKey,data);
@@ -18748,7 +18778,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       if(!x?.id||existingIds.has(x.id))continue;
       const payload={
         id:String(x.id),
-        workspace:SPGS_WORKSPACE,
+        workspace:JBR_WORKSPACE_V1056,
         product_key:g.key,
         product_size:String(x.productSize||g.size||''),
         material:String(x.material||g.material||''),
@@ -19028,7 +19058,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(actual>calc.theoreticalRolls)return toast(`Actual Cut Rolls cannot exceed the theoretical maximum of ${calc.theoreticalRolls} for this JBR`);
 
     const payload={
-      workspace:SPGS_WORKSPACE,
+      workspace:JBR_WORKSPACE_V1056,
       product_key:g.key,
       product_size:String(g.size||''),
       material:String(g.material||''),
@@ -19086,7 +19116,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!confirm(`Delete ${row.code}?`))return;
     try{
       await jbrFetchV1055(
-        `/${JBR_TABLE_V1055}?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&id=eq.${encodeURIComponent(id)}`,
+        `/${JBR_TABLE_V1055}?workspace=eq.${encodeURIComponent(JBR_WORKSPACE_V1056)}&id=eq.${encodeURIComponent(id)}`,
         {method:'DELETE',headers:{'Prefer':'return=minimal'}}
       );
       jbrCloudCacheV1055.delete(g.key);
@@ -19112,7 +19142,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       type:'PRODUCT_JBR',
       dbId:row.id,
       code:row.code,
-      workspace:SPGS_WORKSPACE,
+      workspace:JBR_WORKSPACE_V1056,
       productKey:g.key,
       product:`${g.size} | ${g.material} | ${g.layout} | ${g.pcs} pcs`,
       jbrWidthMm:row.jbrWidth,
