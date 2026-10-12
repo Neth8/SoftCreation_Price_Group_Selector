@@ -18897,7 +18897,7 @@ window.toggleBpSeparateDeliveryButton = function(){
 
                   <div class="field">
                     <label>Actual Cut Rolls</label>
-                    <input id="jbrActualRollsV1055" type="number" min="0" step="1" value="0">
+                    <input id="jbrActualRollsV1055" type="number" min="0" step="1" value="0" oninput="jbrCalcV1055();jbrActualLengthPreviewV1066()">
                     <div class="hint">The packing stage can never exceed the total Actual Cut Rolls from all JBRs.</div>
                   </div>
                   <div class="field">
@@ -18922,6 +18922,13 @@ window.toggleBpSeparateDeliveryButton = function(){
                   <div><span>Labels / Lane</span><b id="jbrLabelsLaneV1055">0</b><small>theoretical</small></div>
                   <div><span>Total Labels</span><b id="jbrTheoreticalLabelsV1055">0</b><small>theoretical</small></div>
                   <div class="strong"><span>Max Full Rolls</span><b id="jbrTheoreticalRollsV1055">0</b><small>planning maximum</small></div>
+                </div>
+
+                <div id="jbrActualLengthCardV1066" class="jbr-actual-length-card-v1066">
+                  <div><span>Actual Cut Rolls</span><b id="jbrPreviewActualRollsV1066">0</b><small>entered output</small></div>
+                  <div class="used"><span>Productive JBR Length Used</span><b id="jbrPreviewUsedLengthV1066">0 m</b><small>actual rolls × pcs × pitch ÷ lanes</small></div>
+                  <div><span>Original JBR Length</span><b id="jbrPreviewOriginalLengthV1066">0 m</b><small>entered jumbo length</small></div>
+                  <div class="balance"><span>Theoretical Remaining Length</span><b id="jbrPreviewBalanceLengthV1066">0 m</b><small>original length − productive length</small></div>
                 </div>
 
                 <div class="actions">
@@ -21127,6 +21134,959 @@ window.toggleBpSeparateDeliveryButton = function(){
   }else{
     installDispatchV1064();
   }
+})();
+</script>
+
+
+<script>
+/* V1.0.66 - Finance Pagination + Live JBR Length + Box-by-Box Dispatch */
+(function(){
+  let financePageV1066=1;
+  const FIN_PAGE_SIZE_V1066=5;
+
+  /* ---------------------- Finance pagination ---------------------- */
+  function ensureFinancePagerV1066(){
+    const host=$('financeJobsV1059');
+    if(!host)return null;
+    let pager=$('financePagerV1066');
+    if(!pager){
+      pager=document.createElement('div');
+      pager.id='financePagerV1066';
+      pager.className='finance-pager-v1066';
+      host.insertAdjacentElement('afterend',pager);
+    }
+    return pager;
+  }
+
+  function applyFinancePaginationV1066(reset=false){
+    const host=$('financeJobsV1059');
+    if(!host)return;
+    if(reset)financePageV1066=1;
+
+    const cards=[...host.querySelectorAll('.finance-usage-card-v1060')];
+    const pager=ensureFinancePagerV1066();
+
+    if(!cards.length){
+      if(pager)pager.innerHTML='';
+      return;
+    }
+
+    const pages=Math.max(1,Math.ceil(cards.length/FIN_PAGE_SIZE_V1066));
+    financePageV1066=Math.min(Math.max(1,financePageV1066),pages);
+
+    const from=(financePageV1066-1)*FIN_PAGE_SIZE_V1066;
+    const to=from+FIN_PAGE_SIZE_V1066;
+
+    cards.forEach((card,i)=>{
+      card.style.display=(i>=from&&i<to)?'':'none';
+    });
+
+    const pageButtons=Array.from({length:pages},(_,i)=>i+1)
+      .map(p=>`<button type="button" class="finance-page-btn-v1066 ${p===financePageV1066?'active':''}" onclick="financeGoPageV1066(${p})">${p}</button>`)
+      .join('');
+
+    pager.innerHTML=`
+      <div class="finance-pager-info-v1066">
+        Showing <b>${from+1}-${Math.min(to,cards.length)}</b> of <b>${cards.length}</b> jobs
+      </div>
+      <div class="finance-pager-actions-v1066">
+        <button type="button" class="btn ghost sm" ${financePageV1066<=1?'disabled':''} onclick="financeGoPageV1066(${financePageV1066-1})">Previous</button>
+        ${pageButtons}
+        <button type="button" class="btn ghost sm" ${financePageV1066>=pages?'disabled':''} onclick="financeGoPageV1066(${financePageV1066+1})">Next</button>
+      </div>`;
+  }
+
+  window.financeGoPageV1066=function(page){
+    financePageV1066=Math.max(1,Number(page||1));
+    applyFinancePaginationV1066(false);
+    try{$('financeJobsV1059')?.scrollIntoView({behavior:'smooth',block:'start'})}catch(_){}
+  };
+
+  function installFinancePaginationV1066(){
+    if(window.__financePaginationV1066Installed)return;
+    window.__financePaginationV1066Installed=true;
+
+    const base=window.renderFinanceV1059;
+    if(typeof base==='function'){
+      window.renderFinanceV1059=async function(force=false){
+        const searchNow=String($('financeSearchV1059')?.value||'');
+        const statusNow=String($('financeStatusV1059')?.value||'');
+        const previousKey=window.__financeFilterKeyV1066||'';
+        const currentKey=searchNow+'|'+statusNow;
+        const shouldReset=currentKey!==previousKey;
+        window.__financeFilterKeyV1066=currentKey;
+
+        const result=await base.apply(this,arguments);
+        applyFinancePaginationV1066(shouldReset);
+        return result;
+      };
+      try{renderFinanceV1059=window.renderFinanceV1059}catch(_){}
+    }
+  }
+
+  /* ---------------------- JBR length preview ---------------------- */
+  window.jbrActualLengthPreviewV1066=function(){
+    const calc=(typeof jbrCalcV1055==='function')
+      ? jbrCalcV1055()
+      : {
+          jbrLengthM:Number($('jbrLengthV1055')?.value||0),
+          pcsPerRoll:Number($('jbrPcsV1055')?.value||0),
+          pitch:Number($('jbrLabelHeightV1055')?.value||0)+Number($('jbrGapV1055')?.value||0),
+          lanes:0,
+          theoreticalRolls:0
+        };
+
+    const actual=Math.max(0,Number($('jbrActualRollsV1055')?.value||0));
+    const lanes=Math.max(0,Number(calc.lanes||0));
+    const pcs=Math.max(0,Number(calc.pcsPerRoll||0));
+    const pitch=Math.max(0,Number(calc.pitch||0));
+    const original=Math.max(0,Number(calc.jbrLengthM||0));
+
+    const used=(lanes>0&&pcs>0&&pitch>0)
+      ? (actual*pcs*pitch)/(lanes*1000)
+      : 0;
+    const balance=Math.max(0,original-used);
+
+    if($('jbrPreviewActualRollsV1066'))$('jbrPreviewActualRollsV1066').textContent=money(actual);
+    if($('jbrPreviewUsedLengthV1066'))$('jbrPreviewUsedLengthV1066').textContent=`${money(used)} m`;
+    if($('jbrPreviewOriginalLengthV1066'))$('jbrPreviewOriginalLengthV1066').textContent=`${money(original)} m`;
+    if($('jbrPreviewBalanceLengthV1066'))$('jbrPreviewBalanceLengthV1066').textContent=`${money(balance)} m`;
+
+    const card=$('jbrActualLengthCardV1066');
+    if(card){
+      card.classList.toggle('over',used>original+.0001);
+      if(used>original+.0001){
+        $('jbrPreviewBalanceLengthV1066').textContent=`OVER BY ${money(used-original)} m`;
+      }
+    }
+
+    return {actual,usedLengthM:used,originalLengthM:original,balanceLengthM:balance};
+  };
+
+  function installJbrPreviewV1066(){
+    if(window.__jbrPreviewV1066Installed)return;
+    window.__jbrPreviewV1066Installed=true;
+
+    const base=window.jbrCalcV1055;
+    if(typeof base==='function'){
+      window.jbrCalcV1055=function(){
+        const result=base.apply(this,arguments);
+        /* Avoid recursion by updating preview directly from returned calc. */
+        const actual=Math.max(0,Number($('jbrActualRollsV1055')?.value||0));
+        const lanes=Math.max(0,Number(result?.lanes||0));
+        const pcs=Math.max(0,Number(result?.pcsPerRoll||0));
+        const pitch=Math.max(0,Number(result?.pitch||0));
+        const original=Math.max(0,Number(result?.jbrLengthM||0));
+        const used=(lanes>0&&pcs>0&&pitch>0)?(actual*pcs*pitch)/(lanes*1000):0;
+        const balance=Math.max(0,original-used);
+
+        if($('jbrPreviewActualRollsV1066'))$('jbrPreviewActualRollsV1066').textContent=money(actual);
+        if($('jbrPreviewUsedLengthV1066'))$('jbrPreviewUsedLengthV1066').textContent=`${money(used)} m`;
+        if($('jbrPreviewOriginalLengthV1066'))$('jbrPreviewOriginalLengthV1066').textContent=`${money(original)} m`;
+        if($('jbrPreviewBalanceLengthV1066'))$('jbrPreviewBalanceLengthV1066').textContent=used>original+.0001?`OVER BY ${money(used-original)} m`:`${money(balance)} m`;
+        $('jbrActualLengthCardV1066')?.classList.toggle('over',used>original+.0001);
+        return result;
+      };
+      try{jbrCalcV1055=window.jbrCalcV1055}catch(_){}
+    }
+  }
+
+  /* ---------------------- Box-by-box dispatch ---------------------- */
+  function boxUsedV1066(r){
+    const used={};
+    (r?.dispatches||[]).forEach(d=>{
+      (d?.boxes||[]).forEach(b=>{
+        used[String(b.boxNo)]=(used[String(b.boxNo)]||0)+Number(b.qty||0);
+      });
+    });
+    return used;
+  }
+
+  function looseUsedV1066(r){
+    return (r?.dispatches||[]).reduce((n,d)=>n+Number(d?.loose||0),0);
+  }
+
+  function ensureBoxPickerV1066(){
+    if($('boxDispatchPickerV1066'))return;
+    document.body.insertAdjacentHTML('beforeend',`
+      <div id="boxDispatchPickerV1066" class="modal">
+        <div class="modal-card box-dispatch-picker-card-v1066">
+          <div class="modal-head">
+            <div>
+              <b>Dispatch — Box by Box</b>
+              <div id="boxDispatchPickerMetaV1066" class="small"></div>
+            </div>
+            <button class="closex" type="button" onclick="closeModal('boxDispatchPickerV1066')">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="notice"><b>One dispatch = one carton.</b> Select an individual packed box below. Each box creates its own Dispatch Note and can be received separately by Stores.</div>
+            <input id="boxDispatchReqIdV1066" type="hidden">
+            <div id="boxDispatchPickerListV1066"></div>
+          </div>
+        </div>
+      </div>`);
+  }
+
+  function renderBoxPickerV1066(r){
+    ensureBoxPickerV1066();
+    const used=boxUsedV1066(r);
+    const boxes=Array.isArray(r?.packing?.boxes)?r.packing.boxes:[];
+    const loosePacked=Math.max(0,Number(r?.packing?.loose||0));
+    const looseUsed=looseUsedV1066(r);
+    const looseRemaining=Math.max(0,loosePacked-looseUsed);
+
+    $('boxDispatchReqIdV1066').value=r.id;
+    $('boxDispatchPickerMetaV1066').textContent=
+      `${r.orderNo} • ${r.customerName||'-'} • ${r.size} • ${r.material}`;
+
+    const rows=boxes.map((b,i)=>{
+      const packed=Math.max(0,Number(b.rolls||0));
+      const already=Math.max(0,Number(used[String(b.boxNo)]||0));
+      const remaining=Math.max(0,packed-already);
+      return `<div class="box-dispatch-item-v1066 ${remaining<=0?'done':''}">
+        <div class="box-dispatch-name-v1066">
+          <b>Box ${esc(b.boxNo||String(i+1).padStart(2,'0'))}</b>
+          <span>${esc(b.note||'')}</span>
+        </div>
+        <div><span>Packed</span><b>${money(packed)}</b></div>
+        <div><span>Already Dispatched</span><b>${money(already)}</b></div>
+        <div><span>Available</span><b>${money(remaining)}</b></div>
+        ${remaining>0
+          ? `<button class="btn navy sm" type="button" onclick="startSingleBoxDispatchV1066('${r.id}',${i})">Dispatch This Box</button>`
+          : `<span class="tag">Dispatched</span>`}
+      </div>`;
+    }).join('');
+
+    const looseRow=loosePacked>0?`
+      <div class="box-dispatch-item-v1066 ${looseRemaining<=0?'done':''}">
+        <div class="box-dispatch-name-v1066"><b>Loose Rolls</b><span>Not packed in a carton</span></div>
+        <div><span>Packed Loose</span><b>${money(loosePacked)}</b></div>
+        <div><span>Already Dispatched</span><b>${money(looseUsed)}</b></div>
+        <div><span>Available</span><b>${money(looseRemaining)}</b></div>
+        ${looseRemaining>0
+          ? `<button class="btn ghost sm" type="button" onclick="startLooseDispatchV1066('${r.id}')">Dispatch Loose Rolls</button>`
+          : `<span class="tag">Dispatched</span>`}
+      </div>`:'';
+
+    $('boxDispatchPickerListV1066').innerHTML=
+      rows||looseRow
+        ? `<div class="box-dispatch-list-v1066">${rows}${looseRow}</div>`
+        : `<div class="empty">No packed cartons are recorded for this production job.</div>`;
+
+    $('boxDispatchPickerV1066').classList.add('show');
+  }
+
+  window.openDispatchLoadingV81=function(id){
+    const r=(state.productionRequests||[]).find(x=>x.id===id);
+    if(!r||flowIndexV81(r.status)<flowIndexV81('Finished')){
+      return toast('Only a Finished production job can be dispatched');
+    }
+    if(!(productionAvailableV81(r)>0))return toast('No finished balance remains');
+    renderBoxPickerV1066(r);
+  };
+
+  function prepareSingleDispatchV1066(r,boxIndex=null,looseOnly=false){
+    const used=boxUsedV1066(r);
+    $('dispatchLoadReqId').value=r.id;
+    $('dispatchLoadingMeta').textContent=
+      `${r.orderNo} • One dispatch note per ${looseOnly?'loose-roll load':'box'}`;
+    $('dispatchLoadDate').value=today();
+    $('dispatchLoadCarrier').value='';
+    $('dispatchLoadNote').value='';
+
+    if(looseOnly){
+      const looseRemaining=Math.max(0,Number(r?.packing?.loose||0)-looseUsedV1066(r));
+      $('dispatchBoxPick').innerHTML='<div class="empty">Loose-roll dispatch — no carton selected.</div>';
+      $('dispatchLoose').value=String(looseRemaining);
+      $('dispatchLoose').readOnly=true;
+    }else{
+      const b=r?.packing?.boxes?.[boxIndex];
+      if(!b)return toast('Packed box not found');
+      const remaining=Math.max(0,Number(b.rolls||0)-Number(used[String(b.boxNo)]||0));
+      if(!(remaining>0))return toast('This box has already been fully dispatched');
+
+      $('dispatchLoose').value='0';
+      $('dispatchLoose').readOnly=true;
+      $('dispatchBoxPick').innerHTML=`
+        <label class="dispatch-box-pick single-v1066">
+          <input class="dispatch-box-check" type="checkbox" data-i="${boxIndex}" checked hidden>
+          <span>
+            <b>Box ${esc(b.boxNo)}</b><br>
+            <span class="small">Packed ${money(b.rolls)} • Dispatching full remaining box: ${money(remaining)} rolls</span>
+          </span>
+          <input class="dispatch-box-qty" data-i="${boxIndex}" type="number" min="${remaining}" max="${remaining}" value="${remaining}" readonly>
+        </label>`;
+    }
+
+    updateDispatchTotalV81();
+    closeModal('boxDispatchPickerV1066');
+    $('dispatchNoteModal').classList.add('show');
+  }
+
+  window.startSingleBoxDispatchV1066=function(jobId,boxIndex){
+    const r=(state.productionRequests||[]).find(x=>x.id===jobId);
+    if(!r)return toast('Production job not found');
+    prepareSingleDispatchV1066(r,Number(boxIndex),false);
+  };
+
+  window.startLooseDispatchV1066=function(jobId){
+    const r=(state.productionRequests||[]).find(x=>x.id===jobId);
+    if(!r)return toast('Production job not found');
+    prepareSingleDispatchV1066(r,null,true);
+  };
+
+  /* Refresh the box picker after a dispatch is saved if the user opens Dispatch again. */
+  const baseConfirm=window.confirmDispatchLoadingV81;
+  if(typeof baseConfirm==='function'){
+    window.confirmDispatchLoadingV81=function(){
+      const result=baseConfirm.apply(this,arguments);
+      /* Existing function saves one selected box because V1066 only renders one checkbox. */
+      return result;
+    };
+    try{confirmDispatchLoadingV81=window.confirmDispatchLoadingV81}catch(_){}
+  }
+
+  function installV1066(){
+    installFinancePaginationV1066();
+    installJbrPreviewV1066();
+    try{jbrActualLengthPreviewV1066()}catch(_){}
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',installV1066,{once:true});
+  }else{
+    installV1066();
+  }
+})();
+</script>
+
+
+<script>
+/* V1.0.67 - Dispatch follows saved Packing Batch boxes
+   Select one or more packed cartons; roll counts come from Packing and are locked. */
+(function(){
+  function dispatchUsedBoxesV1067(r){
+    const used={};
+    (r?.dispatches||[]).forEach(d=>{
+      (d?.boxes||[]).forEach(b=>{
+        const key=String(b?.boxNo||'');
+        used[key]=(used[key]||0)+Number(b?.qty||0);
+      });
+    });
+    return used;
+  }
+
+  function dispatchLooseUsedV1067(r){
+    return (r?.dispatches||[]).reduce((n,d)=>n+Number(d?.loose||0),0);
+  }
+
+  function dispatchBatchSummaryV1067(r){
+    const boxes=Array.isArray(r?.packing?.boxes)?r.packing.boxes:[];
+    const boxRolls=boxes.reduce((n,b)=>n+Number(b?.rolls||0),0);
+    const loose=Number(r?.packing?.loose||0);
+    return {
+      boxes,
+      boxRolls,
+      loose,
+      total:boxRolls+loose
+    };
+  }
+
+  window.dispatchToggleAllBoxesV1067=function(checked){
+    document.querySelectorAll('#dispatchBoxPick .dispatch-box-check:not(:disabled)').forEach(c=>{
+      c.checked=!!checked;
+      const card=c.closest('.dispatch-pack-box-v1067');
+      if(card)card.classList.toggle('selected',!!checked);
+    });
+    updateDispatchTotalV81();
+  };
+
+  window.dispatchBoxChangedV1067=function(el){
+    const card=el?.closest?.('.dispatch-pack-box-v1067');
+    if(card)card.classList.toggle('selected',!!el.checked);
+
+    const available=[...document.querySelectorAll('#dispatchBoxPick .dispatch-box-check:not(:disabled)')];
+    const all=available.length>0&&available.every(c=>c.checked);
+    const master=$('dispatchSelectAllV1067');
+    if(master)master.checked=all;
+
+    updateDispatchTotalV81();
+  };
+
+  window.dispatchLooseToggleV1067=function(el){
+    const r=(state.productionRequests||[]).find(x=>x.id===$('dispatchLoadReqId')?.value);
+    if(!r)return;
+    const remaining=Math.max(
+      0,
+      Number(r?.packing?.loose||0)-dispatchLooseUsedV1067(r)
+    );
+    $('dispatchLoose').value=el.checked?String(remaining):'0';
+    $('dispatchLoosePackCardV1067')?.classList.toggle('selected',!!el.checked);
+    updateDispatchTotalV81();
+  };
+
+  window.openDispatchLoadingV81=function(id){
+    const r=(state.productionRequests||[]).find(x=>x.id===id);
+    if(!r||flowIndexV81(r.status)<flowIndexV81('Finished')){
+      return toast('Only a Finished production job can be dispatched');
+    }
+
+    const available=productionAvailableV81(r);
+    if(!(available>0))return toast('No finished balance remains');
+
+    const batch=dispatchBatchSummaryV1067(r);
+    if(!batch.boxes.length && !(batch.loose>0)){
+      return toast('No Packing Batch is recorded for this production job');
+    }
+
+    const used=dispatchUsedBoxesV1067(r);
+    const looseUsed=dispatchLooseUsedV1067(r);
+    const looseRemaining=Math.max(0,batch.loose-looseUsed);
+
+    $('dispatchLoadReqId').value=id;
+    $('dispatchLoadingMeta').innerHTML=
+      `<b>${esc(r.orderNo)}</b> • ${esc(r.customerName||'-')} • ${esc(r.size||'-')} • ${esc(r.material||'-')}<br>`+
+      `Packing Batch: ${batch.boxes.length} boxes • ${money(batch.boxRolls)} boxed rolls${batch.loose?` • ${money(batch.loose)} loose`:''} • Available to dispatch ${money(available)} rolls`;
+
+    $('dispatchLoadDate').value=today();
+    $('dispatchLoadCarrier').value='';
+    $('dispatchLoadNote').value='';
+    $('dispatchLoose').value='0';
+    $('dispatchLoose').readOnly=true;
+
+    const modal=$('dispatchNoteModal');
+    const title=modal?.querySelector('.modal-head b');
+    if(title)title.textContent='Dispatch Packing Batch';
+
+    const notice=modal?.querySelector('.modal-body > .notice');
+    if(notice){
+      notice.innerHTML=
+        '<b>Select the packed boxes that are physically leaving now.</b> '+
+        'Box quantities come directly from the Packing Count and cannot be edited. '+
+        'You can dispatch one box, several boxes, or all available boxes in the same Dispatch Note.';
+    }
+
+    const boxRows=batch.boxes.map((b,i)=>{
+      const boxNo=String(b?.boxNo||String(i+1).padStart(2,'0'));
+      const packed=Math.max(0,Number(b?.rolls||0));
+      const already=Math.max(0,Number(used[boxNo]||0));
+      const remaining=Math.max(0,packed-already);
+      const disabled=remaining<=0;
+
+      return `
+        <label class="dispatch-pack-box-v1067 ${disabled?'done':''}">
+          <div class="dispatch-pack-check-v1067">
+            <input
+              class="dispatch-box-check"
+              type="checkbox"
+              data-i="${i}"
+              onchange="dispatchBoxChangedV1067(this)"
+              ${disabled?'disabled':''}
+            >
+          </div>
+          <div class="dispatch-pack-box-main-v1067">
+            <b>Box ${esc(boxNo)}</b>
+            <span>${esc(b?.note||'Packed carton')}</span>
+          </div>
+          <div class="dispatch-pack-kpi-v1067">
+            <span>Packed</span>
+            <b>${money(packed)}</b>
+          </div>
+          <div class="dispatch-pack-kpi-v1067">
+            <span>Already Dispatched</span>
+            <b>${money(already)}</b>
+          </div>
+          <div class="dispatch-pack-kpi-v1067 available">
+            <span>${disabled?'Status':'Dispatch Qty'}</span>
+            <b>${disabled?'Dispatched':money(remaining)}</b>
+          </div>
+          <input
+            class="dispatch-box-qty"
+            data-i="${i}"
+            type="number"
+            min="${remaining}"
+            max="${remaining}"
+            value="${remaining}"
+            readonly
+            hidden
+          >
+        </label>`;
+    }).join('');
+
+    const selectableCount=batch.boxes.filter((b,i)=>{
+      const boxNo=String(b?.boxNo||String(i+1).padStart(2,'0'));
+      return Math.max(0,Number(b?.rolls||0)-Number(used[boxNo]||0))>0;
+    }).length;
+
+    const looseCard=batch.loose>0?`
+      <label id="dispatchLoosePackCardV1067" class="dispatch-pack-box-v1067 loose ${looseRemaining<=0?'done':''}">
+        <div class="dispatch-pack-check-v1067">
+          <input
+            id="dispatchLooseToggleV1067"
+            type="checkbox"
+            onchange="dispatchLooseToggleV1067(this)"
+            ${looseRemaining<=0?'disabled':''}
+          >
+        </div>
+        <div class="dispatch-pack-box-main-v1067">
+          <b>Loose Rolls</b>
+          <span>Not packed inside a carton</span>
+        </div>
+        <div class="dispatch-pack-kpi-v1067"><span>Packed</span><b>${money(batch.loose)}</b></div>
+        <div class="dispatch-pack-kpi-v1067"><span>Already Dispatched</span><b>${money(looseUsed)}</b></div>
+        <div class="dispatch-pack-kpi-v1067 available">
+          <span>${looseRemaining<=0?'Status':'Dispatch Qty'}</span>
+          <b>${looseRemaining<=0?'Dispatched':money(looseRemaining)}</b>
+        </div>
+      </label>`:'';
+
+    $('dispatchBoxPick').innerHTML=`
+      <div class="dispatch-pack-batch-head-v1067">
+        <div>
+          <b>Packing Batch</b>
+          <span>${money(batch.total)} total packed rolls • ${batch.boxes.length} cartons</span>
+        </div>
+        ${selectableCount>0?`
+          <label class="dispatch-select-all-v1067">
+            <input id="dispatchSelectAllV1067" type="checkbox" onchange="dispatchToggleAllBoxesV1067(this.checked)">
+            Select all available boxes
+          </label>`:''}
+      </div>
+      <div class="dispatch-pack-list-v1067">${boxRows}${looseCard}</div>`;
+
+    /* Existing field is kept for compatibility with the existing save function,
+       but its value is controlled only by the Loose Rolls packing card above. */
+    const looseField=$('dispatchLoose')?.closest('.field');
+    if(looseField)looseField.style.display='none';
+
+    updateDispatchTotalV81();
+    $('dispatchNoteModal').classList.add('show');
+  };
+
+  /* After save/close, restore compatibility field visibility for any older path. */
+  const baseConfirm=window.confirmDispatchLoadingV81;
+  if(typeof baseConfirm==='function'){
+    window.confirmDispatchLoadingV81=function(){
+      const result=baseConfirm.apply(this,arguments);
+      const looseField=$('dispatchLoose')?.closest('.field');
+      if(looseField)looseField.style.display='';
+      return result;
+    };
+    try{confirmDispatchLoadingV81=window.confirmDispatchLoadingV81}catch(_){}
+  }
+
+  /* V1066 intermediate picker is no longer part of the active flow. */
+  try{closeModal('boxDispatchPickerV1066')}catch(_){}
+})();
+</script>
+
+
+<script>
+/* V1.0.68 - Direct Customer Delivery from Packing Batch Dispatch */
+(function(){
+  function ensureDirectDeliveryUiV1068(){
+    if($('dispatchDirectWrapV1068'))return;
+
+    const total=$('dispatchLoadTotal');
+    if(!total)return;
+
+    total.insertAdjacentHTML('beforebegin',`
+      <div id="dispatchDirectWrapV1068" class="dispatch-direct-wrap-v1068">
+        <label class="dispatch-direct-toggle-v1068">
+          <input id="dispatchDirectCustomerV1068" type="checkbox" onchange="toggleDirectDeliveryV1068(this.checked)">
+          <span>
+            <b>Direct Delivery to Customer from Factory</b>
+            <small>Tick this when the selected packed boxes will bypass Stores and go directly to the customer.</small>
+          </span>
+        </label>
+
+        <div id="dispatchDirectFieldsV1068" class="dispatch-direct-fields-v1068" hidden>
+          <div class="dispatch-direct-title-v1068">
+            <b>Direct Customer Delivery Details</b>
+            <span>Customer details are suggested from Customer Master.</span>
+          </div>
+
+          <div class="grid">
+            <div class="field full dispatch-customer-suggest-wrap-v1068">
+              <label>Customer</label>
+              <input
+                id="dispatchDirectCustomerNameV1068"
+                type="text"
+                list="dispatchCustomerMasterListV1068"
+                autocomplete="off"
+                placeholder="Start typing customer name..."
+                oninput="directCustomerTypeV1068(this.value)"
+                onchange="directCustomerTypeV1068(this.value,true)"
+              >
+              <datalist id="dispatchCustomerMasterListV1068"></datalist>
+              <input id="dispatchDirectCustomerIdV1068" type="hidden">
+              <div class="hint">Select an existing customer from Customer Master. Exact customer selection auto-fills contact and delivery address.</div>
+            </div>
+
+            <div class="field">
+              <label>Customer Contact Number</label>
+              <input id="dispatchDirectCustomerPhoneV1068" type="text" placeholder="Customer phone">
+            </div>
+
+            <div class="field">
+              <label>Vehicle Number</label>
+              <input id="dispatchDirectVehicleV1068" type="text" placeholder="e.g. WP CAB-1234">
+            </div>
+
+            <div class="field">
+              <label>Driver Name</label>
+              <input id="dispatchDirectDriverV1068" type="text" placeholder="Driver full name">
+            </div>
+
+            <div class="field">
+              <label>Driver Contact Number</label>
+              <input id="dispatchDirectDriverPhoneV1068" type="text" placeholder="Driver phone">
+            </div>
+
+            <div class="field full">
+              <label>Customer Delivery Address</label>
+              <textarea id="dispatchDirectAddressV1068" placeholder="Delivery address"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>`);
+  }
+
+  function refreshCustomerSuggestionsV1068(){
+    const list=$('dispatchCustomerMasterListV1068');
+    if(!list)return;
+    list.innerHTML=(state.customers||[])
+      .slice()
+      .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')))
+      .map(c=>`<option value="${esc(c.name||'')}">${esc(c.phone||'')} ${esc(c.delivery||c.address||'')}</option>`)
+      .join('');
+  }
+
+  function findCustomerByNameV1068(name){
+    const q=String(name||'').trim().toLowerCase();
+    if(!q)return null;
+    return (state.customers||[]).find(c=>String(c.name||'').trim().toLowerCase()===q)||null;
+  }
+
+  function fillDirectCustomerV1068(c){
+    if(!c)return;
+    $('dispatchDirectCustomerIdV1068').value=c.id||'';
+    $('dispatchDirectCustomerNameV1068').value=c.name||'';
+    $('dispatchDirectCustomerPhoneV1068').value=c.phone||'';
+    $('dispatchDirectAddressV1068').value=c.delivery||c.address||'';
+  }
+
+  window.directCustomerTypeV1068=function(value,commit=false){
+    refreshCustomerSuggestionsV1068();
+    const c=findCustomerByNameV1068(value);
+    if(c){
+      fillDirectCustomerV1068(c);
+    }else if(commit){
+      $('dispatchDirectCustomerIdV1068').value='';
+    }
+  };
+
+  function currentDispatchJobV1068(){
+    return (state.productionRequests||[]).find(x=>x.id===$('dispatchLoadReqId')?.value)||null;
+  }
+
+  window.toggleDirectDeliveryV1068=function(checked){
+    const fields=$('dispatchDirectFieldsV1068');
+    if(fields)fields.hidden=!checked;
+
+    if(!checked)return;
+
+    refreshCustomerSuggestionsV1068();
+
+    const r=currentDispatchJobV1068();
+    const exact=(state.customers||[]).find(
+      c=>String(c.name||'').trim().toLowerCase()===String(r?.customerName||'').trim().toLowerCase()
+    );
+    if(exact && !$('dispatchDirectCustomerNameV1068').value.trim()){
+      fillDirectCustomerV1068(exact);
+    }else if(r && !$('dispatchDirectCustomerNameV1068').value.trim()){
+      $('dispatchDirectCustomerNameV1068').value=r.customerName||'';
+    }
+  };
+
+  function resetDirectDeliveryV1068(){
+    ensureDirectDeliveryUiV1068();
+    $('dispatchDirectCustomerV1068').checked=false;
+    $('dispatchDirectFieldsV1068').hidden=true;
+    $('dispatchDirectCustomerIdV1068').value='';
+    $('dispatchDirectCustomerNameV1068').value='';
+    $('dispatchDirectCustomerPhoneV1068').value='';
+    $('dispatchDirectVehicleV1068').value='';
+    $('dispatchDirectDriverV1068').value='';
+    $('dispatchDirectDriverPhoneV1068').value='';
+    $('dispatchDirectAddressV1068').value='';
+    refreshCustomerSuggestionsV1068();
+  }
+
+  const baseOpen=window.openDispatchLoadingV81;
+  if(typeof baseOpen==='function'){
+    window.openDispatchLoadingV81=function(id){
+      const result=baseOpen.apply(this,arguments);
+      /* The V1067 flow opens the Packing Batch modal synchronously. */
+      setTimeout(()=>resetDirectDeliveryV1068(),0);
+      return result;
+    };
+    try{openDispatchLoadingV81=window.openDispatchLoadingV81}catch(_){}
+  }
+
+  function directPayloadV1068(){
+    const direct=!!$('dispatchDirectCustomerV1068')?.checked;
+    if(!direct)return {directToCustomer:false};
+
+    const customerName=String($('dispatchDirectCustomerNameV1068')?.value||'').trim();
+    const customerId=String($('dispatchDirectCustomerIdV1068')?.value||'').trim();
+    const customerPhone=String($('dispatchDirectCustomerPhoneV1068')?.value||'').trim();
+    const address=String($('dispatchDirectAddressV1068')?.value||'').trim();
+    const vehicleNo=String($('dispatchDirectVehicleV1068')?.value||'').trim();
+    const driverName=String($('dispatchDirectDriverV1068')?.value||'').trim();
+    const driverPhone=String($('dispatchDirectDriverPhoneV1068')?.value||'').trim();
+
+    return {
+      directToCustomer:true,
+      directDelivery:{
+        customerId,
+        customerName,
+        customerPhone,
+        address,
+        vehicleNo,
+        driverName,
+        driverPhone
+      }
+    };
+  }
+
+  /* Final override: same protected dispatch save, with direct-delivery metadata
+     written BEFORE PDF generation / queue rendering. */
+  window.confirmDispatchLoadingV81=function(){
+    if(typeof currentUserPasswordOKV82==='function' &&
+       !currentUserPasswordOKV82('lock and create the dispatch note')){
+      return;
+    }
+
+    const r=state.productionRequests.find(x=>x.id===$('dispatchLoadReqId').value);
+    if(!r||flowIndexV81(r.status)<flowIndexV81('Finished')){
+      return toast('This production job is locked or no longer available');
+    }
+
+    const boxes=selectedDispatchBoxesV81();
+    const loose=Number($('dispatchLoose').value||0);
+    const qty=boxes.reduce((n,b)=>n+b.qty,0)+loose;
+    const avail=productionAvailableV81(r);
+
+    if(boxes.some(b=>b.qty>Number(
+      document.querySelector(
+        `.dispatch-box-qty[data-i="${(r.packing.boxes||[]).findIndex(x=>x.boxNo===b.boxNo)}"]`
+      )?.max||0
+    ))){
+      return toast('A carton load quantity exceeds its remaining packed count');
+    }
+
+    if(!(qty>0))return toast('Select at least one packed box or loose-roll load');
+    if(qty>avail+.001)return toast(`Dispatch cannot exceed available ${money(avail)} rolls`);
+
+    const directInfo=directPayloadV1068();
+
+    if(directInfo.directToCustomer){
+      const x=directInfo.directDelivery;
+      if(!x.customerName)return toast('Select / enter the direct delivery customer');
+      if(!x.customerPhone)return toast('Enter the customer contact number');
+      if(!x.address)return toast('Enter the customer delivery address');
+      if(!x.vehicleNo)return toast('Enter the vehicle number');
+      if(!x.driverName)return toast('Enter the driver name');
+      if(!x.driverPhone)return toast('Enter the driver contact number');
+    }else{
+      if(!String($('dispatchLoadCarrier').value||'').trim()){
+        return toast('Enter driver / vehicle / courier');
+      }
+    }
+
+    const directCarrier=directInfo.directToCustomer
+      ? `${directInfo.directDelivery.vehicleNo} • ${directInfo.directDelivery.driverName}`
+      : String($('dispatchLoadCarrier').value||'').trim();
+
+    const d={
+      id:uid('dispatch'),
+      dispatchNo:nextDispatchNoV81(),
+      requestId:r.id,
+      orderNo:r.orderNo,
+      piId:r.piId,
+      piSerial:r.piSerial,
+      customerName:r.customerName,
+      boxes,
+      loose,
+      qty,
+      date:$('dispatchLoadDate').value||today(),
+      carrier:directCarrier,
+      note:$('dispatchLoadNote').value.trim(),
+      by:currentUser.display,
+      byUser:currentUser.username,
+      at:new Date().toISOString(),
+      locked:true,
+      directToCustomer:directInfo.directToCustomer,
+      directDelivery:directInfo.directToCustomer?directInfo.directDelivery:null,
+      destinationType:directInfo.directToCustomer?'Customer':'Stores'
+    };
+
+    r.dispatches=r.dispatches||[];
+    r.dispatches.push(d);
+    r.dispatch=d;
+    r.status=qty<avail?'Finished':'Dispatched';
+
+    const historyDestination=d.directToCustomer
+      ? `Direct customer: ${d.directDelivery.customerName}`
+      : 'Stores';
+
+    r.history.push({
+      status:'Dispatched',
+      note:`${d.dispatchNo}; ${boxes.length} boxes + ${loose} loose; ${qty} rolls; ${historyDestination}`,
+      by:currentUser.display,
+      at:d.at
+    });
+
+    notifyV8(
+      r.ownerUser,
+      d.directToCustomer?'Direct Customer Dispatch':'Factory Dispatched',
+      `${d.dispatchNo}: ${money(qty)} rolls / ${boxes.length} boxes dispatched to ${d.directToCustomer?d.directDelivery.customerName:'Stores'}.`,
+      r.id
+    );
+
+    audit(
+      d.directToCustomer?'LOCK_DIRECT_CUSTOMER_DISPATCH':'LOCK_FACTORY_DISPATCH',
+      `${d.dispatchNo} ${r.orderNo} ${qty} rolls ${historyDestination}`
+    );
+
+    saveState();
+    closeModal('dispatchNoteModal');
+    renderProductionBoard();
+    renderStoresQueueV8();
+    downloadDispatchPDFV81(d.id);
+
+    toast(
+      d.directToCustomer
+        ? 'Direct customer dispatch locked. Dispatch Note PDF generated.'
+        : 'Dispatch locked. Dispatch Note PDF generated.'
+    );
+  };
+  try{confirmDispatchLoadingV81=window.confirmDispatchLoadingV81}catch(_){}
+
+  /* Direct deliveries bypass Stores receiving. */
+  const baseStores=window.renderStoresQueueV8;
+  window.renderStoresQueueV8=function(){
+    if(!$('storesQueue'))return;
+
+    const rows=[];
+    (state.productionRequests||[])
+      .filter(productionVisibleV8)
+      .forEach(r=>(r.dispatches||[])
+        .filter(d=>!d.directToCustomer)
+        .forEach(d=>rows.push({
+          r,
+          d,
+          g:state.grns.find(x=>x.dispatchId===d.id)
+        }))
+      );
+
+    $('storesQueue').innerHTML=rows.length
+      ? `<table class="table">
+          <thead><tr><th>Dispatch / Production</th><th>Customer / Item</th><th>Factory Loading</th><th>Stores / Variance</th><th>Actions</th></tr></thead>
+          <tbody>${rows.map(({r,d,g})=>`<tr>
+            <td><b>${esc(d.dispatchNo)}</b><div class="small">${esc(r.orderNo)} • PI ${esc(r.piSerial)}</div></td>
+            <td><b>${esc(r.customerName)}</b><div class="small">${esc(r.size)} • ${esc(r.material)} • ${esc(r.layout)}</div></td>
+            <td><b>${money(d.qty)} Rolls</b><div class="small">${d.boxes.length} boxes + ${money(d.loose)} loose<br>${esc(d.date)} • ${esc(d.carrier)}</div></td>
+            <td>${g
+              ? `<b>${esc(g.grnNo)}</b><div class="${g.variance===0?'grn-ok':'grn-bad'}">Received ${money(g.receivedQty)} • Variance ${money(g.variance)}</div><div class="small">${esc(g.varianceStatus||'')}</div>${g.factoryReason?`<div class="small"><b>Factory:</b> ${esc(g.factoryReason)}</div>`:''}`
+              : '<span class="tag amber">Awaiting Stores Count</span>'}</td>
+            <td>
+              <button class="btn ghost sm" onclick="downloadDispatchPDFV81('${d.id}')">Dispatch PDF</button>
+              ${!g
+                ? `<button class="btn primary sm" onclick="openReceiveDispatchV81('${d.id}')">Receive / Count</button>`
+                : g.variance&&!g.factoryReason&&(currentUser?.role==='admin'||hasPerm('production_manage'))
+                  ? `<button class="btn red sm" onclick="saveFactoryVarianceV81('${g.id}')">Factory Reason</button>`
+                  : g.variance&&!g.factoryReason
+                    ? '<span class="tag amber">Reason pending</span>'
+                    : `<button class="btn green sm" onclick="downloadGRNV8('${g.id}')">Finance PDF</button>`}
+            </td>
+          </tr>`).join('')}</tbody>
+        </table>`
+      : '<div class="empty">No factory dispatches waiting for Stores.</div>';
+  };
+  try{renderStoresQueueV8=window.renderStoresQueueV8}catch(_){}
+
+  /* Dispatch PDF now identifies Stores vs direct customer delivery. */
+  window.downloadDispatchPDFV81=async function(id){
+    const x=findDispatchV81(id);
+    if(!x)return;
+
+    const {r,d}=x;
+    const rows=d.boxes.map(b=>`
+      <tr>
+        <td>Box ${esc(b.boxNo)}</td>
+        <td>${money(b.packedRolls)}</td>
+        <td><b>${money(b.qty)}</b></td>
+        <td>${esc(b.note||'')}</td>
+      </tr>`).join('');
+
+    const direct=!!d.directToCustomer;
+    const dd=d.directDelivery||{};
+
+    const destinationBlock=direct
+      ? `<tr><th>Dispatch Type</th><td colspan="3"><b style="color:#087f83">DIRECT TO CUSTOMER FROM FACTORY</b></td></tr>
+         <tr><th>Delivery Customer</th><td>${esc(dd.customerName||'-')}</td><th>Contact</th><td>${esc(dd.customerPhone||'-')}</td></tr>
+         <tr><th>Delivery Address</th><td colspan="3">${esc(dd.address||'-')}</td></tr>
+         <tr><th>Vehicle Number</th><td>${esc(dd.vehicleNo||'-')}</td><th>Driver</th><td>${esc(dd.driverName||'-')} • ${esc(dd.driverPhone||'-')}</td></tr>`
+      : `<tr><th>Dispatch Type</th><td colspan="3">Factory → Stores</td></tr>
+         <tr><th>Driver / Vehicle / Courier</th><td colspan="3">${esc(d.carrier||'-')}</td></tr>`;
+
+    const footer=direct
+      ? `<span>Factory Released By: ${esc(d.by)}</span><span>Driver Signature: __________________</span><span>Customer Received: __________________</span>`
+      : `<span>Factory Released By: ${esc(d.by)}</span><span>Driver Signature: __________________</span><span>Stores Received: __________________</span>`;
+
+    await pdfFromLetterheadV81(
+      `<div style="border-left:7px solid #078f92;padding-left:14px">
+        <h1 style="margin:0;color:#078f92">${direct?'DIRECT CUSTOMER DISPATCH NOTE':'FACTORY DISPATCH NOTE'}</h1>
+        <b>${esc(d.dispatchNo)}</b>
+      </div>
+
+      <table class="table" style="margin-top:20px">
+        <tr><th>Production Request</th><td>${esc(r.orderNo)}</td><th>PI</th><td>${esc(r.piSerial)}</td></tr>
+        <tr><th>Order Customer</th><td colspan="3">${esc(r.customerName)}</td></tr>
+        <tr><th>Item</th><td colspan="3">${esc(r.size)} / ${esc(r.material)} / ${esc(r.layout)} / ${money(r.pcs)} pcs per roll</td></tr>
+        <tr><th>Dispatch Date</th><td colspan="3">${esc(d.date)}</td></tr>
+        ${destinationBlock}
+      </table>
+
+      <h3 style="color:#078f92">PACKING BATCH DISPATCH</h3>
+      <table class="table">
+        <thead><tr><th>Carton</th><th>Packed Rolls</th><th>Dispatched Rolls</th><th>Note</th></tr></thead>
+        <tbody>
+          ${rows}
+          ${d.loose?`<tr><td>Loose</td><td>-</td><td><b>${money(d.loose)}</b></td><td></td></tr>`:''}
+        </tbody>
+      </table>
+
+      <div class="dn-status">
+        <b>Total Dispatched: ${money(d.qty)} Rolls • ${d.boxes.length} Cartons</b><br>
+        ${esc(d.note||'')}
+      </div>
+
+      <div style="margin-top:45px;display:flex;justify-content:space-between">
+        ${footer}
+      </div>`,
+      `Dispatch_${d.dispatchNo.replaceAll('/','-')}_${direct?(dd.customerName||r.customerName):r.customerName}.pdf`
+    );
+
+    audit('DOWNLOAD_DISPATCH_NOTE',d.dispatchNo);
+    saveState();
+  };
+  try{downloadDispatchPDFV81=window.downloadDispatchPDFV81}catch(_){}
+
+  ensureDirectDeliveryUiV1068();
+  refreshCustomerSuggestionsV1068();
 })();
 </script>
 
