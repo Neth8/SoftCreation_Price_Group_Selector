@@ -6065,3 +6065,150 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   flex-wrap:wrap;
   margin-top:3px;
 }
+
+/* =========================================================
+   V1.0.72 - Stores printing controls
+   ========================================================= */
+.sc-pi-reprint-v1072{
+  white-space:nowrap;
+}
+
+.sc-so-print-host-v1072{
+  padding:0 12px 12px;
+}
+
+.sc-so-print-panel-v1072{
+  margin-top:8px;
+  border:1px solid #cfe2e5;
+  border-radius:12px;
+  padding:10px;
+  background:#f8fbfc;
+}
+
+.sc-so-print-panel-v1072.failed{
+  border-color:#efbcbc;
+  background:#fff1f1;
+}
+
+.sc-so-print-panel-v1072.waiting{
+  border-color:#d7e0e4;
+  background:#f5f8f9;
+}
+
+.sc-so-print-head-v1072{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:8px;
+}
+
+.sc-so-print-head-v1072 b{
+  font-size:10px;
+  letter-spacing:.4px;
+  color:#087f83;
+}
+
+.sc-so-print-panel-v1072.failed
+.sc-so-print-head-v1072 b{
+  color:#b82929;
+}
+
+.sc-so-print-head-v1072 span{
+  font-size:9.5px;
+  color:#627581;
+  text-align:right;
+}
+
+.sc-so-print-deliveries-v1072{
+  display:grid;
+  gap:6px;
+}
+
+.sc-so-print-delivery-v1072{
+  display:grid;
+  grid-template-columns:minmax(190px,1fr) 90px auto;
+  gap:8px;
+  align-items:center;
+  border:1px solid #dde8ea;
+  border-radius:9px;
+  background:#fff;
+  padding:7px 8px;
+}
+
+.sc-so-print-delivery-v1072 > div{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.sc-so-print-delivery-v1072 > div b{
+  font-size:10px;
+  color:#203354;
+}
+
+.sc-so-print-delivery-v1072 > div span{
+  font-size:9px;
+  color:#687985;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.sc-so-print-status-v1072{
+  justify-self:start;
+  border-radius:999px;
+  padding:4px 7px;
+  font-size:8.5px;
+  font-weight:900;
+  background:#eef2f4;
+  color:#5e6f78;
+}
+
+.sc-so-print-delivery-v1072.pending
+.sc-so-print-status-v1072{
+  background:#fff2c9;
+  color:#7d5d05;
+}
+
+.sc-so-print-delivery-v1072.printed
+.sc-so-print-status-v1072{
+  background:#e2f7eb;
+  color:#126f43;
+}
+
+.sc-so-print-delivery-v1072.failed
+.sc-so-print-status-v1072{
+  background:#ffe3e3;
+  color:#b32626;
+}
+
+.sc-so-print-actions-v1072{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-top:8px;
+}
+
+@media(max-width:720px){
+  .sc-so-print-head-v1072{
+    display:block;
+  }
+
+  .sc-so-print-head-v1072 span{
+    display:block;
+    text-align:left;
+    margin-top:3px;
+  }
+
+  .sc-so-print-delivery-v1072{
+    grid-template-columns:1fr auto;
+  }
+
+  .sc-so-print-delivery-v1072 > button{
+    grid-column:1/-1;
+    justify-self:start;
+  }
+}
+
