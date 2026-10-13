@@ -6005,3 +6005,63 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   font-weight:800;
 }
 
+/* V1.0.71 - Separate PI -> Stores order sync status (current base) */
+.sc-order-sync-host-v1070{
+  margin-top:7px;
+}
+.sc-order-sync-v1070{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:3px;
+  padding:7px 8px;
+  border-radius:9px;
+  border:1px solid #d9e5e8;
+  background:#f7fafb;
+  max-width:240px;
+}
+.sc-order-sync-v1070 b{
+  font-size:9.5px;
+  letter-spacing:.2px;
+}
+.sc-order-sync-v1070 span{
+  font-size:8.5px;
+  color:#657984;
+  line-height:1.3;
+}
+.sc-order-sync-v1070.pending,
+.sc-order-sync-v1070.processing{
+  border-color:#e8d399;
+  background:#fff9e8;
+}
+.sc-order-sync-v1070.pending b,
+.sc-order-sync-v1070.processing b{
+  color:#8a6507;
+}
+.sc-order-sync-v1070.printed{
+  border-color:#b7e0c9;
+  background:#eefaf3;
+}
+.sc-order-sync-v1070.printed b{
+  color:#167148;
+}
+.sc-order-sync-v1070.failed{
+  border-color:#efbcbc;
+  background:#fff1f1;
+}
+.sc-order-sync-v1070.failed b{
+  color:#b82929;
+}
+.sc-order-sync-v1070.waiting{
+  border-color:#cfdde2;
+  background:#f5f8f9;
+}
+.sc-order-sync-v1070.waiting b{
+  color:#536973;
+}
+.sc-order-sync-actions-v1070{
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap;
+  margin-top:3px;
+}
