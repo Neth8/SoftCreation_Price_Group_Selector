@@ -6225,3 +6225,78 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
     margin-top:8px;
   }
 }
+
+/* =========================================================
+   V1.0.78 — MOBILE DATA TABLE HORIZONTAL SCROLL
+   Quotations, Pro Forma, Sales Orders and other data lists.
+   ========================================================= */
+#quotations .panel-body,
+#pis .panel-body,
+#customers .panel-body,
+#items .panel-body,
+#devices .panel-body,
+#salesorders .panel-body,
+#purchaseorders .panel-body,
+#productionproducts .panel-body,
+#dealerfulfilment .panel-body,
+#storesqueue .panel-body,
+#admin .panel-body{
+  min-width:0;
+}
+
+#quoteList,
+#piList,
+#customerList,
+#itemList,
+#soList91,
+#poList,
+#productionProductsList,
+#dfList,
+#storesQueueList,
+#dashResults{
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:visible;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+  touch-action:pan-x pan-y;
+}
+
+@media(max-width:800px){
+  #quoteList > table.table,
+  #piList > table.table,
+  #customerList > table.table,
+  #itemList > table.table,
+  #soList91 > table.table,
+  #poList > table.table,
+  #productionProductsList > table.table,
+  #dfList > table.table,
+  #storesQueueList > table.table,
+  #dashResults > table.table{
+    min-width:820px;
+    width:max-content;
+  }
+
+  #quotations .panel,
+  #pis .panel,
+  #customers .panel,
+  #items .panel,
+  #salesorders .panel,
+  #purchaseorders .panel,
+  #productionproducts .panel,
+  #dealerfulfilment .panel{
+    min-width:0;
+  }
+
+  #quotations .panel-body,
+  #pis .panel-body,
+  #customers .panel-body,
+  #items .panel-body,
+  #salesorders .panel-body,
+  #purchaseorders .panel-body,
+  #productionproducts .panel-body,
+  #dealerfulfilment .panel-body{
+    min-width:0;
+    overflow-x:hidden;
+  }
+}
