@@ -6212,3 +6212,16 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   }
 }
 
+/* V1.0.73 - Sales Order direct Stores reprint button */
+.sc-so-card-reprint-v1073{
+  align-self:center;
+  margin-left:auto;
+  white-space:nowrap;
+}
+@media(max-width:700px){
+  .sc-so-card-reprint-v1073{
+    width:100%;
+    margin-left:0;
+    margin-top:8px;
+  }
+}
