@@ -6858,3 +6858,9 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
     grid-template-columns:1fr;
   }
 }
+
+
+/* V1.1.18 — linked Sales Order conversion flow */
+.sc-order-sync-v1070.synced b{
+  letter-spacing:.2px;
+}

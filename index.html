@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.17</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.18</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.17</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.18</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -2120,19 +2120,12 @@ Please record customer payments or increase the approved credit limit before cre
 
   /*
    * CREDIT CHECK PASSED
+   *
+   * V1.1.18:
+   * Use the saved quotation directly. Do not open the full editor.
    */
-
-  openDocument(id);
-
-
-  setTimeout(()=>{
-
-    showView('pis');
-
-    convertCurrentToPI();
-
-  },50);
-
+  convertCurrentToPI(quotation);
+  return true;
 }
 function convertCurrentToPI(){const d=collectCurrent();if(!d||d.type!=='Q')return;$('convertItems').innerHTML=(d.lines||[]).map((l,i)=>`<label class="checkline" style="padding:9px;border-bottom:1px solid #e4ecee"><input type="checkbox" class="convcheck" data-i="${i}" checked><span><b>${esc(l.desc)}</b> — ${esc([l.size,l.material,l.layout].filter(Boolean).join(' / '))} <span class="small">${money(l.qty)} ${esc(l.unit)} @ LKR ${money(l.price)}</span></span></label>`).join('');$('convertModal').classList.add('show')}
 function createPIFromSelection(){
@@ -3609,7 +3602,7 @@ function autoSalesOrderFromConvertedPIV116(pi,q,plans,deliveryMethod){
     date:today(),
     needDate:overallNeedDate,
     deliveryMethod:String(deliveryMethod||pi.deliveryMethod||''),
-    customerRef:q.poRef||'',
+    customerRef:pi.poRef||q.poRef||'',
     customerId:pi.customerId,
     customerName:customer?.name||q.customer?.name||'',
     customerPhone:customer?.phone||q.customer?.phone||'',
@@ -3624,7 +3617,11 @@ function autoSalesOrderFromConvertedPIV116(pi,q,plans,deliveryMethod){
       address:customer?.delivery||customer?.address||q.customer?.delivery||q.customer?.address||'',
       map:customer?.map||q.customer?.map||''
     },
-    note:'Created automatically from Quotation → PI conversion. No production request created.',
+    note:String(
+      pi.extraNote ||
+      q.extraNote ||
+      ''
+    ).trim(),
     lines,
     total:lines.reduce((s,l)=>s+Number(l.qty||0)*Number(l.price||0),0),
     ownerUser:q.ownerUser||currentUser?.username||'',
@@ -3690,9 +3687,12 @@ function toggleProdLineV8(i){
 }
 
 function installProductionConversionV8(){
-  convertCurrentToPI=function(){
-    const d=collectCurrent();
+  convertCurrentToPI=function(sourceQuote=null){
+    const d=sourceQuote || collectCurrent();
     if(!d||d.type!=='Q')return;
+
+    window.scQuoteConversionSourceV1118=
+      JSON.parse(JSON.stringify(d));
 
     $('convertItems').innerHTML=`
       <div class="notice">
@@ -3730,7 +3730,10 @@ function installProductionConversionV8(){
   createPIFromSelection=function(){
     if(!requirePerm('convert_pi','create a PI'))return;
 
-    const q=collectCurrent();
+    const q=
+      window.scQuoteConversionSourceV1118 ||
+      collectCurrent();
+
     const sel=[...document.querySelectorAll('.convcheck:checked')]
       .map(x=>Number(x.dataset.i));
 
@@ -3742,6 +3745,23 @@ function installProductionConversionV8(){
 
     if(!deliveryMethod){
       return toast('Select a delivery method');
+    }
+
+    let poRef=String(q.poRef||'').trim();
+
+    if(!poRef){
+      const entered=window.prompt(
+        'Enter Customer PO / Reference for this Pro Forma Invoice',
+        ''
+      );
+
+      if(entered===null)return;
+
+      poRef=String(entered||'').trim();
+
+      if(!poRef){
+        return toast('Enter the customer PO / Reference');
+      }
     }
 
     const plans=sel.map(i=>({
@@ -3770,6 +3790,7 @@ function installProductionConversionV8(){
       type:'PI',
       serial:serialFor('PI',q.core,q.rev||0),
       sourceQuoteId:q.id,
+      poRef,
       lines:selectedLines,
       date:today(),
       validity:0,
@@ -3795,19 +3816,40 @@ function installProductionConversionV8(){
     try{updateStats()}catch(_){}
 
     closeModal('convertModal');
+    window.scQuoteConversionSourceV1118=null;
+
     resetEditor(false);
-    openDocument(pi.id);
+    try{renderDocLists()}catch(_){}
+    try{renderSalesOrders91?.()}catch(_){}
+    showView('pis');
 
-    if($('poRef'))$('poRef').value='';
-    updateEditorVisibility();
-    renderCurrent();
+    /*
+      PI stays in Pro Forma and does not create a PI receipt.
+      The linked Sales Order is the operational order and
+      automatically creates the Stores Sales Order receipt.
+    */
+    setTimeout(async()=>{
+      try{
+        if(typeof window.syncSalesOrderTabToStoresV1076==='function'){
+          const result=
+            await window.syncSalesOrderTabToStoresV1076(so);
 
-    /* Preserve the confirmed-PI Stores sync when a PO/reference exists. */
-    if(String(pi.poRef||'').trim()){
-      try{syncPIToStoresV1070?.(pi.id,false)}catch(_){}
-    }
+          if(result?.print_enqueued){
+            toast(`${so.soNo} Sales Order receipt queued`);
+          }
+        }
+      }catch(err){
+        console.error(
+          'Automatic Sales Order receipt failed',
+          err
+        );
+        toast(
+          `${so.soNo} saved, but receipt queue failed: ${err?.message||err}`
+        );
+      }
+    },0);
 
-    toast(`${pi.serial} created with ${so.soNo}. No production request created.`);
+    toast(`${pi.serial} saved to Pro Forma and ${so.soNo} created.`);
     return pi;
   };
 }
@@ -5660,7 +5702,7 @@ window.convertBranchRequest=function(id){
  window.toggleSoDestination91=function(){const m=$('soMethod91').value,show=m===DIRECT||m===MIXED;$('soDestination91').style.display=show?'block':'none'};
  function collectSoLines91(){return [...document.querySelectorAll('#soLines91 .so-line')].map(r=>{const l=JSON.parse(decodeURIComponent(r.querySelector('.soData91').value));return {...l,use:r.querySelector('.soUse91').checked,qty:Number(r.querySelector('.soQty91').value||0)}}).filter(x=>x.use&&x.qty>0)}
  function createSoFulfilment91(so){let p=state.dealerFulfilments.find(x=>x.sourceSOId===so.id);if(p)return p;p={id:uid('df'),planNo:`SC/OF/${today().slice(0,4)}/${String(state.dealerFulfilments.length+1).padStart(4,'0')}`,piId:'',piSerial:so.soNo,sourceType:'SO',sourceSOId:so.id,sourceSerial:so.soNo,dealerId:so.customerId,dealerName:so.customerName,dealerPhone:so.customerPhone,poRef:so.customerRef||'',method:so.method,instructions:so.note||'',ownerUser:so.ownerUser,ownerDisplay:so.ownerDisplay,lines:so.lines.map(l=>({desc:l.desc,size:l.size,material:l.material,layout:l.layout,pcs:l.pcs,qty:l.qty,unit:l.unit})),consignments:[],createdAt:new Date().toISOString(),createdBy:currentUser.display,erpSONo:so.erpSONo||''};state.dealerFulfilments.unshift(p);if(so.method===DIRECT){p.consignments.push({id:uid('con'),consignmentNo:`${p.planNo}/S01`,recipient:so.shipTo.name,phone:so.shipTo.phone,address:so.shipTo.address,map:so.shipTo.map,payer:'Customer',charge:0,blind:false,allocations:p.lines.map((l,i)=>({lineIndex:i,qty:l.qty})),status:'Awaiting Instructions',courier:'',tracking:'',dispatchDate:'',expectedDate:'',deliveredDate:'',receiver:'',deliveredQty:0,note:so.note||'',proof:null,packageImages:[],history:[],updatedAt:new Date().toISOString(),updatedBy:currentUser.display})}return p}
- window.saveSalesOrder91=function(sync=false){const id=$('soId91').value,old=state.salesOrders.find(x=>x.id===id),c=state.customers.find(x=>x.id===$('soCustomer91').value),pi=state.docs.find(x=>x.id===$('soSource91').value),lines=collectSoLines91();if(!c||!pi)return toast('Select an eligible customer and source PI');if(!customerPIs91(c.id).some(x=>x.id===pi.id))return toast('The selected PI does not belong to this customer');if(!lines.length)return toast('Select at least one repeat-order item with a valid quantity');const method=$('soMethod91').value,shipTo={name:method===DIRECT||method===MIXED?$('soShipName91').value.trim():c.name,phone:method===DIRECT||method===MIXED?$('soShipPhone91').value.trim():c.phone||'',address:method===DIRECT||method===MIXED?$('soShipAddress91').value.trim():c.delivery||c.address||'',map:method===DIRECT||method===MIXED?$('soShipMap91').value.trim():c.map||''};if((method===DIRECT||method===MIXED)&&(!shipTo.name||!shipTo.phone||!shipTo.address))return toast('Complete the nominated delivery details');const so={...(old||{}),id:old?.id||uid('so'),soNo:old?.soNo||soNo91(),date:$('soDate91').value||today(),needDate:$('soNeed91').value,customerRef:$('soRef91').value.trim(),customerId:c.id,customerName:c.name,customerPhone:c.phone||'',sourcePIId:pi.id,sourcePISerial:pi.serial,method,shipTo,note:$('soNote91').value.trim(),lines,total:soTotalCalc91(lines),ownerUser:old?.ownerUser||currentUser.username,ownerDisplay:old?.ownerDisplay||currentUser.display,erpStatus:old?.erpStatus||'Pending ERP Sync',erpSONo:old?.erpSONo||'',erpMessage:old?.erpMessage||'',createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(),history:[...(old?.history||[]),{action:old?'Updated':'Created',by:currentUser.display,at:new Date().toISOString()}]};if(old)Object.assign(old,so);else state.salesOrders.unshift(so);const p=createSoFulfilment91(so);so.fulfilmentPlanId=p.id;audit(old?'UPDATE_SALES_ORDER':'CREATE_SALES_ORDER',`${so.soNo} • ${c.name}`);saveState();closeModal('soModal91');renderSalesOrders91();renderDealerFulfilment();toast(`${so.soNo} saved and linked to Order Fulfilment`);if(sync)syncSalesOrder91(so.id);return so};
+ window.saveSalesOrder91=function(sync=false){const id=$('soId91').value,old=state.salesOrders.find(x=>x.id===id),c=state.customers.find(x=>x.id===$('soCustomer91').value),pi=state.docs.find(x=>x.id===$('soSource91').value),lines=collectSoLines91();if(!c||!pi)return toast('Select an eligible customer and source PI');if(!customerPIs91(c.id).some(x=>x.id===pi.id))return toast('The selected PI does not belong to this customer');if(!lines.length)return toast('Select at least one repeat-order item with a valid quantity');const method=$('soMethod91').value,shipTo={name:method===DIRECT||method===MIXED?$('soShipName91').value.trim():c.name,phone:method===DIRECT||method===MIXED?$('soShipPhone91').value.trim():c.phone||'',address:method===DIRECT||method===MIXED?$('soShipAddress91').value.trim():c.delivery||c.address||'',map:method===DIRECT||method===MIXED?$('soShipMap91').value.trim():c.map||''};if((method===DIRECT||method===MIXED)&&(!shipTo.name||!shipTo.phone||!shipTo.address))return toast('Complete the nominated delivery details');const so={...(old||{}),id:old?.id||uid('so'),soNo:old?.soNo||soNo91(),date:$('soDate91').value||today(),needDate:$('soNeed91').value,customerRef:$('soRef91').value.trim(),customerId:c.id,customerName:c.name,customerPhone:c.phone||'',sourcePIId:pi.id,sourcePISerial:pi.serial,method,deliveryMethod:old?.deliveryMethod||method,shipTo,note:$('soNote91').value.trim(),lines,total:soTotalCalc91(lines),ownerUser:old?.ownerUser||currentUser.username,ownerDisplay:old?.ownerDisplay||currentUser.display,erpStatus:old?.erpStatus||'Pending ERP Sync',erpSONo:old?.erpSONo||'',erpMessage:old?.erpMessage||'',createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(),history:[...(old?.history||[]),{action:old?'Updated':'Created',by:currentUser.display,at:new Date().toISOString()}]};if(old)Object.assign(old,so);else state.salesOrders.unshift(so);const p=createSoFulfilment91(so);so.fulfilmentPlanId=p.id;audit(old?'UPDATE_SALES_ORDER':'CREATE_SALES_ORDER',`${so.soNo} • ${c.name}`);saveState();closeModal('soModal91');renderSalesOrders91();renderDealerFulfilment();toast(`${so.soNo} saved and linked to Order Fulfilment`);if(!old){setTimeout(async()=>{try{if(typeof window.syncSalesOrderTabToStoresV1076==='function'){const r=await window.syncSalesOrderTabToStoresV1076(so);if(r?.print_enqueued)toast(`${so.soNo} Sales Order receipt queued`)}}catch(err){console.error('Automatic direct Sales Order receipt failed',err);toast(`${so.soNo} saved, but receipt queue failed: ${err?.message||err}`)}},0)}if(sync)syncSalesOrder91(so.id);return so};
  window.saveAndSyncSO91=function(){return saveSalesOrder91(true)};
  window.renderSalesOrders91=function(){if(!$('soList91'))return;const q=($('soSearch91')?.value||'').toLowerCase(),f=$('soStatus91')?.value||'',a=state.salesOrders.filter(soVisible91).filter(x=>(!f||x.erpStatus===f)&&[x.soNo,x.customerName,x.sourcePISerial,x.erpSONo,x.customerRef].join(' ').toLowerCase().includes(q));$('soList91').innerHTML=a.length?`<table class="table"><thead><tr><th>Sales Order</th><th>Customer / Source</th><th>Items</th><th>Value</th><th>ERP Status</th><th>Fulfilment</th><th></th></tr></thead><tbody>${a.map(x=>`<tr><td><b>${esc(x.soNo)}</b><div class="small">${esc(x.date)} • Need ${esc(x.needDate||'-')}</div></td><td><b>${esc(x.customerName)}</b><div class="small">Price source: ${esc(x.sourcePISerial)}<br>PO/Ref: ${esc(x.customerRef||'-')}</div></td><td>${x.lines.length}<div class="small">${x.lines.slice(0,2).map(l=>esc(l.desc+' '+l.size+' × '+money(l.qty))).join('<br>')}</div></td><td><b>LKR ${money(x.total)}</b></td><td><span class="so-status ${soClass91(x.erpStatus)}">${esc(x.erpStatus)}</span>${x.erpSONo?`<div class="small">ERP: ${esc(x.erpSONo)}</div>`:''}${x.erpMessage?`<div class="small">${esc(x.erpMessage)}</div>`:''}</td><td><button class="btn ghost sm" onclick="showView('dealerfulfilment');openDfPlan('${x.fulfilmentPlanId}')">Open Plan</button></td><td>
   <button class="btn ghost sm" onclick="openSalesOrder91('${x.id}')">Open</button>
@@ -22749,6 +22791,14 @@ window.toggleBpSeparateDeliveryButton = function(){
   };
 
   function syncBadgeHtmlV1070(doc){
+    if(doc?.linkedSalesOrderId){
+      return `
+        <div class="sc-order-sync-v1070 synced">
+          <b>LINKED SALES ORDER</b>
+          <span>${esc(doc.linkedSalesOrderNo||'-')} • Receipt handled from Sales Orders</span>
+        </div>`;
+    }
+
     const s=doc?.softcreationOrderSync||{};
 
     if(s.status==='failed'){
@@ -23139,7 +23189,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       order_date:String(so?.date||''),
       required_date:String(so?.needDate||''),
       customer_ref:String(so?.customerRef||''),
-      delivery_method:String(so?.deliveryMethod||''),
+      delivery_method:String(so?.deliveryMethod||so?.method||''),
 
       parent_customer:{
         id:String(so?.customerId||''),
@@ -23516,7 +23566,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       order_date:String(so?.date||''),
       required_date:String(so?.needDate||''),
       customer_ref:String(so?.customerRef||''),
-      delivery_method:String(so?.deliveryMethod||''),
+      delivery_method:String(so?.deliveryMethod||so?.method||''),
 
       parent_customer:{
         id:String(so?.customerId||''),
@@ -23580,6 +23630,9 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     return result;
   }
+
+  window.syncSalesOrderTabToStoresV1076=
+    syncSalesOrderTabToStoresV1076;
 
   window.reprintSalesOrderTabV1076=
   async function(soId){
