@@ -6300,3 +6300,85 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
     overflow-x:hidden;
   }
 }
+
+/* =========================================================
+   V1.0.79 — TOP REFRESH BUTTON
+   ========================================================= */
+.app-refresh-btn-v1079{
+  height:38px;
+  min-width:96px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border:1px solid #d2e0e4;
+  border-radius:11px;
+  padding:0 12px;
+  background:#fff;
+  color:#274250;
+  font-weight:900;
+  font-size:11px;
+  cursor:pointer;
+  transition:.15s;
+  white-space:nowrap;
+}
+
+.app-refresh-btn-v1079:hover{
+  transform:translateY(-1px);
+  filter:brightness(.98);
+  border-color:#a9cfd0;
+}
+
+.app-refresh-btn-v1079:disabled{
+  opacity:.65;
+  cursor:wait;
+}
+
+.app-refresh-icon-v1079{
+  display:inline-block;
+  font-size:19px;
+  line-height:1;
+}
+
+.app-refresh-btn-v1079.is-refreshing
+.app-refresh-icon-v1079{
+  animation:sc-refresh-spin-v1079 .7s linear infinite;
+}
+
+@keyframes sc-refresh-spin-v1079{
+  to{transform:rotate(360deg)}
+}
+
+[data-theme="dark"]
+.app-refresh-btn-v1079{
+  background:#14232a;
+  color:#eef8fa;
+  border-color:#36515a;
+}
+
+@media(max-width:650px){
+  .app-refresh-btn-v1079{
+    min-width:38px;
+    width:38px;
+    padding:0;
+  }
+
+  .app-refresh-text-v1079{
+    display:none;
+  }
+}
+
+/* =========================================================
+   V1.0.80 — PRO FORMA STORES STATUS CLEANUP
+   Keep:
+   - FROM QUOTE / source quotation
+   - SC-ORD number
+   - Stores Print status
+   Remove:
+   - Check Print
+   - Reprint
+   - Resync
+   ========================================================= */
+#piList .sc-order-sync-actions-v1070{
+  display:none !important;
+}
