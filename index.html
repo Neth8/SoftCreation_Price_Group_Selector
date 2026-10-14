@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.10</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.11</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.10</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.11</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -25527,6 +25527,7 @@ let miCustomerRows=[];
 let miCustomerTimer=null;
 let miCustomerSeq=0;
 let miLocked=false;
+let miViewingId='';
 
 const mi$=id=>document.getElementById(id);
 const miNum=v=>Number(v||0);
@@ -25732,10 +25733,12 @@ function miRender(){
   if(!body)return;
   if(miPage==='dashboard')body.innerHTML=miDashboardHTML(invoices,pending,updated);
   else if(miPage==='editor')body.innerHTML=miEditorHTML();
+  else if(miPage==='viewer')body.innerHTML=miViewerHTML();
   else if(miPage==='pending')body.innerHTML=miListPageHTML('ERP Pending','Manual invoices awaiting GRN / ERP update.',pending,'miPendingSearch');
-  else if(miPage==='updated')body.innerHTML=miListPageHTML('ERP Updated — Locked','Final records. Editing, payment changes and deletion are disabled.',updated,'miUpdatedSearch');
+  else if(miPage==='updated')body.innerHTML=miListPageHTML('ERP Updated — Locked','Final records. View and download only.',updated,'miUpdatedSearch');
   else body.innerHTML=miListPageHTML('Invoice History','Complete searchable manual invoice register.',invoices,'miHistorySearch');
   if(miPage==='editor')setTimeout(miAfterEditorRender,0);
+  if(miPage==='viewer')setTimeout(miAfterViewerRender,0);
 }
 function miDashboardHTML(all,pending,updated){
   const outstanding=all.reduce((s,x)=>s+miBalance(x),0);
@@ -25776,6 +25779,10 @@ function miTableHTML(list){
   if(!list.length)return '<div class="mi-empty">No invoices found.</div>';
   return `<div class="mi-table-wrap"><table class="mi-table"><thead><tr><th>Invoice No.</th><th>Date</th><th>ERP Customer</th><th>Total</th><th>Paid</th><th>Balance</th><th>Payment</th><th>ERP</th><th>Action</th></tr></thead><tbody>${list.map(inv=>{
     const ps=miPayStatus(inv);
+    const updated=inv.erpStatus==='updated';
+    const actions=updated
+      ? `<button class="btn ghost sm" onclick="miViewInvoice('${inv.id}')">View</button><button class="btn ghost sm" onclick="miPrintInvoice('${inv.id}')">Download / PDF</button>`
+      : `<button class="btn ghost sm" onclick="miViewInvoice('${inv.id}')">View</button>${miCan('manual_invoice_finalize')?`<button class="btn green sm" onclick="miMarkERPUpdatedById('${inv.id}')">ERP Updated</button>`:''}`;
     return `<tr>
       <td><b>${miEsc(inv.invoiceNo)}</b>${inv.erpRef?`<small>ERP: ${miEsc(inv.erpRef)}</small>`:''}</td>
       <td>${miEsc(inv.invoiceDate||'')}</td>
@@ -25784,8 +25791,8 @@ function miTableHTML(list){
       <td class="num">${miMoney(miPaid(inv))}</td>
       <td class="num strong">${miMoney(miBalance(inv))}</td>
       <td><span class="mi-status ${miStatusClass(ps)}">${ps}</span></td>
-      <td><span class="mi-status ${inv.erpStatus==='updated'?'updated':'pending'}">${inv.erpStatus==='updated'?'ERP Updated':'ERP Pending'}</span></td>
-      <td><div class="mi-actions"><button class="btn ghost sm" onclick="miOpenInvoice('${inv.id}')">${inv.erpStatus==='updated'?'View':'Edit'}</button><button class="btn ghost sm" onclick="miPrintInvoice('${inv.id}')">Print / PDF</button></div></td>
+      <td><span class="mi-status ${updated?'updated':'pending'}">${updated?'ERP Updated':'ERP Pending'}</span></td>
+      <td><div class="mi-actions">${actions}</div></td>
     </tr>`;
   }).join('')}</tbody></table></div>`;
 }
@@ -25793,16 +25800,31 @@ function miTableHTML(list){
 window.miNewInvoice=function(){
   if(!miCan('manual_invoice_create'))return requirePerm('manual_invoice_create','create manual invoices');
   miEditingId='';
+  miViewingId='';
   miDraftPayments=[];
   miSelectedErpCustomer=null;
   miLocked=false;
   miPage='editor';
   miRender();
 };
+
+window.miViewInvoice=function(id){
+  const inv=miInvoice(id);
+  if(!inv)return;
+  miViewingId=id;
+  miPage='viewer';
+  miRender();
+};
+
 window.miOpenInvoice=function(id){
   const inv=miInvoice(id);
   if(!inv)return;
+  if(inv.erpStatus==='updated'){
+    return miViewInvoice(id);
+  }
+  if(!miCan('manual_invoice_create'))return requirePerm('manual_invoice_create','edit manual invoices');
   miEditingId=id;
+  miViewingId='';
   miDraftPayments=(inv.payments||[]).map(x=>({...x}));
   miSelectedErpCustomer={
     id:inv.erpCustomerId,
@@ -25812,11 +25834,49 @@ window.miOpenInvoice=function(id){
     phone:inv.customerPhone,
     tin:inv.customerTIN
   };
-  miLocked=inv.erpStatus==='updated';
+  miLocked=false;
   miPage='editor';
   miRender();
 };
 
+function miViewerHTML(){
+  const inv=miInvoice(miViewingId);
+  if(!inv)return `<div class="mi-card"><div class="mi-empty">Invoice not found.</div></div>`;
+  const updated=inv.erpStatus==='updated';
+  const ps=miPayStatus(inv);
+  return `<div class="mi-viewer-shell">
+    <div class="mi-card">
+      <div class="mi-card-head">
+        <div>
+          <h3>${miEsc(inv.invoiceNo)}</h3>
+          <p>${miEsc(inv.customerName)} • ${miEsc(inv.invoiceDate||'')}</p>
+        </div>
+        <div class="mi-actions">
+          ${!updated&&miCan('manual_invoice_create')?`<button class="btn amber" onclick="miOpenInvoice('${inv.id}')">Edit Invoice</button>`:''}
+          <button class="btn ghost" onclick="miPrintInvoice('${inv.id}')">Download / PDF</button>
+          ${!updated&&miCan('manual_invoice_finalize')?`<button class="btn green" onclick="miMarkERPUpdatedById('${inv.id}')">ERP Updated</button>`:''}
+          <button class="btn ghost" onclick="miGo('${updated?'updated':'history'}')">Back</button>
+        </div>
+      </div>
+      <div class="mi-viewer-statusbar">
+        <span class="mi-status ${updated?'updated':'pending'}">${updated?'ERP Updated — Locked':'ERP Pending'}</span>
+        <span class="mi-status ${miStatusClass(ps)}">${ps}</span>
+        <span>Total: <b>Rs. ${miMoney(miTotal(inv))}</b></span>
+        <span>Paid: <b>Rs. ${miMoney(miPaid(inv))}</b></span>
+        <span>Balance: <b>Rs. ${miMoney(miBalance(inv))}</b></span>
+      </div>
+      ${updated?'<div class="mi-locked-view-note"><b>Final ERP Updated record.</b> Editing and payment changes are disabled. This invoice is view/download only.</div>':''}
+    </div>
+    <div class="mi-card">
+      <div class="mi-viewer-paper"><div id="miViewerInvoiceHost"></div></div>
+    </div>
+  </div>`;
+}
+
+function miAfterViewerRender(){
+  const inv=miInvoice(miViewingId);
+  if(inv)miRenderInvoice(inv,'miViewerInvoiceHost');
+}
 function miEditorHTML(){
   const inv=miEditingId?miInvoice(miEditingId):null;
   const locked=!!inv&&inv.erpStatus==='updated';
@@ -26062,6 +26122,36 @@ window.miSaveInvoice=async function(silent=false){
     miRender();
   }catch(e){console.error(e);toast(e.message)}
 };
+window.miMarkERPUpdatedById=async function(id){
+  const inv=miInvoice(id);
+  if(!inv)return toast('Manual invoice not found');
+  if(inv.erpStatus==='updated'){
+    miViewingId=id;
+    miPage='updated';
+    miRender();
+    return;
+  }
+  if(!miCan('manual_invoice_finalize'))return requirePerm('manual_invoice_finalize','mark manual invoices ERP Updated');
+  if(!confirm(`Mark ${inv.invoiceNo} as ERP Updated?\n\nThis permanently locks the invoice. After this, it can only be viewed or downloaded.`))return;
+  try{
+    await miRpc('spgs_manual_invoice_mark_erp_updated',{
+      p_invoice_id:id,
+      p_username:currentUser?.username||'',
+      p_display_name:currentUser?.display||currentUser?.username||''
+    });
+    await miLoad();
+    miEditingId='';
+    miViewingId='';
+    miLocked=false;
+    miPage='updated';
+    miRender();
+    toast('ERP Updated — invoice moved to ERP Updated and locked');
+  }catch(e){
+    console.error(e);
+    toast(e.message);
+  }
+};
+
 window.miMarkERPUpdated=async function(){
   if(!miEditingId)return toast('Save the invoice first');
   if(!miCan('manual_invoice_finalize'))return requirePerm('manual_invoice_finalize','mark manual invoices ERP Updated');
@@ -26074,7 +26164,13 @@ window.miMarkERPUpdated=async function(){
       p_username:currentUser?.username||'',
       p_display_name:currentUser?.display||currentUser?.username||''
     });
-    await miLoad();miLocked=true;miRender();toast('ERP Updated — invoice locked');
+    await miLoad();
+    miEditingId='';
+    miViewingId='';
+    miLocked=false;
+    miPage='updated';
+    miRender();
+    toast('ERP Updated — invoice moved to ERP Updated and locked');
   }catch(e){console.error(e);toast(e.message)}
 };
 window.miDeleteInvoice=async function(){

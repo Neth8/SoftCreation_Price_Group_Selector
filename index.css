@@ -6446,3 +6446,18 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   body.mi-printing #miPrintHost{display:block!important}
   body.mi-printing #miPrintHost .mi-invoice-page{width:210mm!important;height:297mm!important;min-height:297mm!important;margin:0!important;box-shadow:none!important;transform:none!important}
 }
+
+
+/* V1.1.11 — Manual Invoice row actions + read-only viewer */
+.mi-viewer-shell{display:grid;grid-template-columns:1fr;gap:14px}
+.mi-viewer-statusbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border:1px solid #dce8ea;border-radius:10px;background:#f8fbfc;font-size:10px;color:#586d74}
+.mi-locked-view-note{margin-top:10px;padding:10px 12px;border:1px solid #c9e6d4;border-radius:10px;background:#edf9f1;color:#16643b;font-size:10.5px}
+.mi-viewer-paper{background:#e4eaec;border-radius:10px;padding:16px;overflow:auto;display:flex;justify-content:center}
+.mi-viewer-paper .mi-invoice-page{transform:none;margin:0 auto}
+.mi-actions .btn.green{background:#16885b;color:#fff}
+@media(max-width:760px){
+  .mi-viewer-paper{padding:8px;justify-content:flex-start}
+  .mi-viewer-paper .mi-invoice-page{transform:scale(.62);transform-origin:top left;margin-bottom:-320px}
+}
+[data-theme="dark"] .mi-viewer-statusbar{background:#172a32;border-color:#314b54;color:#dbeaec}
+[data-theme="dark"] .mi-locked-view-note{background:#153024;border-color:#27543b;color:#cfeedd}
