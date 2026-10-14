@@ -6396,3 +6396,8 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 @media(max-width:1050px){.pc-grid{grid-template-columns:1fr}.pc-kpis{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.pc-kpis{grid-template-columns:1fr 1fr}.pc-policy-grid,.pc-split{grid-template-columns:1fr}.pc-title small{display:none}.pc-tabs{overflow-x:auto;flex-wrap:nowrap}.pc-tabs button{white-space:nowrap}}
 [data-theme="dark"] .pc-card,[data-theme="dark"] .pc-kpi{background:#122129;border-color:#29424a;color:#e8f4f6}[data-theme="dark"] .pc-card h3,[data-theme="dark"] .pc-kpi strong{color:#e8f4f6}[data-theme="dark"] .pc-table th{background:#182a32}[data-theme="dark"] .pc-formula{background:#152c2c;border-color:#31514e}
+
+/* V1.1.01 — PI row reprint button */
+#piList .sc-pi-row-reprint-v1101{
+  margin-right:4px;
+}
