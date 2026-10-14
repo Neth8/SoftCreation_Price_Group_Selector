@@ -6421,7 +6421,15 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 /* Approved manual-invoice artwork positions from the supplied designer file. */
 .mi-invoice-page{width:595.28pt;height:841.89pt;min-height:841.89pt;position:relative;overflow:hidden;background:#fff;font-family:Arial,Helvetica,sans-serif;color:#111;box-shadow:0 3px 14px rgba(0,0,0,.12)}
 .mi-exact-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:0;pointer-events:none}.mi-exact-text{position:absolute;z-index:2;color:#111;white-space:nowrap}.mi-ex-date{left:35pt;top:115pt;font-size:8.1pt;line-height:14pt;font-weight:700}.mi-ex-no{left:308pt;top:115pt;font-size:8.1pt;line-height:14pt;font-weight:700}
-.mi-ex-buyer{position:absolute;z-index:2;left:308pt;top:140pt;width:250pt;font-size:7.2pt;line-height:1.25;color:#111}.mi-ex-buyer-row{display:grid;grid-template-columns:86pt 10pt 1fr;margin-bottom:7pt;align-items:start}.mi-ex-buyer .strong{font-weight:700}.mi-ex-buyer .addr{line-height:1.35;white-space:normal}.mi-ex-supply-date{left:35pt;top:224pt;font-size:7.6pt;line-height:14pt}.mi-ex-additional{left:36pt;top:251pt;width:520pt;font-size:8pt;line-height:14pt;white-space:normal}
+.mi-ex-buyer{position:absolute;z-index:4;left:307pt;top:140pt;width:251pt;font-size:7.2pt;line-height:1.28;color:#111}
+.mi-ex-buyer-row{display:grid;grid-template-columns:88pt 10pt minmax(0,1fr);align-items:start;min-height:14pt;margin-bottom:5pt}
+.mi-ex-buyer-row span:nth-child(2){text-align:center}
+.mi-ex-buyer .strong{font-weight:700}
+.mi-ex-buyer .addr{line-height:1.38;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+.mi-ex-buyer.mi-long-address{background:#fff;padding-bottom:5pt}
+.mi-ex-buyer.mi-long-address::after{content:"";position:absolute;z-index:-1;left:-2pt;right:-2pt;top:-4pt;bottom:-6pt;background:#fff;border-right:.7pt solid #111;border-bottom:.7pt solid #111}
+.mi-ex-supply-date{left:35pt;top:224pt;font-size:7.6pt;line-height:14pt}
+.mi-ex-additional{left:36pt;top:251pt;width:520pt;font-size:8pt;line-height:14pt;white-space:normal}
 .mi-ex-table{position:absolute;z-index:2;left:28pt;top:287pt;width:539pt;border-collapse:collapse;table-layout:fixed;font-size:6.8pt;color:#111}.mi-ex-table th{background:#000;color:#fff;border:1px solid #000;height:24pt;padding:3pt 4pt;text-align:center;font-size:6.8pt}.mi-ex-table td{border:.45pt solid #555;padding:4pt 5pt;vertical-align:middle;overflow:hidden}.mi-ex-table tbody tr:nth-child(odd) td{background:#e6e9eb}.mi-ex-table .c{text-align:center}.mi-ex-table .r{text-align:right;white-space:nowrap}.mi-ex-table .desc{white-space:normal;line-height:1.15}
 .mi-ex-summary{position:absolute;z-index:2;left:28pt;top:560pt;width:539pt;font-size:8.2pt}.mi-ex-sumrow{height:24pt;border:.7pt solid #111;border-bottom:0;display:grid;grid-template-columns:1fr 130pt;align-items:center;padding:0 10pt}.mi-ex-sumrow .v{text-align:right}.mi-ex-words{height:32pt;border:.7pt solid #111;padding:7pt 10pt;font-size:7.4pt;line-height:1.18}.mi-ex-mode{height:24pt;border:.7pt solid #111;border-top:0;display:flex;align-items:center;padding:0 10pt;font-size:7.8pt}
 
@@ -6461,3 +6469,328 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 }
 [data-theme="dark"] .mi-viewer-statusbar{background:#172a32;border-color:#314b54;color:#dbeaec}
 [data-theme="dark"] .mi-locked-view-note{background:#153024;border-color:#27543b;color:#cfeedd}
+
+
+/* V1.1.12 — Manual Invoice approved-template alignment */
+.mi-ex-date,.mi-ex-no{display:flex;align-items:center}
+.mi-ex-buyer-row>span:last-child{padding-top:.1pt}
+.mi-ex-buyer .addr{max-width:150pt}
+
+
+/* =====================================================================
+   V1.1.13 — Manual Invoice header rebuild + correct multi-page printing
+   ===================================================================== */
+
+/* Hide the old variable-text overlay classes from earlier revisions. */
+.mi-ex-date,.mi-ex-no,.mi-ex-buyer,.mi-ex-supply-date,.mi-ex-additional{display:none!important}
+
+/*
+  The approved background still supplies company branding, TAX INVOICE,
+  watermark, signatures and banking footer. The entire variable header
+  is redrawn above it so borders/text stay aligned and can grow.
+*/
+.mi-dyn-header{
+  position:absolute;
+  left:28pt;
+  width:539pt;
+  z-index:5;
+  background:#fff;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#111;
+  font-size:7.6pt;
+}
+.mi-dyn-doc-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  height:25pt;
+  border:.7pt solid #111;
+}
+.mi-dyn-doc-row>div,
+.mi-dyn-supply-row>div{
+  display:grid;
+  grid-template-columns:auto 8pt 1fr;
+  align-items:center;
+  padding:0 9pt;
+  min-width:0;
+}
+.mi-dyn-doc-row>div+div,
+.mi-dyn-supply-row>div+div{
+  border-left:.7pt solid #111;
+}
+.mi-dyn-doc-row b,
+.mi-dyn-supply-row b{
+  white-space:nowrap;
+}
+.mi-dyn-doc-row i,
+.mi-dyn-supply-row i,
+.mi-dyn-kv i{
+  font-style:normal;
+  text-align:center;
+}
+.mi-dyn-doc-row span{
+  font-weight:700;
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+
+.mi-dyn-party-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  border-left:.7pt solid #111;
+  border-right:.7pt solid #111;
+  border-bottom:.7pt solid #111;
+  background:#fff;
+}
+.mi-dyn-party-cell{
+  padding:11pt 9pt 9pt;
+  min-width:0;
+}
+.mi-dyn-party-cell+.mi-dyn-party-cell{
+  border-left:.7pt solid #111;
+}
+.mi-dyn-kv{
+  display:grid;
+  grid-template-columns:83pt 9pt minmax(0,1fr);
+  align-items:start;
+  line-height:1.35;
+  margin-bottom:7pt;
+  min-width:0;
+}
+.mi-dyn-kv:last-child{margin-bottom:0}
+.mi-dyn-kv>b{
+  font-weight:400;
+  min-width:0;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+.mi-dyn-kv>b.strong{font-weight:700}
+.mi-dyn-address-row>b{line-height:1.4}
+
+.mi-dyn-supply-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  min-height:25pt;
+  border-left:.7pt solid #111;
+  border-right:.7pt solid #111;
+  border-bottom:.7pt solid #111;
+  background:#fff;
+}
+.mi-dyn-additional{
+  min-height:34pt;
+  border-left:.7pt solid #111;
+  border-right:.7pt solid #111;
+  border-bottom:.7pt solid #111;
+  padding:10pt 9pt 7pt;
+  line-height:1.35;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  background:#fff;
+}
+
+/* Cover the baked "Page 1 of 1 / Original" and print the live page count. */
+.mi-page-number-mask{
+  position:absolute;
+  z-index:8;
+  right:26pt;
+  top:25pt;
+  width:92pt;
+  min-height:31pt;
+  padding:2pt 2pt 0;
+  background:#fff;
+  text-align:right;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#111;
+}
+.mi-page-number-mask b,
+.mi-page-number-mask span{
+  display:block;
+  font-size:7.4pt;
+  line-height:1.35;
+  font-weight:700;
+}
+.mi-page-number-mask span{margin-top:5pt}
+
+/* Page-specific item table. */
+.mi-ex-table.mi-ex-table-paged{
+  position:absolute;
+  left:28pt;
+  width:539pt;
+  margin:0;
+}
+.mi-ex-table-paged thead{display:table-header-group}
+.mi-ex-table-paged tr{break-inside:avoid;page-break-inside:avoid}
+
+.mi-continuation-note{
+  position:absolute;
+  z-index:3;
+  left:28pt;
+  right:28pt;
+  bottom:104pt;
+  text-align:right;
+  font:700 7.5pt Arial,Helvetica,sans-serif;
+  color:#555;
+}
+.mi-ex-summary.mi-ex-summary-paged{
+  position:absolute;
+  left:28pt;
+  width:539pt;
+}
+
+/* Screen preview: show real sheets one under another. */
+.mi-preview-wrap{
+  max-height:760px;
+  overflow:auto;
+}
+.mi-preview-wrap .mi-invoice-page{
+  transform:scale(.58);
+  transform-origin:top center;
+  margin:0 auto -350px;
+}
+.mi-preview-wrap .mi-invoice-page+.mi-invoice-page{
+  margin-top:365px;
+}
+.mi-viewer-paper{
+  display:block!important;
+}
+.mi-viewer-paper .mi-invoice-page{
+  margin:0 auto 16px;
+}
+.mi-viewer-paper .mi-invoice-page:last-child{margin-bottom:0}
+
+/* Correct physical A4 pagination. */
+@media print{
+  body.mi-printing #miPrintHost{
+    display:block!important;
+  }
+  body.mi-printing #miPrintHost .mi-invoice-page{
+    width:210mm!important;
+    height:297mm!important;
+    min-height:297mm!important;
+    margin:0!important;
+    box-shadow:none!important;
+    transform:none!important;
+    break-after:page;
+    page-break-after:always;
+    overflow:hidden!important;
+  }
+  body.mi-printing #miPrintHost .mi-invoice-page:last-child{
+    break-after:auto;
+    page-break-after:auto;
+  }
+}
+
+
+/* v1.1.14 — centered manual invoice company header */
+.mi-company-header-mask{
+  position:absolute;
+  z-index:8;
+  top:26pt;
+  left:160pt;
+  width:275pt;
+  padding:0 4pt;
+  background:#fff;
+  text-align:center;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#111;
+}
+.mi-company-title{
+  font-size:11pt;
+  font-weight:500;
+  line-height:1.2;
+  margin-bottom:3pt;
+}
+.mi-company-line{
+  font-size:6.9pt;
+  line-height:1.35;
+}
+.mi-company-contact{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:18pt;
+  white-space:nowrap;
+}
+@media print{
+  body.mi-printing #miPrintHost .mi-company-header-mask{
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+}
+
+
+/* =====================================================================
+   V1.1.15 — Manual Invoice header cleanup
+   The template image already contains old company text.  This dedicated
+   mask removes ONLY that baked center text, leaving the logo and page
+   number areas untouched.  The new company block is then drawn above it.
+   ===================================================================== */
+.mi-company-header-clean-mask{
+  position:absolute;
+  z-index:7;
+  top:23pt;
+  left:170pt;
+  width:360pt;
+  height:54pt;
+  background:#fff;
+  pointer-events:none;
+}
+
+.mi-company-header-mask{
+  position:absolute;
+  z-index:9;
+  top:28pt;
+  left:137.5pt;
+  width:320pt;
+  padding:0;
+  background:transparent;
+  text-align:center;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#111;
+}
+
+.mi-company-title{
+  font-size:11.2pt;
+  font-weight:500;
+  line-height:1.18;
+  margin:0 0 3pt;
+}
+
+.mi-company-line{
+  font-size:6.9pt;
+  line-height:1.38;
+  margin:0;
+}
+
+.mi-company-contact{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:18pt;
+  white-space:nowrap;
+  margin-top:.5pt;
+}
+
+/* Keep the original logo and live page counter above the white mask. */
+.mi-page-number-mask{
+  z-index:10;
+}
+
+@media print{
+  body.mi-printing #miPrintHost .mi-company-header-clean-mask{
+    background:#fff!important;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+}
+/* Hide duplicate Email / Web text baked into old invoice template */
+.mi-old-contact-mask{
+  position:absolute;
+  z-index:8;
+  top:75pt;
+  left:265pt;
+  width:285pt;
+  height:8pt;
+  background:#fff;
+  pointer-events:none;
+}

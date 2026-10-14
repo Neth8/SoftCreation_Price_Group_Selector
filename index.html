@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.11</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.15</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.11</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.15</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -26310,12 +26310,157 @@ function miNumberToWords(num){
 function miAmountWords(n){n=miNum(n);let ru=Math.floor(n+1e-9),cents=Math.round((n-ru)*100);if(cents===100){ru++;cents=0}return miNumberToWords(ru)+' Rupees'+(cents?' and '+miNumberToWords(cents)+' Cents':'')+' Only.'}
 function miRenderInvoice(inv,hostId){
   const host=mi$(hostId);if(!host)return;
+
   const total=miTotal(inv),paid=miPaid(inv),bal=miBalance(inv);
-  const count=Math.max(1,(inv.items||[]).length),rowH=count<=5?34:(count<=7?25:21);
-  const rows=(inv.items||[]).map((it,idx)=>`<tr style="height:${rowH}pt"><td class="c">${String(idx+1).padStart(2,'0')}</td><td>${miEsc(it.code||'')}</td><td class="desc">${miEsc(it.desc||'')}</td><td class="c">${miNum(it.qty).toLocaleString('en-US',{maximumFractionDigits:3})}</td><td class="r">${miMoney(it.unitPrice)}</td><td class="r">${miMoney(miNum(it.qty)*miNum(it.unitPrice))}</td></tr>`).join('');
-  const addr=miEsc(inv.customerAddress||'').replace(/\n/g,'<br>');
-  const addText=inv.additionalInfo?`Additional Information if Any : ${miEsc(inv.additionalInfo)}`:'Additional Information if Any :';
-  host.innerHTML=`<div class="mi-invoice-page"><img class="mi-exact-bg" src="${MI_TEMPLATE}" alt=""><div class="mi-exact-text mi-ex-date">Date of Invoice : ${miFmtDate(inv.invoiceDate)}</div><div class="mi-exact-text mi-ex-no">Tax Invoice No : ${miEsc(inv.invoiceNo||'')}</div><div class="mi-ex-buyer"><div class="mi-ex-buyer-row"><span>Purchaser's TIN</span><span>:</span><span>${miEsc(inv.customerTIN||'')}</span></div><div class="mi-ex-buyer-row"><span>Purchaser's Name</span><span>:</span><span class="strong">${miEsc(inv.customerName||'')}</span></div><div class="mi-ex-buyer-row"><span>Address</span><span>:</span><span class="addr">${addr}</span></div><div class="mi-ex-buyer-row"><span>Telephone No</span><span>:</span><span>${miEsc(inv.customerPhone||'')}</span></div></div><div class="mi-exact-text mi-ex-supply-date">Date of Supply : ${miFmtDate(inv.supplyDate)}</div><div class="mi-exact-text mi-ex-additional">${addText}</div><table class="mi-ex-table"><colgroup><col style="width:26pt"><col style="width:82pt"><col style="width:245pt"><col style="width:48pt"><col style="width:65pt"><col style="width:73pt"></colgroup><thead><tr><th>Ref</th><th>Item Code</th><th>Description of Good or Services</th><th>Quantity</th><th>Unit Price</th><th>Amount (Rs.)</th></tr></thead><tbody>${rows}</tbody></table><div class="mi-ex-summary"><div class="mi-ex-sumrow"><div>Total Value of Supply</div><div class="v">${miMoney(total)}</div></div><div class="mi-ex-sumrow"><div>Advance Paid</div><div class="v">${miMoney(paid)}</div></div><div class="mi-ex-sumrow"><div>Balance Payment</div><div class="v">${miMoney(bal)}</div></div><div class="mi-ex-words">Total Amount In Words : ${miAmountWords(total)}</div><div class="mi-ex-mode">Mode of Payment : ${miEsc(inv.paymentMode||'Cash / Card / Bank Transfer')}</div></div></div>`;
+  const rawAddress=String(inv.customerAddress||'').trim();
+  const addressLines=rawAddress
+    ? rawAddress.split(/\n/).reduce((n,line)=>n+Math.max(1,Math.ceil(String(line||'').length/34)),0)
+    : 1;
+
+  /*
+    Rebuild the variable invoice header over the approved artwork.
+    This fixes the old absolute-text alignment problem and allows the
+    buyer card to grow when the address becomes longer.
+  */
+  const buyerExtra=Math.max(0,addressLines-2)*10;
+  const headerTop=106;
+  const docRowH=25;
+  const partyH=88+buyerExtra;
+  const supplyH=25;
+  const additionalH=34;
+  const headerHeight=docRowH+partyH+supplyH+additionalH;
+  const tableTop=headerTop+headerHeight+16;
+
+  const rowH=23;
+  const tableHeadH=25;
+
+  /* Keep the final summary safely above the fixed signature/footer art. */
+  const summaryTopBase=560;
+  const footerLimit=705;
+  const finalRows=Math.max(1,Math.floor((summaryTopBase-tableTop-tableHeadH-18)/rowH));
+  const continuationRows=Math.max(1,Math.floor((footerLimit-tableTop-tableHeadH-14)/rowH));
+
+  const items=(inv.items||[]).slice();
+  const pages=[];
+
+  if(items.length<=finalRows){
+    pages.push(items);
+  }else{
+    let remaining=items.slice();
+    while(remaining.length>finalRows){
+      const mustLeave=finalRows;
+      const take=Math.min(continuationRows,remaining.length-mustLeave);
+      pages.push(remaining.splice(0,Math.max(1,take)));
+    }
+    pages.push(remaining);
+  }
+
+  const pageCount=Math.max(1,pages.length);
+  const addText=inv.additionalInfo
+    ? `Additional Information if Any : ${miEsc(inv.additionalInfo)}`
+    : 'Additional Information if Any :';
+
+  const supplierBlock=`
+    <div class="mi-dyn-party-cell mi-dyn-supplier">
+      <div class="mi-dyn-kv"><span>Supplier's TIN</span><i>:</i><b>103723353</b></div>
+      <div class="mi-dyn-kv"><span>Supplier's Name</span><i>:</i><b>SoftCreation (Pvt) Ltd.</b></div>
+      <div class="mi-dyn-kv mi-dyn-address-row"><span>Address</span><i>:</i><b>No.29, South Circular Road,<br>Kurunegala.</b></div>
+      <div class="mi-dyn-kv"><span>Telephone No</span><i>:</i><b>071 77 44 555</b></div>
+    </div>`;
+
+  const buyerBlock=`
+    <div class="mi-dyn-party-cell mi-dyn-buyer">
+      <div class="mi-dyn-kv"><span>Purchaser's TIN</span><i>:</i><b>${miEsc(inv.customerTIN||'')}</b></div>
+      <div class="mi-dyn-kv"><span>Purchaser's Name</span><i>:</i><b class="strong">${miEsc(inv.customerName||'')}</b></div>
+      <div class="mi-dyn-kv mi-dyn-address-row"><span>Address</span><i>:</i><b>${miEsc(rawAddress).replace(/\n/g,'<br>')}</b></div>
+      <div class="mi-dyn-kv"><span>Telephone No</span><i>:</i><b>${miEsc(inv.customerPhone||'')}</b></div>
+    </div>`;
+
+  function pageHTML(pageItems,pageIndex){
+    const isLast=pageIndex===pageCount-1;
+    const rows=pageItems.map((it,localIndex)=>{
+      const globalIndex=pages.slice(0,pageIndex).reduce((s,p)=>s+p.length,0)+localIndex;
+      return `<tr style="height:${rowH}pt">
+        <td class="c">${String(globalIndex+1).padStart(2,'0')}</td>
+        <td>${miEsc(it.code||'')}</td>
+        <td class="desc">${miEsc(it.desc||'')}</td>
+        <td class="c">${miNum(it.qty).toLocaleString('en-US',{maximumFractionDigits:3})}</td>
+        <td class="r">${miMoney(it.unitPrice)}</td>
+        <td class="r">${miMoney(miNum(it.qty)*miNum(it.unitPrice))}</td>
+      </tr>`;
+    }).join('');
+
+    const currentTableBottom=tableTop+tableHeadH+(pageItems.length*rowH);
+    const summaryTop=Math.max(summaryTopBase,currentTableBottom+18);
+
+    return `<div class="mi-invoice-page mi-invoice-print-page" data-page="${pageIndex+1}">
+<img class="mi-exact-bg" src="${MI_TEMPLATE}" alt="">
+
+<div class="mi-old-contact-mask" aria-hidden="true"></div>
+<div class="mi-company-header-clean-mask" aria-hidden="true"></div>
+      <div class="mi-company-header-mask">
+        <div class="mi-company-title">SoftCreation (Pvt) Ltd.</div>
+        <div class="mi-company-line">Address : No.29, South Circular Road, Kurunegala.</div>
+        <div class="mi-company-line">Tel : 071 77 44 555</div>
+        <div class="mi-company-line mi-company-contact">
+          <span>Email : info@softcreation.lk</span>
+          <span>Web : www.softcreation.lk</span>
+        </div>
+      </div>
+
+      <div class="mi-page-number-mask">
+        <b>Page ${pageIndex+1} of ${pageCount}</b>
+        <span>Original</span>
+      </div>
+
+      <div class="mi-dyn-header" style="top:${headerTop}pt">
+        <div class="mi-dyn-doc-row">
+          <div><b>Date of Invoice</b><i>:</i><span>${miFmtDate(inv.invoiceDate)}</span></div>
+          <div><b>Tax Invoice No</b><i>:</i><span>${miEsc(inv.invoiceNo||'')}</span></div>
+        </div>
+
+        <div class="mi-dyn-party-row" style="min-height:${partyH}pt">
+          ${supplierBlock}
+          ${buyerBlock}
+        </div>
+
+        <div class="mi-dyn-supply-row">
+          <div><b>Date of Supply</b><i>:</i><span>${miFmtDate(inv.supplyDate)}</span></div>
+          <div><b>Place of Supply</b><i>:</i><span>No. 29, South Circular Road, Kurunegala.</span></div>
+        </div>
+
+        <div class="mi-dyn-additional">${addText}</div>
+      </div>
+
+      <table class="mi-ex-table mi-ex-table-paged" style="top:${tableTop}pt">
+        <colgroup>
+          <col style="width:26pt"><col style="width:82pt"><col style="width:245pt">
+          <col style="width:48pt"><col style="width:65pt"><col style="width:73pt">
+        </colgroup>
+        <thead><tr>
+          <th>Ref</th><th>Item Code</th><th>Description of Good or Services</th>
+          <th>Quantity</th><th>Unit Price</th><th>Amount (Rs.)</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      ${!isLast?`
+        <div class="mi-continuation-note">Continued on page ${pageIndex+2} of ${pageCount}</div>
+      `:''}
+
+      ${isLast?`
+        <div class="mi-ex-summary mi-ex-summary-paged" style="top:${summaryTop}pt">
+          <div class="mi-ex-sumrow"><div>Total Value of Supply</div><div class="v">${miMoney(total)}</div></div>
+          <div class="mi-ex-sumrow"><div>Advance Paid</div><div class="v">${miMoney(paid)}</div></div>
+          <div class="mi-ex-sumrow"><div>Balance Payment</div><div class="v">${miMoney(bal)}</div></div>
+          <div class="mi-ex-words">Total Amount In Words : ${miAmountWords(total)}</div>
+          <div class="mi-ex-mode">Mode of Payment : ${miEsc(inv.paymentMode||'Cash / Card / Bank Transfer')}</div>
+        </div>
+      `:''}
+    </div>`;
+  }
+
+  host.innerHTML=pages.map((p,i)=>pageHTML(p,i)).join('');
 }
 window.miPrintDraft=function(){
   const inv=miDraft(),err=miValidate(inv);if(err)return toast(err);
