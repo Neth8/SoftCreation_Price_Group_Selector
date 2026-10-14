@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.15</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.17</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.15</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.17</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -780,67 +780,7 @@
 </div><div class="actions"><button class="btn primary" onclick="saveItem()">Save Item</button><button class="btn red" id="deleteItemBtn" onclick="deleteItem()">Delete</button></div></div></div></div>
 
 <div id="convertModal" class="modal"><div class="modal-card convert-pi-modal" style="width:min(900px,96vw)"><div class="modal-head"><b>Select items for Pro Forma Invoice</b><button class="closex" onclick="closeModal('convertModal')">×</button></div><div class="modal-body">
-  <div class="erp-lookup-panel">
-
-    <div class="erp-lookup-header">
-      <div class="erp-lookup-title-wrap">
-        <div class="erp-lookup-icon">⌕</div>
-
-        <div>
-          <div class="erp-lookup-title">
-            Check ERP Stock
-            <span class="erp-live-dot"></span>
-            <span class="erp-live-text">LIVE</span>
-          </div>
-
-          <div class="erp-lookup-subtitle">
-            Search a product by name or code to check current availability before creating the PI.
-          </div>
-        </div>
-      </div>
-
-      <div class="erp-branch-chip">
-        <span>WAREHOUSE</span>
-        <b>Branch 2</b>
-      </div>
-    </div>
-
-    <div class="erp-autocomplete-wrap">
-      <div class="erp-search-box">
-        <span class="erp-search-icon">⌕</span>
-
-        <input
-          id="erpStockSearch"
-          type="text"
-          placeholder="Start typing product name or code..."
-          autocomplete="off"
-          spellcheck="false"
-          oninput="erpStockTypeV112(this.value)"
-          onkeydown="erpStockKeyV112(event)"
-          onfocus="erpStockFocusV112()"
-        >
-
-        <button
-          id="erpStockClear"
-          class="erp-search-clear"
-          type="button"
-          onclick="clearERPStockV112()"
-          aria-label="Clear search"
-          title="Clear search"
-        >×</button>
-      </div>
-
-      <div id="erpStockSuggestions" class="erp-suggestions"></div>
-    </div>
-
-    <div id="erpStockStatus" class="erp-lookup-status">
-      <span class="erp-status-dot"></span>
-      Type at least 2 characters to search ERP products.
-    </div>
-
-    <div id="erpStockSelected" class="erp-selected-wrap"></div>
-
-  </div>
+  
   <div id="convertItems"></div><div class="actions"><button class="btn green" onclick="createPIFromSelection()">Create PI with Selected Items</button></div></div></div></div>
 <div id="deviceModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Device Master</b><button class="closex" onclick="closeModal('deviceModal')">×</button></div><div class="modal-body"><div class="grid"><input id="devId" type="hidden"><div class="field"><label>Device Name</label><input id="devName" placeholder="Desktop Barcode Label Printer"></div><div class="field"><label>Model</label><input id="devModel"></div><div class="field"><label>Serial Number (Optional)</label><input id="devSerial"></div><div class="field"><label>Brand / Make</label><input id="devBrand"></div><div class="field"><label>Base Unit Price</label><input id="devPrice" type="number" step="0.01"></div><div class="field"><label>Available Qty</label><input id="devStock" type="number" step="1"></div><div class="field"><label>Device Image</label><input id="devImage" type="file" accept="image/jpeg,image/png,image/webp"><div class="device-image-storage-note">Image uploads automatically to the Supabase Storage bucket <b>device-images</b> immediately after selection. Click Save Device after the upload completes to link the cloud image to this Device Master record.</div><div id="devImageUploadProgress" hidden><div class="small"><span id="devImageUploadLabel">Preparing image...</span> • <b id="devImageUploadPercent">0%</b></div><progress id="devImageUploadBar" max="100" value="0"></progress></div><div id="devImageStorageStatus" class="device-image-storage-status">No image selected.</div></div><div class="field full"><label>Features (one per line)</label><textarea id="devFeatures" placeholder="Resolution: 203 DPI&#10;Interface: USB + Ethernet&#10;Printing Method: Direct Thermal"></textarea></div><div class="section">Automatic Quantity Prices</div><div class="field"><label>1-5 Qty Discount %</label><input id="devD1" type="number" value="0"></div><div class="field"><label>6-10 Qty Discount %</label><input id="devD2" type="number" value="5"></div><div class="field"><label>11-20 Qty Discount %</label><input id="devD3" type="number" value="10"></div><div class="field"><label>21+ Qty Discount %</label><input id="devD4" type="number" value="15"></div></div><div class="actions"><button id="saveDeviceBtn" class="btn primary" onclick="saveDevice()">Save Device</button><button id="deleteDeviceBtn" class="btn red" onclick="deleteDevice()">Delete</button></div></div></div></div>
 <div id="devicePickerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Add Devices to Quotation</b><button class="closex" onclick="closeModal('devicePickerModal')">×</button></div><div class="modal-body"><div id="devicePickerList"></div></div></div></div>
@@ -3600,12 +3540,281 @@ function updateVarianceV8(){const r=state.productionRequests.find(x=>x.id===$('r
 function nextGRNV8(){state.counters.grn=Number(state.counters.grn||0)+1;return `SC/GRN/${today().replaceAll('-','')}/${String(state.counters.grn).padStart(3,'0')}`}
 function saveGRNV8(){const r=state.productionRequests.find(x=>x.id===$('receiveReqId').value);if(!r)return;const receivedQty=Number($('receivedQty').value||0),variance=receivedQty-Number(r.dispatch.qty||0),reason=$('varianceReason').value.trim();if(variance!==0&&!reason)return toast('Variance reason is mandatory when the count differs');const g={id:uid('grn'),grnNo:nextGRNV8(),requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,item:`${r.size} / ${r.material} / ${r.layout} / ${r.pcs} pcs`,unit:r.unit,dispatchedQty:Number(r.dispatch.qty||0),receivedQty,variance,reason,date:$('receivedDate').value||today(),countedBy:$('countedBy').value.trim(),receivedFrom:$('receivedFrom').value.trim(),createdBy:currentUser.display,createdByUser:currentUser.username,createdAt:new Date().toISOString()};state.grns.unshift(g);r.status='Received';r.grnId=g.id;r.history.push({status:'Received',note:`GRN ${g.grnNo}; received ${receivedQty}; variance ${variance}`,by:currentUser.display,at:new Date().toISOString()});notifyV8(r.ownerUser,'Stores GRN Completed',`${g.grnNo}: received ${money(receivedQty)} ${r.unit}; variance ${money(variance)}.`,r.id);audit('CREATE_GRN',`${g.grnNo} ${r.orderNo} variance ${variance}`);saveState();closeModal('receiveModal');renderStoresQueueV8();renderProductionBoard();toast('GRN saved for finance')}
 async function downloadGRNV8(id){const g=state.grns.find(x=>x.id===id);if(!g)return;const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas),okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);if(!okC||!okP)return toast('PDF libraries unavailable');const h=document.createElement('div');h.className='paper';h.style='position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;padding:180px 55px 90px;box-sizing:border-box;background-size:100% 100%;color:#172f36';h.innerHTML=`<div style="border-left:7px solid #078f92;padding-left:14px"><h1 style="margin:0;color:#078f92">GOODS RECEIVED NOTE</h1><b>${esc(g.grnNo)}</b></div><table class="table" style="margin-top:24px"><tr><th>Production Request</th><td>${esc(g.orderNo)}</td><th>PI</th><td>${esc(g.piSerial)}</td></tr><tr><th>Customer</th><td colspan="3">${esc(g.customerName)}</td></tr><tr><th>Item</th><td colspan="3">${esc(g.item)}</td></tr><tr><th>Dispatched</th><td>${money(g.dispatchedQty)} ${esc(g.unit)}</td><th>Received</th><td>${money(g.receivedQty)} ${esc(g.unit)}</td></tr><tr><th>Variance</th><td style="color:${g.variance?'#bd2525':'#087247'};font-weight:900">${money(g.variance)}</td><th>Date</th><td>${esc(g.date)}</td></tr><tr><th>Variance Reason</th><td colspan="3">${esc(g.reason||'No variance')}</td></tr><tr><th>Counted By</th><td>${esc(g.countedBy)}</td><th>Received From</th><td>${esc(g.receivedFrom)}</td></tr></table><div style="margin-top:35px;padding:14px;background:#eef8f8;border-radius:12px"><b>Finance Control</b><br>This GRN is linked to ${esc(g.piSerial)} and ${esc(g.orderNo)}. Verify supplier/factory movement and quantity variance before posting.</div>`;document.body.appendChild(h);try{const c=await html2canvas(h,{scale:2,backgroundColor:'#fff',useCORS:true}),{jsPDF}=window.jspdf,p=new jsPDF({unit:'mm',format:'a4'});p.addImage(c.toDataURL('image/png'),'PNG',0,0,210,297);p.save(`${g.grnNo.replaceAll('/','-')}.pdf`);const r=state.productionRequests.find(x=>x.id===g.requestId);if(r){r.status='GRN Closed';r.history.push({status:'GRN Closed',note:g.grnNo,by:currentUser.display,at:new Date().toISOString()})}audit('DOWNLOAD_GRN_PDF',g.grnNo);saveState()}finally{h.remove()}renderStoresQueueV8();renderProductionBoard()}
-function productionConversionRowsV8(q){return (q.lines||[]).map((l,i)=>`<div class="production-line"><input type="checkbox" class="convcheck" data-i="${i}" checked><div><b>${esc(l.desc)}</b><div class="small">${esc([l.size,l.material,l.layout,l.pcs?l.pcs+' pcs/roll':''].filter(Boolean).join(' / '))}</div></div><select class="convSupply" data-i="${i}" onchange="toggleProdLineV8(${i})"><option value="stock">In Stock</option><option value="production">Send to Production</option></select><input class="convProdQty" data-i="${i}" type="number" min="0" value="${Number(l.qty||0)}" disabled title="Production quantity"><input class="convProdDate" data-i="${i}" type="date" value="${new Date(Date.now()+7*86400000).toISOString().slice(0,10)}" disabled title="Planned completion date"></div>`).join('')}
-function toggleProdLineV8(i){const on=document.querySelector(`.convSupply[data-i="${i}"]`).value==='production';document.querySelector(`.convProdQty[data-i="${i}"]`).disabled=!on;document.querySelector(`.convProdDate[data-i="${i}"]`).disabled=!on}
-function installProductionConversionV8(){convertCurrentToPI=function(){const d=collectCurrent();if(!d||d.type!=='Q')return;$('convertItems').innerHTML=`<div class="notice"><b>PI Supply Plan:</b> Mark each selected item as In Stock or Send to Production. Production jobs are created automatically with the PI.</div><div class="production-line" style="font-weight:900"><span></span><span>PI Item</span><span>Supply</span><span>Production Qty</span><span>Need Date</span></div>${productionConversionRowsV8(d)}<div class="field" style="margin-top:10px"><label>Production Instructions</label><textarea id="convProdInstructions">Confirm material, size, winding direction, label count and packing quality. Complete QC before factory dispatch.</textarea></div>`;$('convertModal').classList.add('show')};
-  createPIFromSelection=function(){if(!requirePerm('convert_pi','create a PI'))return;const q=collectCurrent(),sel=[...document.querySelectorAll('.convcheck:checked')].map(x=>Number(x.dataset.i));if(!sel.length)return toast('Select at least one item');const plans=sel.map(i=>({i,supply:document.querySelector(`.convSupply[data-i="${i}"]`)?.value||'stock',qty:Number(document.querySelector(`.convProdQty[data-i="${i}"]`)?.value||q.lines[i].qty),needDate:document.querySelector(`.convProdDate[data-i="${i}"]`)?.value||''}));if(plans.some(x=>x.supply==='production'&&!(x.qty>0)))return toast('Enter a valid production quantity');const pi={...JSON.parse(JSON.stringify(q)),id:uid('doc'),type:'PI',serial:serialFor('PI',q.core,q.rev||0),sourceQuoteId:q.id,lines:q.lines.filter((_,i)=>sel.includes(i)).map((l,j)=>({...l,supplyMode:plans[j].supply,productionQty:plans[j].supply==='production'?plans[j].qty:0,productionNeedDate:plans[j].needDate})),date:today(),validity:0,attachments:{...q.attachments},delivery3:true,whatsappTracking:true,created:Date.now(),productionStatus:plans.some(x=>x.supply==='production')?'Production requested':'All items in stock'};state.docs.unshift(pi);plans.forEach((p,j)=>{if(p.supply!=='production')return;const l=q.lines[p.i],r={id:uid('prod'),orderNo:prodNoV8(),piId:pi.id,piSerial:pi.serial,quoteId:q.id,poRef:q.poRef||'',customerId:q.customerId,customerName:q.customer?.name||'',customerPhone:q.customer?.phone||'',ownerUser:q.ownerUser||currentUser.username,ownerDisplay:q.createdBy||currentUser.display,lineIndex:j,itemId:l.itemId||'',desc:l.desc||'ELP',size:l.size||'',material:l.material||'',layout:l.layout||'',pcs:Number(l.pcs||0),piQty:Number(l.qty||0),requestQty:p.qty,unit:l.unit||'Rolls',needDate:p.needDate,priority:'normal',shift:'day',instructions:$('convProdInstructions')?.value.trim()||'',status:'Requested',createdBy:currentUser.display,createdByUser:currentUser.username,createdAt:new Date().toISOString(),history:[{status:'Requested',note:`Created automatically from ${pi.serial}`,by:currentUser.display,username:currentUser.username,at:new Date().toISOString()}]};state.productionRequests.unshift(r);l.productionRequestId=r.id;notifyV8('admin','New Production Request',`${r.orderNo} • ${r.customerName} • ${money(r.requestQty)} ${r.unit}`,r.id)});audit('CREATE_PI_PRODUCTION_PLAN',`${pi.serial}: ${plans.filter(x=>x.supply==='production').length} production item(s)`);saveState();renderDocLists();updateStats();closeModal('convertModal');resetEditor(false);openDocument(pi.id);$('poRef').value='';updateEditorVisibility();renderCurrent();toast(plans.some(x=>x.supply==='production')?'PI created and production requests sent':'PI created with all items marked In Stock')}
+function productionConversionRowsV8(q){
+  return (q.lines||[]).map((l,i)=>`
+    <div class="production-line pi-so-convert-line">
+      <input type="checkbox" class="convcheck" data-i="${i}" checked>
+      <div>
+        <b>${esc(l.desc)}</b>
+        <div class="small">${esc([l.size,l.material,l.layout,l.pcs?l.pcs+' pcs/roll':''].filter(Boolean).join(' / '))}</div>
+      </div>
+      <div class="pi-so-fixed-source">Sales Order</div>
+      <input
+        class="convProdQty"
+        data-i="${i}"
+        type="number"
+        min="0.01"
+        step="0.01"
+        value="${Number(l.qty||0)}"
+        title="PI / Sales Order quantity"
+      >
+      <input
+        class="convProdDate"
+        data-i="${i}"
+        type="date"
+        value="${new Date(Date.now()+7*86400000).toISOString().slice(0,10)}"
+        title="Required date"
+      >
+    </div>`).join('');
 }
-const buildDocHTMLV8=buildDocHTML;buildDocHTML=function(doc,forPrint=false){let h=buildDocHTMLV8(doc,forPrint);if(doc.type==='PI'&&doc.lines?.some(l=>l.supplyMode)){const rows=doc.lines.map(l=>`<div class="small" style="margin:3px 0"><span class="supply-pill ${l.supplyMode==='production'?'production':''}">${l.supplyMode==='production'?'PRODUCTION':'IN STOCK'}</span> ${esc(l.desc)} / ${esc(l.size||'')} — ${l.supplyMode==='production'?`Production plan: ${money(l.productionQty||l.qty)} ${esc(l.unit||'')} • expected within 7 working days / ${esc(l.productionNeedDate||'planned date')}`:'Available from stock, subject to confirmation'}</div>`).join('');h=h.replace('<div class="terms">',`<div class="prod-summary-note"><b>SUPPLY & PRODUCTION PLAN</b>${rows}</div><div class="terms">`)}return h};
+
+/*
+  Quotation -> PI conversion no longer sends anything to Production.
+  Selected quantities become the PI quantities and a linked Sales Order
+  is created from the same selected lines.
+*/
+function autoSalesOrderFromConvertedPIV116(pi,q,plans,deliveryMethod){
+  state.salesOrders=state.salesOrders||[];
+  state.dealerFulfilments=state.dealerFulfilments||[];
+
+  const customer=(state.customers||[]).find(c=>c.id===pi.customerId);
+  const now=new Date().toISOString();
+  const selectedNeedDates=plans.map(x=>x.needDate).filter(Boolean).sort();
+  const overallNeedDate=selectedNeedDates[0]||'';
+  const soNo=`SC/SO/${today().replaceAll('-','')}/${String(state.salesOrders.length+1).padStart(3,'0')}`;
+
+  const lines=pi.lines.map((l,i)=>({
+    kind:l.kind||'label',
+    itemId:l.itemId||'',
+    desc:l.desc||'ELP',
+    size:l.size||'',
+    material:l.material||'',
+    layout:l.layout||'',
+    pcs:l.pcs||'',
+    unit:l.unit||'Rolls',
+    qty:Number(l.qty||0),
+    price:Number(l.price||0),
+    priceTier:l.priceTier||'',
+    use:true,
+    needDate:plans[i]?.needDate||'',
+    sourcePIId:pi.id,
+    sourcePISerial:pi.serial,
+    sourceQuoteId:q.id,
+    sourceQuoteSerial:q.serial||''
+  }));
+
+  const so={
+    id:uid('so'),
+    soNo,
+    date:today(),
+    needDate:overallNeedDate,
+    deliveryMethod:String(deliveryMethod||pi.deliveryMethod||''),
+    customerRef:q.poRef||'',
+    customerId:pi.customerId,
+    customerName:customer?.name||q.customer?.name||'',
+    customerPhone:customer?.phone||q.customer?.phone||'',
+    sourcePIId:pi.id,
+    sourcePISerial:pi.serial,
+    sourceQuoteId:q.id,
+    sourceQuoteSerial:q.serial||'',
+    method:'Deliver all to dealer',
+    shipTo:{
+      name:customer?.name||q.customer?.name||'',
+      phone:customer?.phone||q.customer?.phone||'',
+      address:customer?.delivery||customer?.address||q.customer?.delivery||q.customer?.address||'',
+      map:customer?.map||q.customer?.map||''
+    },
+    note:'Created automatically from Quotation → PI conversion. No production request created.',
+    lines,
+    total:lines.reduce((s,l)=>s+Number(l.qty||0)*Number(l.price||0),0),
+    ownerUser:q.ownerUser||currentUser?.username||'',
+    ownerDisplay:q.createdBy||currentUser?.display||'',
+    erpStatus:'Pending ERP Sync',
+    erpSONo:'',
+    erpMessage:'',
+    createdAt:now,
+    updatedAt:now,
+    history:[{
+      action:'Created from PI conversion',
+      by:currentUser?.display||'',
+      at:now
+    }]
+  };
+
+  state.salesOrders.unshift(so);
+
+  const plan={
+    id:uid('df'),
+    planNo:`SC/OF/${today().slice(0,4)}/${String(state.dealerFulfilments.length+1).padStart(4,'0')}`,
+    piId:pi.id,
+    piSerial:pi.serial,
+    sourceType:'SO',
+    sourceSOId:so.id,
+    sourceSerial:so.soNo,
+    dealerId:so.customerId,
+    dealerName:so.customerName,
+    dealerPhone:so.customerPhone,
+    poRef:so.customerRef||'',
+    method:so.method,
+    deliveryMethod:so.deliveryMethod||'',
+    instructions:so.note||'',
+    ownerUser:so.ownerUser,
+    ownerDisplay:so.ownerDisplay,
+    lines:so.lines.map(l=>({
+      desc:l.desc,
+      size:l.size,
+      material:l.material,
+      layout:l.layout,
+      pcs:l.pcs,
+      qty:l.qty,
+      unit:l.unit,
+      needDate:l.needDate||''
+    })),
+    consignments:[],
+    createdAt:now,
+    createdBy:currentUser?.display||'',
+    erpSONo:''
+  };
+
+  state.dealerFulfilments.unshift(plan);
+  so.fulfilmentPlanId=plan.id;
+  pi.linkedSalesOrderId=so.id;
+  pi.linkedSalesOrderNo=so.soNo;
+
+  audit('CREATE_PI_AND_SALES_ORDER',`${pi.serial} → ${so.soNo} • ${lines.length} item(s)`);
+  return so;
+}
+
+function toggleProdLineV8(i){
+  /* Legacy hook retained intentionally; conversion no longer has Supply/Production switching. */
+}
+
+function installProductionConversionV8(){
+  convertCurrentToPI=function(){
+    const d=collectCurrent();
+    if(!d||d.type!=='Q')return;
+
+    $('convertItems').innerHTML=`
+      <div class="notice">
+        <b>PI + Sales Order:</b>
+        Select the required items, edit the quantity and required date.
+        Creating the PI will also create a linked Sales Order.
+        <b>No production request is created from this screen.</b>
+      </div>
+
+      <div class="pi-so-delivery-method">
+        <label for="convDeliveryMethod">Delivery Method</label>
+        <select id="convDeliveryMethod">
+          <option value="">-- Select Delivery Method --</option>
+          <option value="COD">COD</option>
+          <option value="Courier">Courier</option>
+          <option value="Pickup">Pickup</option>
+          <option value="Delivery">Delivery</option>
+          <option value="WhatsApp PO">WhatsApp PO</option>
+        </select>
+      </div>
+
+      <div class="production-line pi-so-convert-head" style="font-weight:900">
+        <span></span>
+        <span>PI Item</span>
+        <span>Source</span>
+        <span>Production Qty</span>
+        <span>Need Date</span>
+      </div>
+      ${productionConversionRowsV8(d)}
+    `;
+
+    $('convertModal').classList.add('show');
+  };
+
+  createPIFromSelection=function(){
+    if(!requirePerm('convert_pi','create a PI'))return;
+
+    const q=collectCurrent();
+    const sel=[...document.querySelectorAll('.convcheck:checked')]
+      .map(x=>Number(x.dataset.i));
+
+    if(!sel.length)return toast('Select at least one item');
+
+    const deliveryMethod=String(
+      $('convDeliveryMethod')?.value||''
+    ).trim();
+
+    if(!deliveryMethod){
+      return toast('Select a delivery method');
+    }
+
+    const plans=sel.map(i=>({
+      i,
+      qty:Number(document.querySelector(`.convProdQty[data-i="${i}"]`)?.value||0),
+      needDate:document.querySelector(`.convProdDate[data-i="${i}"]`)?.value||''
+    }));
+
+    if(plans.some(x=>!(x.qty>0))){
+      return toast('Enter a valid quantity for every selected item');
+    }
+
+    const selectedLines=plans.map(p=>{
+      const l=q.lines[p.i];
+      return {
+        ...JSON.parse(JSON.stringify(l)),
+        qty:p.qty,
+        salesOrderQty:p.qty,
+        salesOrderNeedDate:p.needDate
+      };
+    });
+
+    const pi={
+      ...JSON.parse(JSON.stringify(q)),
+      id:uid('doc'),
+      type:'PI',
+      serial:serialFor('PI',q.core,q.rev||0),
+      sourceQuoteId:q.id,
+      lines:selectedLines,
+      date:today(),
+      validity:0,
+      attachments:{...q.attachments},
+      delivery3:true,
+      whatsappTracking:true,
+      created:Date.now(),
+      deliveryMethod,
+      productionStatus:'',
+      linkedSalesOrderId:'',
+      linkedSalesOrderNo:''
+    };
+
+    state.docs.unshift(pi);
+
+    const so=autoSalesOrderFromConvertedPIV116(pi,q,plans,deliveryMethod);
+
+    saveState();
+
+    try{renderDocLists()}catch(_){}
+    try{renderSalesOrders91?.()}catch(_){}
+    try{renderDealerFulfilment?.()}catch(_){}
+    try{updateStats()}catch(_){}
+
+    closeModal('convertModal');
+    resetEditor(false);
+    openDocument(pi.id);
+
+    if($('poRef'))$('poRef').value='';
+    updateEditorVisibility();
+    renderCurrent();
+
+    /* Preserve the confirmed-PI Stores sync when a PO/reference exists. */
+    if(String(pi.poRef||'').trim()){
+      try{syncPIToStoresV1070?.(pi.id,false)}catch(_){}
+    }
+
+    toast(`${pi.serial} created with ${so.soNo}. No production request created.`);
+    return pi;
+  };
+}
+const buildDocHTMLV8=buildDocHTML;
+buildDocHTML=function(doc,forPrint=false){
+  return buildDocHTMLV8(doc,forPrint);
+};
 
 /* V8.1 - forward-only production, carton counts, dispatch note and variance closure */
 const PROD_FLOW_V81=['Requested','Approved','Planned','In Production','QC Check','Finished','Dispatched','Received','GRN Closed'];
@@ -22930,6 +23139,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       order_date:String(so?.date||''),
       required_date:String(so?.needDate||''),
       customer_ref:String(so?.customerRef||''),
+      delivery_method:String(so?.deliveryMethod||''),
 
       parent_customer:{
         id:String(so?.customerId||''),
@@ -23306,6 +23516,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       order_date:String(so?.date||''),
       required_date:String(so?.needDate||''),
       customer_ref:String(so?.customerRef||''),
+      delivery_method:String(so?.deliveryMethod||''),
 
       parent_customer:{
         id:String(so?.customerId||''),

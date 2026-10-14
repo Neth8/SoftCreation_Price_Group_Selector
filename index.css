@@ -6794,3 +6794,67 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   background:#fff;
   pointer-events:none;
 }
+
+
+/* V1.1.16 — Quotation → PI + Sales Order conversion */
+#convertModal .pi-so-fixed-source{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:36px;
+  padding:7px 9px;
+  border:1px solid #c9dfe1;
+  border-radius:9px;
+  background:#eef8f8;
+  color:#087f83;
+  font-size:10px;
+  font-weight:950;
+  white-space:nowrap;
+}
+#convertModal .pi-so-convert-line .convProdQty,
+#convertModal .pi-so-convert-line .convProdDate{
+  background:#fff;
+  cursor:text;
+}
+#convertModal .pi-so-convert-head{
+  color:#49636d;
+}
+
+
+/* =====================================================================
+   V1.1.17 — Quotation -> PI delivery method
+   ===================================================================== */
+#convertModal .pi-so-delivery-method{
+  display:grid;
+  grid-template-columns:170px minmax(220px,360px);
+  align-items:center;
+  gap:12px;
+  margin:12px 0 14px;
+  padding:12px 14px;
+  border:1px solid #c9dfe1;
+  border-radius:12px;
+  background:#f6fbfb;
+}
+#convertModal .pi-so-delivery-method label{
+  font-size:11px;
+  font-weight:950;
+  color:#3e5964;
+}
+#convertModal .pi-so-delivery-method select{
+  width:100%;
+  border:1px solid #bfd5d9;
+  border-radius:9px;
+  background:#fff;
+  padding:9px 10px;
+  color:#17243c;
+  outline:none;
+}
+#convertModal .pi-so-delivery-method select:focus{
+  border-color:#07989a;
+  box-shadow:0 0 0 2px rgba(7,152,154,.12);
+}
+@media(max-width:650px){
+  #convertModal .pi-so-delivery-method{
+    grid-template-columns:1fr;
+  }
+}
