@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.18</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.19</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.18</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.19</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -209,7 +209,26 @@
             <div class="field" id="poRefField"><label>PO / Reference (PI Only)</label><input id="poRef" placeholder="Enter customer PO number before generating PI"/></div>
 
             <div class="section">Customer</div>
-            <div class="field full"><label>Customer</label><div style="display:flex;gap:6px"><select id="customerSelect" style="flex:1"></select><button class="btn ghost sm" onclick="openCustomerModal()">+ New / Edit</button></div></div>
+            <div class="field full">
+  <label>Customer</label>
+  <div class="sc-customer-combo-v1119">
+    <div class="sc-customer-search-wrap-v1119">
+      <input
+        id="customerSearchV1119"
+        type="text"
+        autocomplete="off"
+        placeholder="Type customer name, phone or email — System + Brylix ERP"
+        oninput="scCustomerSearchTypeV1119(this.value)"
+        onfocus="scCustomerSearchFocusV1119()"
+        onkeydown="scCustomerSearchKeyV1119(event)"
+      />
+      <div id="customerSuggestionsV1119" class="sc-customer-suggestions-v1119"></div>
+    </div>
+    <button class="btn ghost sm" type="button" onclick="openCustomerModal()">+ New / Edit</button>
+  </div>
+  <select id="customerSelect" hidden></select>
+  <div id="customerSourceV1119" class="sc-customer-source-v1119"></div>
+</div>
             <div id="piBrRequirementNotice" class="pi-br-requirement-notice" style="display:none"></div>
             <div class="field"><label>Contact Number</label><input id="customerPhone"/></div><div class="field"><label>Email</label><input id="customerEmail"/></div>
             <div class="field full"><label>Billing Address</label><textarea id="customerAddress"></textarea></div>
@@ -25593,7 +25612,33 @@ function pcKey(){const k=(localStorage.getItem(PC_KEY_STORE)||'').trim();if(!k)t
 function pcHeaders(extra={}){const k=pcKey(),h={apikey:k,...extra};if(k.startsWith('eyJ'))h.Authorization='Bearer '+k;return h}
 async function pcFetch(path,options={}){const r=await fetch(PC_REST+path,{...options,headers:pcHeaders(options.headers||{})});if(!r.ok){const b=await r.text().catch(()=>r.statusText);throw new Error(`Production Control DB ${r.status}: ${b.slice(0,500)}`)}if(r.status===204)return null;const t=await r.text();return t?JSON.parse(t):null}
 async function pcRpc(name,args){return await pcFetch('/rpc/'+name,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(args||{})})}
-function pcHas(p){return currentUser?.role==='admin'||(typeof hasPerm==='function'&&hasPerm(p))}
+function pcHas(p){
+  const role=String(currentUser?.role||'').toLowerCase();
+
+  if(role==='admin')return true;
+
+  /* V1.1.19 hard role separation */
+  if(role==='manager'){
+    if(p==='production_control_create')return false;
+    if([
+      'production_control_view',
+      'production_control_approve',
+      'production_control_chat',
+      'production_control_policy'
+    ].includes(p))return true;
+  }
+
+  if(role==='sales'){
+    if(p==='production_control_approve')return false;
+    if([
+      'production_control_view',
+      'production_control_create',
+      'production_control_chat'
+    ].includes(p))return true;
+  }
+
+  return typeof hasPerm==='function'&&hasPerm(p);
+}
 function pcEsc(v){return typeof esc==='function'?esc(v):String(v??'')}
 function pcNum(v){return Number(v||0)}
 function pcMoney(v){return pcNum(v).toLocaleString(undefined,{maximumFractionDigits:2})}
@@ -25639,7 +25684,38 @@ function pcInstallUI(){
 window.pcGo=function(v){pcView=v;pcRender()}
 window.pcRefresh=async function(showToast=false){try{await pcLoadCloud();await pcConsumeReleases();await pcLoadCloud();pcRender();if(showToast)toast('Production Control live data refreshed')}catch(e){console.error(e);const b=document.getElementById('pcBody');if(b)b.innerHTML=`<div class="notice"><b>Production Control database is not ready.</b><br>${pcEsc(e.message)}<br><br>Run <b>01_PRODUCTION_CONTROL_DATABASE.sql</b> in Supabase, then refresh.</div>`;if(showToast)toast('Production Control refresh failed')}}
 function pcRenderKpis(){const g=pcDemandGroups(),open=g.reduce((n,x)=>n+x.demand,0),awaiting=pcCloud.requests.filter(r=>r.status==='Pending Approval').length,pipeline=(state.productionRequests||[]).filter(r=>pcOpenProdStatuses().has(String(r.status||''))).reduce((n,r)=>n+pcNum(r.requestQty),0),stock=pcCloud.policies.reduce((n,p)=>n+pcNum(p.available_stock_qty),0),el=document.getElementById('pcKpis');if(el)el.innerHTML=[['OPEN SALES DEMAND',open,'Rolls not allocated to an open PR'],['AWAITING APPROVAL',awaiting,'Manager decisions required'],['PRODUCTION PIPELINE',pipeline,'Current productionRequests'],['HO AVAILABLE STOCK',stock,'Production Control stock']].map(x=>`<div class="pc-kpi"><small>${x[0]}</small><strong>${pcMoney(x[1])}</strong><span>${x[2]}</span></div>`).join('')}
-function pcRender(){document.querySelectorAll('[data-pc-view]').forEach(b=>b.classList.toggle('active',b.dataset.pcView===pcView));pcRenderKpis();const b=document.getElementById('pcBody');if(!b)return;b.innerHTML=pcView==='planner'?pcPlannerHTML():pcView==='register'?pcRegisterHTML():pcDemandHTML()}
+function pcRender(){
+  const role=String(currentUser?.role||'').toLowerCase();
+  const isManager=role==='manager';
+
+  const plannerBtn=document.querySelector('[data-pc-view="planner"]');
+  if(plannerBtn)plannerBtn.style.display=isManager?'none':'';
+
+  if(isManager&&pcView==='planner')pcView='register';
+
+  document.querySelectorAll('[data-pc-view]').forEach(
+    b=>b.classList.toggle('active',b.dataset.pcView===pcView)
+  );
+
+  pcRenderKpis();
+
+  const b=document.getElementById('pcBody');
+  if(!b)return;
+
+  const roleBanner=isManager
+    ? `<div class="pc-role-banner-v1119 manager"><b>Manager Approval Workspace</b><span>You can review, approve or return Sales production requests. Managers cannot create production requests.</span></div>`
+    : role==='sales'
+      ? `<div class="pc-role-banner-v1119 sales"><b>Sales Production Request Workspace</b><span>Create and submit requests. Approval is controlled by Manager.</span></div>`
+      : '';
+
+  const body=pcView==='planner'
+    ? pcPlannerHTML()
+    : pcView==='register'
+      ? pcRegisterHTML()
+      : pcDemandHTML();
+
+  b.innerHTML=roleBanner+body;
+}
 function pcPlannerHTML(){
   const groups=pcDemandGroups();if(!pcPlannerItemKey&&groups.length)pcPlannerItemKey=groups[0].key;const g=pcGroup(pcPlannerItemKey)||groups[0];
   return `<div class="pc-grid"><div><div class="pc-card"><div class="pc-card-head"><div><h3>Build a production request</h3><p>Real Sales Orders are linked automatically by item.</p></div><span class="pc-pill">SC HO Stores</span></div><div class="field"><label>Item / SKU</label><select onchange="pcSelectItem(this.value)">${groups.map(x=>`<option value="${encodeURIComponent(x.key)}" ${g&&x.key===g.key?'selected':''}>${pcEsc(pcLineLabel(x))}</option>`).join('')}</select></div>${g?pcPlannerGroupHTML(g):'<div class="empty">No outstanding Sales Order demand found.</div>'}</div>${g?`<div class="pc-card"><div class="pc-card-head"><h3>4-week fulfilled movement</h3><span class="pc-pill blue">${pcMoney(g.avg)} avg / week</span></div><div class="pc-bars">${g.movement.map(n=>`<div class="pc-bar" style="height:${Math.max(4,(n/Math.max(1,...g.movement))*90)}%"><span>${pcMoney(n)}</span></div>`).join('')}</div><div class="pc-week-labels"><span>W-4</span><span>W-3</span><span>W-2</span><span>Last week</span></div></div>`:''}</div>
@@ -25653,10 +25729,22 @@ window.pcSelectItem=function(v){pcPlannerItemKey=decodeURIComponent(v);pcRender(
 window.pcRemoveBasket=function(i){pcBasket.splice(i,1);pcRender()}
 window.pcAddToBasket=function(){const g=pcGroup(pcPlannerItemKey);if(!g)return;const qty=pcNum(document.getElementById('pcQty')?.value),reason=String(document.getElementById('pcOverride')?.value||'').trim();if(!Number.isInteger(qty)||qty<=0)return toast('Enter a positive whole quantity.');if(qty<g.demand)return toast('Quantity must cover linked SO demand.');if(Math.abs(qty-g.recommended)>.001&&!reason)return toast('Enter an override reason.');if(pcBasket.some(x=>x.itemKey===g.key))return toast('This item is already in the basket.');pcBasket.push({itemKey:g.key,sourceItemId:g.sourceItemId,label:pcLineLabel(g),desc:g.desc,size:g.size,material:g.material,layout:g.layout,pcs:g.pcs,unit:g.unit,requestedQty:qty,soDemand:g.demand,cover:g.cover,safety:g.safety,stock:g.stock,pipeline:g.pipeline,recommended:g.recommended,overrideReason:reason,coverWeeks:g.coverWeeks,allocations:g.orders.filter(o=>o.available>0).map(o=>({source_so_id:o.sourceSoId,source_so_no:o.sourceSoNo,source_so_line_index:o.lineIndex,customer_name:o.customer,required_date:o.requiredDate,qty:o.available}))});pcRender();toast('Item added to request')}
 window.pcSavePolicy=async function(){const g=pcGroup(pcPlannerItemKey);if(!g)return;try{await pcRpc('spgs_pc_upsert_item_policy',{p_item_key:g.key,p_source_item_id:g.sourceItemId||'',p_safety_stock_qty:pcNum(document.getElementById('pcSafety')?.value),p_available_stock_qty:pcNum(document.getElementById('pcStock')?.value),p_cover_weeks:pcNum(document.getElementById('pcCoverWeeks')?.value)||2,p_username:currentUser?.username||''});await pcRefresh(false);toast('Stock policy saved')}catch(e){console.error(e);toast(e.message)}}
-window.pcSubmitRequest=async function(){if(!pcHas('production_control_create'))return requirePerm('production_control_create','submit Production Control requests');if(!pcBasket.length)return toast('Add at least one item.');const due=document.getElementById('pcDue')?.value;if(!due)return toast('Choose Required at HO date.');const payload={workspace:PC_WORKSPACE,required_date:due,material_mode:document.getElementById('pcMaterial')?.value||'Factory to arrange material',reason:String(document.getElementById('pcRequestReason')?.value||'').trim(),user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},lines:pcBasket.map(x=>({item_key:x.itemKey,source_item_id:x.sourceItemId,description:x.desc,size_label:x.size,material:x.material,layout:x.layout,pcs_per_roll:x.pcs,unit:x.unit,requested_qty:x.requestedQty,so_demand_qty:x.soDemand,stock_cover_qty:x.cover,safety_stock_qty:x.safety,available_stock_qty:x.stock,pipeline_qty:x.pipeline,recommended_qty:x.recommended,override_reason:x.overrideReason,cover_weeks:x.coverWeeks,allocations:x.allocations}))};try{const r=await pcRpc('spgs_pc_create_request',{p_payload:payload});pcBasket=[];pcView='register';pcSelectedRequest=r?.id||'';await pcRefresh(false);toast(`${r?.request_no||'Production request'} submitted`)}catch(e){console.error(e);toast(e.message)}}
+window.pcSubmitRequest=async function(){
+  const role=String(currentUser?.role||'').toLowerCase();
+  if(role==='manager')return toast('Managers cannot create Production Control requests.');
+  if(!pcHas('production_control_create'))return requirePerm('production_control_create','submit Production Control requests');if(!pcBasket.length)return toast('Add at least one item.');const due=document.getElementById('pcDue')?.value;if(!due)return toast('Choose Required at HO date.');const payload={workspace:PC_WORKSPACE,required_date:due,material_mode:document.getElementById('pcMaterial')?.value||'Factory to arrange material',reason:String(document.getElementById('pcRequestReason')?.value||'').trim(),user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},lines:pcBasket.map(x=>({item_key:x.itemKey,source_item_id:x.sourceItemId,description:x.desc,size_label:x.size,material:x.material,layout:x.layout,pcs_per_roll:x.pcs,unit:x.unit,requested_qty:x.requestedQty,so_demand_qty:x.soDemand,stock_cover_qty:x.cover,safety_stock_qty:x.safety,available_stock_qty:x.stock,pipeline_qty:x.pipeline,recommended_qty:x.recommended,override_reason:x.overrideReason,cover_weeks:x.coverWeeks,allocations:x.allocations}))};try{const r=await pcRpc('spgs_pc_create_request',{p_payload:payload});pcBasket=[];pcView='register';pcSelectedRequest=r?.id||'';await pcRefresh(false);toast(`${r?.request_no||'Production request'} submitted`)}catch(e){console.error(e);toast(e.message)}}
 
 function pcRegisterHTML(){
-  const rows=pcCloud.requests,selected=rows.find(x=>x.id===pcSelectedRequest)||rows[0];if(selected&&!pcSelectedRequest)pcSelectedRequest=selected.id;
+  const role=String(currentUser?.role||'').toLowerCase();
+  const rows=[...(pcCloud.requests||[])].sort((a,b)=>{
+    if(role==='manager'){
+      const ap=a.status==='Pending Approval'?0:1;
+      const bp=b.status==='Pending Approval'?0:1;
+      if(ap!==bp)return ap-bp;
+    }
+    return Date.parse(b.created_at||0)-Date.parse(a.created_at||0);
+  });
+  const selected=rows.find(x=>x.id===pcSelectedRequest)||rows[0];if(selected&&!pcSelectedRequest)pcSelectedRequest=selected.id;
   return `<div class="pc-card"><div class="pc-card-head"><h3>Production request register</h3><span class="pc-pill">${rows.length} request(s)</span></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Request</th><th>Required</th><th>Items / Rolls</th><th>Status</th><th>Created By</th><th></th></tr></thead><tbody>${rows.map(r=>{const ls=pcRequestLines(r.id);return `<tr><td><b>${pcEsc(r.request_no)}</b><small>${new Date(r.created_at).toLocaleString()}</small></td><td>${pcEsc(r.required_date||'-')}</td><td>${ls.length} item(s) • ${pcMoney(ls.reduce((n,l)=>n+pcNum(l.requested_qty),0))}</td><td><span class="pc-status ${String(r.status).toLowerCase().replace(/\s+/g,'-')}">${pcEsc(r.status)}</span></td><td>${pcEsc(r.created_by_display||r.created_by)}</td><td><button class="btn ghost sm" onclick="pcOpenRequest('${r.id}')">Review →</button></td></tr>`}).join('')||'<tr><td colspan="6">No Production Control requests yet.</td></tr>'}</tbody></table></div></div>${selected?pcRequestDetailHTML(selected):''}`;
 }
 window.pcOpenRequest=function(id){pcSelectedRequest=id;pcRender()}
@@ -25668,9 +25756,50 @@ function pcRequestDetailHTML(r){
   <div class="pc-split"><div class="pc-card"><h3>Stores ↔ Production Communication</h3>${msgs.map(m=>`<div class="pc-chat"><b>${pcEsc(m.created_by_display||m.created_by)}</b><small>${new Date(m.created_at).toLocaleString()}</small><p>${pcEsc(m.message)}</p></div>`).join('')||'<p class="pc-muted">No messages yet.</p>'}${pcHas('production_control_chat')?`<div class="field"><label>Message</label><textarea id="pcMessageText" placeholder="Material, priority, progress or clarification"></textarea></div><button class="btn primary sm" onclick="pcSendMessage('${r.id}')">Send Update</button>`:''}</div>
   <div class="pc-card"><h3>Audit Trail</h3>${audit.map(a=>`<div class="pc-audit"><b>${pcEsc(a.action)}</b><span>${pcEsc(a.detail||'')}</span><small>${pcEsc(a.display_name||a.username)} • ${new Date(a.created_at).toLocaleString()}</small></div>`).join('')||'<p class="pc-muted">No audit entries.</p>'}</div></div>`;
 }
-window.pcApproveRequest=async function(id){if(!pcHas('production_control_approve'))return requirePerm('production_control_approve','approve Production Control requests');try{await pcRpc('spgs_pc_transition',{p_request_id:id,p_action:'approve',p_reason:'',p_username:currentUser?.username||'',p_display_name:currentUser?.display||currentUser?.username||''});await pcRefresh(false);toast('Approved. Existing Production / Products jobs released.')}catch(e){console.error(e);toast(e.message)}}
+window.pcApproveRequest=async function(id){
+  const role=String(currentUser?.role||'').toLowerCase();
+  if(role==='sales')return toast('Sales users cannot approve Production Control requests.');
+  if(!pcHas('production_control_approve'))return requirePerm('production_control_approve','approve Production Control requests');
+  try{
+    await pcRpc('spgs_pc_transition',{
+      p_request_id:id,
+      p_action:'approve',
+      p_reason:'',
+      p_username:currentUser?.username||'',
+      p_display_name:currentUser?.display||currentUser?.username||''
+    });
+    await pcRefresh(false);
+    try{renderProductionBoard?.()}catch(_){}
+    try{renderProductionProducts?.()}catch(_){}
+    toast('Approved and released to Productions Summary / Products.');
+  }catch(e){
+    console.error(e);
+    toast(e.message);
+  }
+}
 window.pcOpenReturn=function(id){pcReturnTarget=id;document.getElementById('pcReturnReason').value='';document.getElementById('pcReturnModal').classList.add('show')}
-window.pcConfirmReturn=async function(){const reason=String(document.getElementById('pcReturnReason')?.value||'').trim();if(!reason)return toast('Return reason is required');try{await pcRpc('spgs_pc_transition',{p_request_id:pcReturnTarget,p_action:'return',p_reason:reason,p_username:currentUser?.username||'',p_display_name:currentUser?.display||currentUser?.username||''});closeModal('pcReturnModal');await pcRefresh(false);toast('Request returned to HO Stores')}catch(e){console.error(e);toast(e.message)}}
+window.pcConfirmReturn=async function(){
+  const role=String(currentUser?.role||'').toLowerCase();
+  if(role==='sales')return toast('Sales users cannot return approval requests.');
+  if(!pcHas('production_control_approve'))return requirePerm('production_control_approve','return Production Control requests');
+  const reason=String(document.getElementById('pcReturnReason')?.value||'').trim();
+  if(!reason)return toast('Return reason is required');
+  try{
+    await pcRpc('spgs_pc_transition',{
+      p_request_id:pcReturnTarget,
+      p_action:'return',
+      p_reason:reason,
+      p_username:currentUser?.username||'',
+      p_display_name:currentUser?.display||currentUser?.username||''
+    });
+    closeModal('pcReturnModal');
+    await pcRefresh(false);
+    toast('Request returned to Sales with reason');
+  }catch(e){
+    console.error(e);
+    toast(e.message);
+  }
+}
 window.pcSendMessage=async function(id){const text=String(document.getElementById('pcMessageText')?.value||'').trim();if(!text)return toast('Enter a message');try{await pcRpc('spgs_pc_add_message',{p_request_id:id,p_message:text,p_username:currentUser?.username||'',p_display_name:currentUser?.display||currentUser?.username||''});await pcRefresh(false);toast('Message sent')}catch(e){console.error(e);toast(e.message)}}
 function pcDemandHTML(){const groups=pcDemandGroups();return `<div class="pc-card"><div class="pc-card-head"><div><h3>Live Sales Order production demand</h3><p>Ordered − dispatched − cancelled − quantities reserved by open Production Control requests.</p></div></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Item</th><th class="num">SO Demand</th><th class="num">Cover</th><th class="num">Safety</th><th class="num">HO Stock</th><th class="num">Pipeline</th><th class="num">Recommended</th></tr></thead><tbody>${groups.map(g=>`<tr><td><b>${pcEsc(pcLineLabel(g))}</b><small>${g.orders.length} open SO line(s)</small></td><td class="num">${pcMoney(g.demand)}</td><td class="num">${pcMoney(g.cover)}</td><td class="num">${pcMoney(g.safety)}</td><td class="num">${pcMoney(g.stock)}</td><td class="num">${pcMoney(g.pipeline)}</td><td class="num"><b>${pcMoney(g.recommended)}</b></td></tr>`).join('')||'<tr><td colspan="7">No current Sales Order demand.</td></tr>'}</tbody></table></div></div>`}
 const showBase=window.showView;
@@ -26753,6 +26882,396 @@ miInstallPermissions();
 miInstallUI();
 try{applyUserAccess()}catch(_){}
 if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
+})();
+</script>
+
+
+<script>
+/* =====================================================================
+   V1.1.19 — New Document combined customer search
+   SoftCreation System Customer Master + Brylix ERP customers
+   ===================================================================== */
+(function(){
+  'use strict';
+
+  const ERP_CUSTOMER_FUNCTION_V1119 =
+    'https://qyxgamverzdmhtvezbft.supabase.co/functions/v1/erp-customer-search';
+
+  let timerV1119=null;
+  let seqV1119=0;
+  let resultsV1119=[];
+  let activeV1119=-1;
+
+  function el(id){return document.getElementById(id)}
+  function e(v){return typeof esc==='function'?esc(String(v??'')):String(v??'')}
+
+  function browserKeyV1119(){
+    const key=String(
+      localStorage.getItem('spgs_supabase_browser_key_v1')||''
+    ).trim();
+    if(!key)throw new Error('Supabase browser key is not configured on this device.');
+    return key;
+  }
+
+  async function erpCallV1119(payload){
+    const key=browserKeyV1119();
+    const res=await fetch(ERP_CUSTOMER_FUNCTION_V1119,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        apikey:key,
+        Authorization:'Bearer '+key
+      },
+      body:JSON.stringify(payload)
+    });
+    const raw=await res.text();
+    let data=null;
+    try{data=raw?JSON.parse(raw):null}catch(_){data=raw}
+    if(!res.ok||data?.ok===false){
+      throw new Error(data?.error||data?.message||raw||`ERP customer lookup HTTP ${res.status}`);
+    }
+    return data;
+  }
+
+  function localMatchesV1119(q){
+    const s=String(q||'').trim().toLowerCase();
+    const rows=(state.customers||[]).filter(c=>{
+      if(c.erpSource==='brylix')return false; /* ERP copies appear in ERP section */
+      if(!s)return true;
+      return [
+        c.name,c.phone,c.email,c.contactPerson,c.vat
+      ].join(' ').toLowerCase().includes(s);
+    });
+    return rows.slice(0,10).map(c=>({
+      source:'system',
+      id:c.id,
+      name:c.name||'',
+      phone:c.phone||'',
+      email:c.email||'',
+      code:'',
+      raw:c
+    }));
+  }
+
+  function renderSuggestionsV1119(localRows,erpRows,message=''){
+    const box=el('customerSuggestionsV1119');
+    if(!box)return;
+
+    const combined=[
+      ...localRows,
+      ...erpRows.map(c=>({
+        source:'erp',
+        id:String(c.id||''),
+        name:c.name||'',
+        phone:c.phone||'',
+        email:c.email||'',
+        code:c.code||c.customer_id||'',
+        raw:c
+      }))
+    ];
+
+    resultsV1119=combined;
+    activeV1119=-1;
+
+    let html='';
+
+    if(localRows.length){
+      html+=`<div class="sc-customer-group-v1119">SOFTCREATION SYSTEM</div>`;
+      html+=localRows.map((c,i)=>`
+        <button type="button" class="sc-customer-option-v1119" data-i="${i}" onclick="scSelectCustomerV1119(${i})">
+          <span class="sc-customer-badge-v1119 system">SYSTEM</span>
+          <b>${e(c.name||'-')}</b>
+          <small>${e(c.phone||'No phone')}${c.email?' • '+e(c.email):''}</small>
+        </button>`).join('');
+    }
+
+    if(erpRows.length){
+      const offset=localRows.length;
+      html+=`<div class="sc-customer-group-v1119">BRYLIX ERP — LIVE</div>`;
+      html+=erpRows.map((c,j)=>`
+        <button type="button" class="sc-customer-option-v1119" data-i="${offset+j}" onclick="scSelectCustomerV1119(${offset+j})">
+          <span class="sc-customer-badge-v1119 erp">ERP</span>
+          <b>${e(c.name||'-')}</b>
+          <small>${e(c.phone||'No phone')}${c.email?' • '+e(c.email):''}${c.code?' • '+e(c.code):''}</small>
+        </button>`).join('');
+    }
+
+    if(!html){
+      html=`<div class="sc-customer-message-v1119">${e(message||'No matching customer found.')}</div>`;
+    }
+
+    box.innerHTML=html;
+    box.classList.add('show');
+  }
+
+  async function searchV1119(q){
+    const thisSeq=++seqV1119;
+    const localRows=localMatchesV1119(q);
+
+    if(String(q||'').trim().length<2){
+      renderSuggestionsV1119(localRows,[]);
+      return;
+    }
+
+    renderSuggestionsV1119(
+      localRows,
+      [],
+      'Searching Brylix ERP...'
+    );
+
+    try{
+      const r=await erpCallV1119({
+        action:'search',
+        q:String(q||'').trim(),
+        limit:12
+      });
+
+      if(thisSeq!==seqV1119)return;
+
+      const erpRows=Array.isArray(r?.customers)?r.customers:[];
+      renderSuggestionsV1119(localRows,erpRows);
+    }catch(err){
+      console.error('Brylix ERP customer search failed',err);
+      if(thisSeq!==seqV1119)return;
+      renderSuggestionsV1119(
+        localRows,
+        [],
+        localRows.length
+          ? ''
+          : `ERP lookup unavailable: ${err.message||err}`
+      );
+    }
+  }
+
+  window.scCustomerSearchTypeV1119=function(value){
+    clearTimeout(timerV1119);
+    timerV1119=setTimeout(()=>searchV1119(value),220);
+  };
+
+  window.scCustomerSearchFocusV1119=function(){
+    const input=el('customerSearchV1119');
+    searchV1119(input?.value||'');
+  };
+
+  function highlightV1119(){
+    document.querySelectorAll('#customerSuggestionsV1119 .sc-customer-option-v1119')
+      .forEach((b,i)=>b.classList.toggle('active',i===activeV1119));
+  }
+
+  window.scCustomerSearchKeyV1119=function(ev){
+    if(!resultsV1119.length)return;
+    if(ev.key==='ArrowDown'){
+      ev.preventDefault();
+      activeV1119=Math.min(resultsV1119.length-1,activeV1119+1);
+      highlightV1119();
+    }else if(ev.key==='ArrowUp'){
+      ev.preventDefault();
+      activeV1119=Math.max(0,activeV1119-1);
+      highlightV1119();
+    }else if(ev.key==='Enter'&&activeV1119>=0){
+      ev.preventDefault();
+      window.scSelectCustomerV1119(activeV1119);
+    }else if(ev.key==='Escape'){
+      el('customerSuggestionsV1119')?.classList.remove('show');
+    }
+  };
+
+  async function firstErpAddressV1119(customerId){
+    try{
+      const r=await erpCallV1119({
+        action:'addresses',
+        customer_id:customerId
+      });
+      const rows=Array.isArray(r?.addresses)?r.addresses:[];
+      const a=rows[0];
+      if(!a)return '';
+      return [
+        a.address,
+        a.address_line_1,
+        a.address_line_2,
+        a.city,
+        a.province,
+        a.country,
+        a.postal_code
+      ].filter(Boolean).join(', ');
+    }catch(err){
+      console.warn('ERP customer address lookup failed',err);
+      return '';
+    }
+  }
+
+  function findExistingErpCustomerV1119(c){
+    return (state.customers||[]).find(x=>
+      String(x.erpCustomerId||'')===String(c.id||'') ||
+      (
+        c.code &&
+        String(x.erpCustomerCode||'')===String(c.code)
+      )
+    );
+  }
+
+  window.scSelectCustomerV1119=async function(index){
+    const row=resultsV1119[index];
+    if(!row)return;
+
+    const input=el('customerSearchV1119');
+    const select=el('customerSelect');
+    const source=el('customerSourceV1119');
+
+    if(row.source==='system'){
+      if(input)input.value=row.name||'';
+      if(select){
+        select.value=row.id;
+        select.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+      if(source){
+        source.innerHTML=`<span class="system">SYSTEM CUSTOMER</span>${e(row.phone||'')}`;
+      }
+      el('customerSuggestionsV1119')?.classList.remove('show');
+      return;
+    }
+
+    const c=row.raw||{};
+    const address=await firstErpAddressV1119(c.id);
+
+    let local=findExistingErpCustomerV1119(c);
+
+    if(!local){
+      local={
+        id:`erp_customer_${String(c.id||Date.now()).replace(/[^a-zA-Z0-9_-]/g,'_')}`,
+        name:c.name||'ERP Customer',
+        contactPerson:'',
+        phone:c.phone||'',
+        email:c.email||'',
+        address:address||'',
+        delivery:address||'',
+        map:'',
+        vat:c.tin||'',
+        vatEnabled:false,
+        paymentMode:'credit',
+        creditDays:0,
+        creditLimit:0,
+        erpSource:'brylix',
+        erpCustomerId:String(c.id||''),
+        erpCustomerCode:String(c.code||c.customer_id||''),
+        erpLinkedAt:new Date().toISOString(),
+        active:true
+      };
+      state.customers=state.customers||[];
+      state.customers.push(local);
+    }else{
+      local.name=c.name||local.name;
+      local.phone=c.phone||local.phone||'';
+      local.email=c.email||local.email||'';
+      local.address=address||local.address||'';
+      local.delivery=address||local.delivery||local.address||'';
+      local.erpSource='brylix';
+      local.erpCustomerId=String(c.id||local.erpCustomerId||'');
+      local.erpCustomerCode=String(c.code||c.customer_id||local.erpCustomerCode||'');
+      local.erpLinkedAt=new Date().toISOString();
+    }
+
+    /*
+      Refresh the hidden native customer selector so every existing
+      quotation/PI/customer-price function continues to use the same
+      customerSelect ID and state.customers contract.
+    */
+    try{refreshCustomerPick(true)}catch(_){
+      if(select){
+        select.innerHTML='<option value="">-- Select customer --</option>'+
+          (state.customers||[]).map(x=>`<option value="${e(x.id)}">${e(x.name)}</option>`).join('');
+      }
+    }
+
+    if(select){
+      select.value=local.id;
+      select.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+
+    if(input)input.value=local.name||'';
+
+    if(source){
+      source.innerHTML=
+        `<span class="erp">BRYLIX ERP CUSTOMER</span>`+
+        `ID ${e(c.id||'-')}${local.erpCustomerCode?' • '+e(local.erpCustomerCode):''}`;
+    }
+
+    try{saveState()}catch(_){}
+
+    el('customerSuggestionsV1119')?.classList.remove('show');
+    try{renderCurrent()}catch(_){}
+  };
+
+  function syncSearchFromNativeV1119(){
+    const select=el('customerSelect');
+    const input=el('customerSearchV1119');
+    const source=el('customerSourceV1119');
+    if(!select||!input)return;
+
+    const c=(state.customers||[]).find(x=>x.id===select.value);
+
+    if(!c){
+      if(!state.current?.customerId)input.value='';
+      if(source)source.innerHTML='';
+      return;
+    }
+
+    input.value=c.name||'';
+
+    if(source){
+      source.innerHTML=c.erpSource==='brylix'
+        ? `<span class="erp">BRYLIX ERP CUSTOMER</span>ID ${e(c.erpCustomerId||'-')}${c.erpCustomerCode?' • '+e(c.erpCustomerCode):''}`
+        : `<span class="system">SYSTEM CUSTOMER</span>${e(c.phone||'')}`;
+    }
+  }
+
+  /* Keep the visible search field synchronized with old lifecycle code. */
+  if(typeof window.refreshCustomerPick==='function'){
+    const base=window.refreshCustomerPick;
+    window.refreshCustomerPick=function(){
+      const r=base.apply(this,arguments);
+      setTimeout(syncSearchFromNativeV1119,0);
+      return r;
+    };
+    try{refreshCustomerPick=window.refreshCustomerPick}catch(_){}
+  }
+
+  if(typeof window.fillCustomer==='function'){
+    const base=window.fillCustomer;
+    window.fillCustomer=function(){
+      const r=base.apply(this,arguments);
+      syncSearchFromNativeV1119();
+      return r;
+    };
+    try{fillCustomer=window.fillCustomer}catch(_){}
+  }
+
+  if(typeof window.newDocument==='function'){
+    const base=window.newDocument;
+    window.newDocument=function(){
+      const r=base.apply(this,arguments);
+      setTimeout(syncSearchFromNativeV1119,0);
+      return r;
+    };
+    try{newDocument=window.newDocument}catch(_){}
+  }
+
+  if(typeof window.openDocument==='function'){
+    const base=window.openDocument;
+    window.openDocument=function(){
+      const r=base.apply(this,arguments);
+      setTimeout(syncSearchFromNativeV1119,0);
+      return r;
+    };
+    try{openDocument=window.openDocument}catch(_){}
+  }
+
+  document.addEventListener('click',ev=>{
+    const wrap=ev.target.closest?.('.sc-customer-search-wrap-v1119');
+    if(!wrap)el('customerSuggestionsV1119')?.classList.remove('show');
+  });
+
+  setTimeout(syncSearchFromNativeV1119,0);
 })();
 </script>
 
