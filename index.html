@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.21</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.23</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.21</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.23</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -17721,11 +17721,9 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
 
     const notice=$('packingModal').querySelector('.notice');
-    if(notice)notice.innerHTML=allQC
-      ? '<b>Grouped QC approval:</b> verify the combined carton/roll count and quality for this product batch. Approval will finish every underlying source job.'
-      : '<b>Grouped mandatory production count:</b> enter the combined carton and loose-roll count for this product batch. Saving sends every underlying source job to QC Check.';
+    if(notice)notice.innerHTML='<b>Final Packing Count:</b> enter the physical cartons and loose rolls received from production. If QC is Passed, one save finishes the batch and makes it Dispatch Ready. Use Hold / Recheck only when the batch must remain in QC.';
     const btn=$('packingModal').querySelector('button[onclick="savePackingV81()"]');
-    if(btn)btn.textContent=allQC?'Approve QC & Finish Batch':'Save Count & Send Batch to QC Check';
+    if(btn)btn.textContent='Save Packing & Make Dispatch Ready';
     closeModal('productionProductDetailModal');
   };
 
@@ -17755,26 +17753,28 @@ window.toggleBpSeparateDeliveryButton = function(){
     const g=groupByKeyV1040(encodedKey);if(!g)return toast('Factory batch was not found');
     const jobs=activeBatchJobsV1040(g);
     if(!jobs.length)return toast('No active production jobs');
-    if(jobs.some(r=>idxV1040(r.status)<idxV1040('In Production')))return toast('All source jobs must be In Production before count / QC');
+    if(jobs.some(r=>idxV1040(r.status)<idxV1040('In Production')))return toast('All source jobs must be In Production before packing');
 
     const boxes=readBoxesV81('pack');
     const loose=Number($('packLoose')?.value||0);
     const total=boxesTotalV81(boxes)+loose;
     const qc=$('packQC')?.value||'Passed';
     const note=String($('packNote')?.value||'').trim();
-    if(!(total>0))return toast('Box / roll count is mandatory before QC Check');
+    if(!(total>0))return toast('Box / roll count is mandatory before finishing packing');
     if(!boxes.length&&!(loose>0))return toast('Enter at least one box count or loose-roll count');
 
-    const allQC=jobs.every(r=>r.status==='QC Check');
-    if(!passwordOKV1040(allQC?'approve grouped QC and finish production':'save the grouped production count and send to QC'))return;
+    const finishing=qc!=='Hold / Recheck';
+    if(!passwordOKV1040(finishing?'save packing and finish the batch':'save packing as Hold / Recheck'))return;
 
     const core=(typeof window.packingCoreCalcV1057==='function')
       ? window.packingCoreCalcV1057(total,g)
       : {rollWidthMm:0,coreStickLengthMm:1000,coreMmUsed:0,coreEquivalent:0,coreSticksRequired:0,coreBalanceMm:0};
 
+    /* V1.1.22: a successful packing save is the final production/QC count.
+       Cloud snapshot is therefore saved as the approval/final stage in one pass. */
     if(typeof window.savePackingCloudSnapshotV1057==='function'){
       const dbSaved=await window.savePackingCloudSnapshotV1057({
-        g,jobs,boxes,loose,total,qc,note,allQC,core
+        g,jobs,boxes,loose,total,qc,note,allQC:finishing,core
       });
       if(!dbSaved)return;
     }
@@ -17787,7 +17787,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     const productionVarianceRollsV1120=actualReceivedRollsV1120-plannedJbrRollsV1120;
     const alloc=allocationsV1040(jobs,total);
     const snapshot={
-      boxes,loose,total,qc,note,
+      boxes:boxes.map(b=>({...b})),loose,total,qc,note,
       actualReceivedRolls:actualReceivedRollsV1120,
       plannedJbrRolls:plannedJbrRollsV1120,
       theoreticalMaxRolls:theoreticalMaxRollsV1120,
@@ -17808,52 +17808,50 @@ window.toggleBpSeparateDeliveryButton = function(){
       coreBalanceMm:core.coreBalanceMm
     };
 
-    if(allQC && qc==='Hold / Recheck'){
+    if(!finishing){
       for(const {r,qty} of alloc){
         r.batchPackingV1040=snapshot;
-        r.packing={boxes:[{boxNo:'BATCH',rolls:qty,note:'Allocated from grouped factory batch'}],loose:0,total:qty,qc,note,packedBy:currentUser.display,packedAt:now,batchProductKey:g.key,batchTotal:total};
+        r.packing=jobs.length===1
+          ? {boxes:boxes.map(b=>({...b})),loose,total,qc,note,packedBy:currentUser.display,packedAt:now,batchProductKey:g.key,batchTotal:total}
+          : {boxes:[{boxNo:'BATCH',rolls:qty,note:'Allocated from grouped factory batch'}],loose:0,total:qty,qc,note,packedBy:currentUser.display,packedAt:now,batchProductKey:g.key,batchTotal:total,sharedBatchPacking:snapshot};
         r.finishedQty=qty;
+        r.status='QC Check';
         r.lastNote=note||'QC Hold / Recheck';
         r._spgsUpdatedAt=now;
         r.history=r.history||[];
-        r.history.push({status:'QC Check',note:`GROUPED QC HOLD / RECHECK: ${note||'Quality recheck required'} • Batch count ${total} ${g.unit}`,by:currentUser.display,username:currentUser.username,at:now,batchProductKey:g.key});
-        if(typeof audit==='function')audit('QC_BATCH_HOLD',`${r.orderNo} | batch ${g.size}/${g.material} | allocated ${qty}`);
+        r.history.push({status:'QC Check',note:`PACKING HOLD / RECHECK: ${note||'Quality recheck required'} • ${boxes.length} boxes + ${loose} loose • total ${total} ${g.unit}`,by:currentUser.display,username:currentUser.username,at:now,batchProductKey:g.key});
+        if(typeof audit==='function')audit('PACKING_BATCH_HOLD',`${r.orderNo} | batch ${g.size}/${g.material} | allocated ${qty}`);
       }
-      saveState();closeModal('packingModal');renderProductionProducts();renderProductionBoard();toast('QC hold saved. Batch remains in QC Check');return;
+      saveState();closeModal('packingModal');renderProductionProducts();renderProductionBoard();
+      toast('Packing hold saved. Batch remains in QC Check');return;
     }
 
-    if(allQC){
-      for(const {r,qty} of alloc){
-        r.batchPackingV1040=snapshot;
-        r.packing={boxes:[{boxNo:'BATCH',rolls:qty,note:'Allocated from grouped factory batch'}],loose:0,total:qty,qc,note,packedBy:currentUser.display,packedAt:now,batchProductKey:g.key,batchTotal:total};
-        r.finishedQty=qty;
-        r.status='Finished';
-        r.finishedAt=now;
-        r.lastNote=note;
-        r._spgsUpdatedAt=now;
-        r.history=r.history||[];
-        r.history.push({status:'Finished',note:`GROUPED QC ${qc}; batch verified ${boxes.length} boxes + ${loose} loose; total ${total} ${g.unit}; allocated ${qty} to this job`,by:currentUser.display,username:currentUser.username,at:now,batchProductKey:g.key});
-        if(typeof notifyV8==='function')notifyV8(r.ownerUser,'Production Finished',`${r.orderNo}: grouped QC passed. Finished ${money(qty)} ${r.unit}.`,r.id);
-        const pi=state.docs.find(d=>d.id===r.piId);if(pi)pi.productionStatus='Part / all production finished';
-        if(typeof audit==='function')audit('QC_BATCH_APPROVE_FINISH',`${r.orderNo} | allocated ${qty} | batch total ${total}`);
-      }
-      saveState();closeModal('packingModal');renderProductionProducts();renderProductionBoard();try{renderStoresQueueV8()}catch(_){}
-      toast(`QC approved. ${jobs.length} source job${jobs.length===1?' is':'s are'} Finished and locked`);return;
-    }
-
-    /* First packing save: synchronize every source job to QC Check. */
+    /* One-pass packing -> Finished / Dispatch Ready. */
     for(const {r,qty} of alloc){
       r.batchPackingV1040=snapshot;
-      r.packing={boxes:[{boxNo:'BATCH',rolls:qty,note:'Allocated from grouped factory batch'}],loose:0,total:qty,qc,note,packedBy:currentUser.display,packedAt:now,batchProductKey:g.key,batchTotal:total};
+      /* When one source job owns the product batch, preserve the exact physical
+         cartons + loose rolls so Dispatch can present them separately. */
+      r.packing=jobs.length===1
+        ? {boxes:boxes.map(b=>({...b})),loose,total,qc,note,packedBy:currentUser.display,packedAt:now,lastCheckedBy:currentUser.display,lastCheckedAt:now,batchProductKey:g.key,batchTotal:total}
+        : {boxes:[{boxNo:'BATCH',rolls:qty,note:'Allocated from grouped factory batch'}],loose:0,total:qty,qc,note,packedBy:currentUser.display,packedAt:now,lastCheckedBy:currentUser.display,lastCheckedAt:now,batchProductKey:g.key,batchTotal:total,sharedBatchPacking:snapshot};
       r.finishedQty=qty;
-      r.status='QC Check';
+      r.status='Finished';
+      r.finishedAt=now;
       r.lastNote=note;
       r._spgsUpdatedAt=now;
       r.history=r.history||[];
-      r.history.push({status:'QC Check',note:`GROUPED COUNT SUBMITTED: ${boxes.length} boxes + ${loose} loose; batch total ${total} ${g.unit}; allocated ${qty} to this job`,by:currentUser.display,username:currentUser.username,at:now,batchProductKey:g.key});
-      if(typeof audit==='function')audit('SUBMIT_BATCH_COUNT_TO_QC',`${r.orderNo} | allocated ${qty} | batch total ${total}`);
+      r.history.push({status:'Finished',note:`PACKED & FINISHED: ${boxes.length} boxes + ${loose} loose; batch total ${total} ${g.unit}; allocated ${qty} to this job; QC ${qc}`,by:currentUser.display,username:currentUser.username,at:now,batchProductKey:g.key});
+      if(typeof notifyV8==='function')notifyV8(r.ownerUser,'Production Packed / Dispatch Ready',`${r.orderNo}: ${money(qty)} ${r.unit} packed and ready for dispatch.`,r.id);
+      const pi=state.docs.find(d=>d.id===r.piId);if(pi)pi.productionStatus='Part / all production finished';
+      if(typeof audit==='function')audit('PACK_FINISH_BATCH_ONE_PASS',`${r.orderNo} | allocated ${qty} | batch total ${total} | ${boxes.length} boxes + ${loose} loose`);
     }
-    saveState();closeModal('packingModal');renderProductionProducts();renderProductionBoard();toast(`Count saved. ${jobs.length} source job${jobs.length===1?'':'s'} moved to QC Check`);
+
+    saveState();
+    closeModal('packingModal');
+    try{renderProductionProducts()}catch(_){}
+    try{renderProductionBoard()}catch(_){}
+    try{renderStoresQueueV8()}catch(_){}
+    toast(`Packing saved. ${jobs.length} source job${jobs.length===1?' is':'s are'} Finished and Dispatch Ready`);
   };
   try{savePackingV81=window.savePackingV81}catch(_){}
 
@@ -21490,10 +21488,18 @@ window.toggleBpSeparateDeliveryButton = function(){
           const produced=producedQtyV1064(r);
           const dispatched=dispatchedQtyV1064(r);
           const available=availableQtyV1064(r);
+          const physical=(r?.packing?.sharedBatchPacking||r?.batchPackingV1040||r?.packing||{});
+          const pboxes=Array.isArray(physical?.boxes)?physical.boxes:[];
+          const pboxRolls=pboxes.reduce((n,b)=>n+Math.max(0,Number(b?.rolls||0)),0);
+          const ploose=Math.max(0,Number(physical?.loose||0));
+          const packText=pboxes.length||ploose>0
+            ? `${pboxes.length} box${pboxes.length===1?'':'es'} • ${money(pboxRolls)} boxed${ploose>0?` • ${money(ploose)} loose`:''}`
+            : 'No packing breakdown';
           return `<div class="product-dispatch-row-v1064">
             <div class="product-dispatch-job-v1064">
               <b>${esc(r.orderNo||'-')}</b>
               <span>${esc(r.customerName||'-')} • PI ${esc(r.piSerial||'-')} • ${esc(r.status||'-')}</span>
+              <span class="product-pack-summary-v1122"><b>Packing:</b> ${esc(packText)}</span>
             </div>
             <div><span>Finished</span><b>${money(produced)}</b></div>
             <div><span>Dispatched</span><b>${money(dispatched)}</b></div>
@@ -27477,6 +27483,42 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
   else install();
+})();
+</script>
+
+
+
+<script>
+/* V1.1.23 - Same-job multi-box dispatch hardening */
+(function(){
+  function arr(v){if(Array.isArray(v))return v;if(typeof v==='string'){try{const x=JSON.parse(v);return Array.isArray(x)?x:[]}catch(_){return []}}return []}
+  function cloneBoxes(boxes){return (Array.isArray(boxes)?boxes:[]).map((b,i)=>({boxNo:String(b?.boxNo||String(i+1).padStart(2,'0')),rolls:Math.max(0,Number(b?.rolls||0)),note:String(b?.note||'')})).filter(b=>b.rolls>0)}
+  function exactPacking(r){
+    const s=r?.batchPackingV1040;if(!s||typeof s!=='object')return null;
+    const ids=arr(s.sourceJobIds);if(ids.length!==1||String(ids[0])!==String(r?.id||''))return null;
+    const boxes=cloneBoxes(s.boxes),loose=Math.max(0,Number(s.loose||0));
+    const total=boxes.reduce((n,b)=>n+b.rolls,0)+loose;if(!(total>0))return null;
+    return {boxes,loose,total,qc:s.qc||r?.packing?.qc||'Passed',note:s.note||r?.packing?.note||'',packedBy:s.packedBy||r?.packing?.packedBy||'',packedAt:s.packedAt||r?.packing?.packedAt||'',lastCheckedBy:s.lastCheckedBy||r?.packing?.lastCheckedBy||'',lastCheckedAt:s.lastCheckedAt||r?.packing?.lastCheckedAt||'',batchProductKey:s.productKey||r?.packing?.batchProductKey||'',batchTotal:total,physicalPackagesV1123:true};
+  }
+  function flattened(r){const b=Array.isArray(r?.packing?.boxes)?r.packing.boxes:[];return b.length===1&&String(b[0]?.boxNo||'').trim().toUpperCase()==='BATCH'}
+  window.ensureSameJobPhysicalPackingV1123=function(r,persist=true){
+    if(!r)return false;const ex=exactPacking(r);if(!ex)return false;
+    const cb=Array.isArray(r?.packing?.boxes)?r.packing.boxes:[],cl=Math.max(0,Number(r?.packing?.loose||0));
+    const same=cb.length===ex.boxes.length&&cl===ex.loose&&cb.every((b,i)=>String(b?.boxNo||'')===String(ex.boxes[i]?.boxNo||'')&&Number(b?.rolls||0)===Number(ex.boxes[i]?.rolls||0));
+    if(same)return false;
+    if(cb.length>1&&!flattened(r))return false;
+    r.packing=ex;r.finishedQty=ex.total;try{if(persist)saveState()}catch(_){}return true;
+  };
+  function install(){
+    if(window.__sameJobPhysicalDispatchV1123Installed)return;window.__sameJobPhysicalDispatchV1123Installed=true;
+    let repaired=false;try{(state?.productionRequests||[]).forEach(r=>{if(window.ensureSameJobPhysicalPackingV1123(r,false))repaired=true});if(repaired)saveState()}catch(e){console.error('V1123 repair',e)}
+    const base=window.openDispatchLoadingV81;
+    if(typeof base==='function'){
+      window.openDispatchLoadingV81=function(id){try{const r=(state?.productionRequests||[]).find(x=>x.id===id);if(r)window.ensureSameJobPhysicalPackingV1123(r,true)}catch(e){console.error('V1123 dispatch normalize',e)}return base.apply(this,arguments)};
+      try{openDispatchLoadingV81=window.openDispatchLoadingV81}catch(_){}
+    }
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
 </script>
 
