@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.19</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.20</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.19</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.20</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -17707,6 +17707,13 @@ window.toggleBpSeparateDeliveryButton = function(){
       try{updatePackGrandV81()}catch(_){}
     }
 
+    const packingModalV1120=$('packingModal');
+    if(packingModalV1120){
+      packingModalV1120.dataset.savedActualReceivedV1120=saved
+        ? String(Number(saved.actualReceivedRolls??saved.actualReceived??saved.total??0))
+        : '';
+    }
+
     const notice=$('packingModal').querySelector('.notice');
     if(notice)notice.innerHTML=allQC
       ? '<b>Grouped QC approval:</b> verify the combined carton/roll count and quality for this product batch. Approval will finish every underlying source job.'
@@ -17767,9 +17774,20 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
 
     const now=new Date().toISOString();
+    const packModalV1120=$('packingModal');
+    const plannedJbrRollsV1120=Math.max(0,Number(packModalV1120?.dataset.jbrPlannedRolls||0));
+    const theoreticalMaxRollsV1120=Math.max(0,Number(packModalV1120?.dataset.jbrMaxRolls||plannedJbrRollsV1120));
+    const actualReceivedRollsV1120=Math.max(0,Number($('packActualReceivedV1120')?.value||total));
+    const productionVarianceRollsV1120=actualReceivedRollsV1120-plannedJbrRollsV1120;
     const alloc=allocationsV1040(jobs,total);
     const snapshot={
       boxes,loose,total,qc,note,
+      actualReceivedRolls:actualReceivedRollsV1120,
+      plannedJbrRolls:plannedJbrRollsV1120,
+      theoreticalMaxRolls:theoreticalMaxRollsV1120,
+      productionVarianceRolls:productionVarianceRollsV1120,
+      productionShortageRolls:Math.max(0,-productionVarianceRollsV1120),
+      productionOverRolls:Math.max(0,productionVarianceRollsV1120),
       productKey:g.key,
       sourceJobIds:jobs.map(r=>r.id),
       packedBy:currentUser.display,
@@ -19085,6 +19103,30 @@ window.toggleBpSeparateDeliveryButton = function(){
     };
   }
 
+  /* V1.1.20 JBR automatic target allocation. */
+  let jbrRequestedTotalV1120=0;
+  let jbrExistingAllocatedV1120=0;
+
+  function jbrAutoActualV1120(theoreticalRolls){
+    const requested=Math.max(0,Number(jbrRequestedTotalV1120||0));
+    const existing=Math.max(0,Number(jbrExistingAllocatedV1120||0));
+    const remaining=Math.max(0,requested-existing);
+    const maxFull=Math.max(0,Math.floor(Number(theoreticalRolls||0)));
+    const auto=Math.max(0,Math.floor(Math.min(remaining,maxFull)));
+    const input=$('jbrActualRollsV1055');
+    if(input){
+      input.value=String(auto);
+      input.readOnly=true;
+      input.setAttribute('aria-readonly','true');
+      input.title=`Auto target: min(remaining requested ${money(remaining)}, max full rolls ${money(maxFull)})`;
+    }
+    const hint=$('jbrActualAutoHintV1120');
+    if(hint){
+      hint.innerHTML=`Auto-filled from remaining Requested <b>${money(remaining)}</b>, capped by Max Full Rolls <b>${money(maxFull)}</b>. Packing will record the actual rolls physically received.`;
+    }
+    return {requested,existing,remaining,maxFull,auto};
+  }
+
   function jbrCalcV1055(){
     const jbrWidth=Number($('jbrWidthV1055')?.value||0);
     const jbrLengthM=Number($('jbrLengthV1055')?.value||0);
@@ -19104,6 +19146,9 @@ window.toggleBpSeparateDeliveryButton = function(){
     if($('jbrLabelsLaneV1055'))$('jbrLabelsLaneV1055').textContent=money(labelsPerLane);
     if($('jbrTheoreticalLabelsV1055'))$('jbrTheoreticalLabelsV1055').textContent=money(theoreticalLabels);
     if($('jbrTheoreticalRollsV1055'))$('jbrTheoreticalRollsV1055').textContent=money(theoreticalRolls);
+
+    jbrAutoActualV1120(theoreticalRolls);
+    try{jbrActualLengthPreviewV1066()}catch(_){}
 
     return {jbrWidth,jbrLengthM,labelWidth,labelHeight,gap,pcsPerRoll,lanes,pitch,labelsPerLane,theoreticalLabels,theoreticalRolls};
   }
@@ -19251,9 +19296,9 @@ window.toggleBpSeparateDeliveryButton = function(){
                   </div>
 
                   <div class="field">
-                    <label>Actual Cut Rolls</label>
-                    <input id="jbrActualRollsV1055" type="number" min="0" step="1" value="0" oninput="jbrCalcV1055();jbrActualLengthPreviewV1066()">
-                    <div class="hint">The packing stage can never exceed the total Actual Cut Rolls from all JBRs.</div>
+                    <label>Actual Cut Rolls <span class="jbr-auto-badge-v1120">AUTO</span></label>
+                    <input id="jbrActualRollsV1055" class="jbr-auto-rolls-v1120" type="number" min="0" step="1" value="0" readonly aria-readonly="true">
+                    <div id="jbrActualAutoHintV1120" class="hint">Auto-filled from Requested, capped by Max Full Rolls. Packing records the physically received quantity.</div>
                   </div>
                   <div class="field">
                     <label>JBR Process Status</label>
@@ -19409,6 +19454,8 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('jbrLabelHeightV1055').value=size.height||'';
     $('jbrGapV1055').value='2';
     $('jbrPcsV1055').value=Number(g.pcs||0)||'';
+    jbrRequestedTotalV1120=jbrJobsV1055(g).reduce((n,r)=>n+Math.max(0,Number(r.requestQty||0)),0);
+    jbrExistingAllocatedV1120=0;
     $('jbrActualRollsV1055').value='0';
     $('jbrStatusV1055').value='Not Die Cut';
     $('jbrNoteV1055').value='';
@@ -19419,6 +19466,9 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     try{
       await jbrMigrateLocalOnceV1055(g);
+      const statsV1120=await jbrStatsV1055(g.key,true);
+      jbrExistingAllocatedV1120=Math.max(0,Number(statsV1120?.actualCut||0));
+      jbrCalcV1055();
       await jbrRenderSummaryV1055(g);
     }catch(e){
       console.error(e);
@@ -19633,11 +19683,12 @@ window.toggleBpSeparateDeliveryButton = function(){
         setTimeout(()=>{
           const modal=$('packingModal');
           if(!modal?.classList.contains('show'))return;
-          modal.dataset.jbrMaxRolls=String(stats.actualCut);
+          modal.dataset.jbrPlannedRolls=String(stats.actualCut);
+          modal.dataset.jbrMaxRolls=String(stats.theoretical);
           modal.dataset.jbrProductKey=g.key;
           const notice=modal.querySelector('.notice');
           if(notice){
-            notice.insertAdjacentHTML('beforeend',`<br><b>JBR production limit:</b> ${money(stats.actualCut)} ${esc(g.unit||'Rolls')} actual cut. Box + loose count cannot exceed this quantity.`);
+            notice.insertAdjacentHTML('beforeend',`<br><b>JBR planned target:</b> ${money(stats.actualCut)} ${esc(g.unit||'Rolls')} • <b>physical maximum:</b> ${money(stats.theoretical)}. Enter the rolls actually received below; carton + loose count must match that received quantity.`);
           }
         },0);
         return r;
@@ -19660,9 +19711,11 @@ window.toggleBpSeparateDeliveryButton = function(){
           const boxes=readBoxesV81('pack');
           const loose=Number($('packLoose')?.value||0);
           const total=boxesTotalV81(boxes)+loose;
-          if(total>stats.actualCut){
-            return toast(`Packing count cannot exceed JBR Actual Cut Rolls. Maximum ${money(stats.actualCut)}, entered ${money(total)}.`);
-          }
+          const actualReceived=Math.max(0,Math.floor(Number($('packActualReceivedV1120')?.value||0)));
+          const physicalMax=Math.max(0,Math.floor(Number(stats.theoretical||0)));
+          if(!(actualReceived>0))return toast('Enter the Actual Rolls Received from production before saving packing.');
+          if(actualReceived>physicalMax)return toast(`Actual Rolls Received cannot exceed the combined JBR Max Full Rolls. Maximum ${money(physicalMax)}, entered ${money(actualReceived)}.`);
+          if(total!==actualReceived)return toast(`Packed count must match Actual Rolls Received. Received ${money(actualReceived)}, boxes + loose ${money(total)}.`);
         }
         return baseSavePacking.apply(this,arguments);
       };
@@ -19763,22 +19816,38 @@ window.toggleBpSeparateDeliveryButton = function(){
     const boxRolls=boxesTotalV81(boxes);
     const loose=Math.max(0,Number($('packLoose')?.value||0));
     const total=boxRolls+loose;
-    const max=Math.max(0,Number(modal.dataset.jbrMaxRolls||0));
-    const remaining=Math.max(0,max-total);
-    const over=Math.max(0,total-max);
+    const planned=Math.max(0,Number(modal.dataset.jbrPlannedRolls||0));
+    const max=Math.max(0,Number(modal.dataset.jbrMaxRolls||planned||0));
+    const actualReceived=Math.max(0,Number($('packActualReceivedV1120')?.value||0));
+    const unpacked=Math.max(0,actualReceived-total);
+    const overPacked=Math.max(0,total-actualReceived);
+    const overPhysical=Math.max(0,actualReceived-max);
+    const variance=actualReceived-planned;
+    const shortage=Math.max(0,-variance);
+    const overProduction=Math.max(0,variance);
     const g=packCurrentGroupV1057();
     const core=window.packingCoreCalcV1057(total,g);
 
     const grand=$('packGrand');
     if(grand){
-      grand.classList.toggle('pack-over-v1057',over>0);
+      grand.classList.toggle('pack-over-v1057',overPacked>0||overPhysical>0);
       grand.innerHTML=`
         <div class="pack-live-grid-v1057">
           <div><span>Boxes</span><b>${boxes.length}</b><small>${money(boxRolls)} rolls</small></div>
           <div><span>Loose</span><b>${money(loose)}</b><small>rolls</small></div>
-          <div><span>Packed Total</span><b>${money(total)}</b><small>rolls</small></div>
-          <div><span>JBR Actual Cut</span><b>${money(max)}</b><small>${over>0?`OVER BY ${money(over)}`:`${money(remaining)} remaining`}</small></div>
+          <div><span>Packed Total</span><b>${money(total)}</b><small>${unpacked>0?`${money(unpacked)} received rolls still unpacked`:overPacked>0?`OVER RECEIVED BY ${money(overPacked)}`:'matches received'}</small></div>
+          <div><span>Actual Received</span><b>${money(actualReceived)}</b><small>physically counted at Packing</small></div>
         </div>`;
+    }
+
+    const receiptSummary=$('packReceiptSummaryV1120');
+    if(receiptSummary){
+      const varianceText=variance===0?'Matches JBR target':variance<0?`${money(shortage)} roll shortage / process loss`:`${money(overProduction)} roll over target`;
+      receiptSummary.innerHTML=`
+        <div><span>JBR Planned Target</span><b>${money(planned)}</b><small>auto allocation from Requested</small></div>
+        <div><span>JBR Physical Maximum</span><b>${money(max)}</b><small>combined Max Full Rolls</small></div>
+        <div class="${variance<0?'shortage':variance>0?'over':''}"><span>Production Variance</span><b>${variance>0?'+':''}${money(variance)}</b><small>${varianceText}</small></div>
+        <div><span>Count Reconciliation</span><b>${money(total)} / ${money(actualReceived)}</b><small>${total===actualReceived?'fully reconciled':`${money(Math.abs(actualReceived-total))} roll difference`}</small></div>`;
     }
 
     if($('packCoreSummaryV1057')){
@@ -19790,10 +19859,16 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
 
     if($('packLimitNoteV1057')){
-      $('packLimitNoteV1057').innerHTML=over>0
-        ? `<b>Over JBR production:</b> packing is ${money(over)} rolls above Actual Cut Rolls. Reduce box or loose quantity before saving.`
-        : `<b>JBR balance:</b> ${money(remaining)} rolls remain available to pack.`;
-      $('packLimitNoteV1057').classList.toggle('danger',over>0);
+      let msg='';
+      let danger=false;
+      if(overPhysical>0){danger=true;msg=`<b>Invalid received quantity:</b> Actual Received is ${money(overPhysical)} rolls above the combined JBR physical maximum.`;}
+      else if(overPacked>0){danger=true;msg=`<b>Packing mismatch:</b> boxes + loose are ${money(overPacked)} rolls above Actual Received.`;}
+      else if(unpacked>0){msg=`<b>Unreconciled received rolls:</b> ${money(unpacked)} rolls were received but are not yet entered in boxes / loose.`;}
+      else if(variance<0){msg=`<b>Production shortage / waste:</b> received ${money(shortage)} rolls below the JBR planned target. This variance will be recorded when packing is saved.`;}
+      else if(variance>0){msg=`<b>Production over target:</b> received ${money(overProduction)} rolls above the JBR planned target. This variance will be recorded when packing is saved.`;}
+      else{msg='<b>Production count matched:</b> Actual Received matches the JBR planned target and the packing count is reconciled.';}
+      $('packLimitNoteV1057').innerHTML=msg;
+      $('packLimitNoteV1057').classList.toggle('danger',danger);
     }
 
     try{
@@ -19821,7 +19896,18 @@ window.toggleBpSeparateDeliveryButton = function(){
       const grand=$('packGrand');
       const wrap=document.createElement('div');
       wrap.id='packV1057Controls';
+      const savedReceivedV1120=Number(modal.dataset.savedActualReceivedV1120||0);
+      const plannedReceivedV1120=Number(modal.dataset.jbrPlannedRolls||0);
       wrap.innerHTML=`
+        <div class="section">PRODUCTION RECEIPT / ACTUAL COUNT</div>
+        <div class="pack-receipt-input-v1120">
+          <div class="field">
+            <label>Actual Rolls Received *</label>
+            <input id="packActualReceivedV1120" type="number" min="0" step="1" value="${savedReceivedV1120>0?savedReceivedV1120:plannedReceivedV1120}" oninput="updatePackingLiveV1057()">
+            <div class="hint">Packing user physically counts the rolls received from production. This final actual quantity records shortage, waste or over-production.</div>
+          </div>
+        </div>
+        <div id="packReceiptSummaryV1120" class="pack-receipt-summary-v1120"></div>
         <div id="packLimitNoteV1057" class="pack-limit-note-v1057"></div>
 
         <div class="pack-loose-action-v1057">
@@ -19849,6 +19935,10 @@ window.toggleBpSeparateDeliveryButton = function(){
     }else{
       const w=$('packRollWidthV1057');
       if(w && !(Number(w.value)>0))w.value=packProductWidthV1057(g)||'';
+      const actualInput=$('packActualReceivedV1120');
+      const savedActual=Number(modal.dataset.savedActualReceivedV1120||0);
+      const plannedActual=Number(modal.dataset.jbrPlannedRolls||0);
+      if(actualInput && !(Number(actualInput.value)>0))actualInput.value=String(savedActual>0?savedActual:plannedActual);
     }
 
     // Existing box row input handler only updated the old box total.
@@ -19858,6 +19948,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       modal.addEventListener('input',e=>{
         if(e.target?.classList?.contains('pack-box-rolls') ||
            e.target?.id==='packLoose' ||
+           e.target?.id==='packActualReceivedV1120' ||
            e.target?.id==='packRollWidthV1057' ||
            e.target?.id==='packCoreStickLengthV1057'){
           updatePackingLiveV1057();
@@ -19875,20 +19966,23 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!g)return false;
 
     let jbrActual=0;
+    let jbrTheoretical=0;
     try{
       if(typeof window.jbrCloudStatsV1055==='function'){
         const stats=await window.jbrCloudStatsV1055(g.key,true);
         jbrActual=Number(stats?.actualCut||0);
+        jbrTheoretical=Number(stats?.theoretical||0);
       }
     }catch(e){
       toast(`Packing database save blocked: JBR data unavailable. ${e.message}`);
       return false;
     }
 
-    if(total>jbrActual){
-      toast(`Packing count cannot exceed JBR Actual Cut Rolls. Maximum ${money(jbrActual)}, entered ${money(total)}.`);
-      return false;
-    }
+    const actualReceived=Math.max(0,Math.floor(Number($('packActualReceivedV1120')?.value||0)));
+    if(!(actualReceived>0)){toast('Enter the Actual Rolls Received from production.');return false;}
+    if(actualReceived>jbrTheoretical){toast(`Actual Rolls Received cannot exceed combined JBR Max Full Rolls. Maximum ${money(jbrTheoretical)}, entered ${money(actualReceived)}.`);return false;}
+    if(Number(total)!==actualReceived){toast(`Packed total must match Actual Rolls Received. Received ${money(actualReceived)}, packed ${money(total)}.`);return false;}
+    const productionVariance=actualReceived-jbrActual;
 
     const payload={
       workspace:PACK_WORKSPACE_V1057,
@@ -19910,6 +20004,12 @@ window.toggleBpSeparateDeliveryButton = function(){
       loose_rolls:Number(loose||0),
       packed_total:Number(total||0),
       jbr_actual_cut_rolls:jbrActual,
+      jbr_planned_rolls:jbrActual,
+      jbr_theoretical_max_rolls:jbrTheoretical,
+      actual_received_rolls:actualReceived,
+      production_variance_rolls:productionVariance,
+      production_shortage_rolls:Math.max(0,-productionVariance),
+      production_over_rolls:Math.max(0,productionVariance),
       roll_width_mm:Number(core?.rollWidthMm||0),
       core_stick_length_mm:Number(core?.coreStickLengthMm||1000),
       core_mm_used:Number(core?.coreMmUsed||0),
@@ -20113,7 +20213,7 @@ window.toggleBpSeparateDeliveryButton = function(){
         <div><span>Saved Records</span><b>${rows.length}</b><small>packing / QC snapshots</small></div>
         <div><span>Latest Boxes</span><b>${latestBoxes.length}</b><small>${money(latestBoxRolls)} rolls in boxes</small></div>
         <div><span>Latest Loose</span><b>${money(latestLoose)}</b><small>rolls</small></div>
-        <div><span>Latest Packed Total</span><b>${money(latestTotal)}</b><small>JBR limit ${money(Number(latest.jbr_actual_cut_rolls||0))}</small></div>
+        <div><span>Latest Packed Total</span><b>${money(latestTotal)}</b><small>Actual received ${money(Number(latest.actual_received_rolls??latestTotal))}</small></div>
       </div>`;
 
     list.innerHTML=rows.map((r,index)=>{
@@ -20128,8 +20228,10 @@ window.toggleBpSeparateDeliveryButton = function(){
         : `<tr><td colspan="3" class="small">No cartons recorded in this snapshot.</td></tr>`;
 
       const total=Number(r.packed_total||0);
-      const jbr=Number(r.jbr_actual_cut_rolls||0);
-      const remaining=Math.max(0,jbr-total);
+      const jbr=Number(r.jbr_planned_rolls??r.jbr_actual_cut_rolls??0);
+      const physicalMax=Number(r.jbr_theoretical_max_rolls??jbr);
+      const actualReceived=Number(r.actual_received_rolls??total);
+      const variance=Number(r.production_variance_rolls??(actualReceived-jbr));
 
       return `
         <div class="pack-history-entry-v1058">
@@ -20146,8 +20248,10 @@ window.toggleBpSeparateDeliveryButton = function(){
             <div><span>Box Rolls</span><b>${money(Number(r.box_rolls||0))}</b></div>
             <div><span>Loose</span><b>${money(Number(r.loose_rolls||0))}</b></div>
             <div><span>Packed Total</span><b>${money(total)}</b></div>
-            <div><span>JBR Actual Cut</span><b>${money(jbr)}</b></div>
-            <div><span>Remaining</span><b>${money(remaining)}</b></div>
+            <div><span>Actual Received</span><b>${money(actualReceived)}</b></div>
+            <div><span>JBR Planned</span><b>${money(jbr)}</b></div>
+            <div><span>Physical Max</span><b>${money(physicalMax)}</b></div>
+            <div><span>Variance</span><b>${variance>0?'+':''}${money(variance)}</b></div>
           </div>
 
           <div class="tablewrap">

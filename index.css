@@ -7075,3 +7075,19 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   }
   .pc-role-banner-v1119 span{text-align:left}
 }
+
+
+/* V1.1.20 — JBR Auto Target + Packing Actual Receipt */
+.jbr-auto-badge-v1120{display:inline-flex;align-items:center;margin-left:6px;padding:2px 7px;border-radius:999px;background:#e4f8ed;border:1px solid #b8e9cb;color:#11683c;font-size:9px;font-weight:950;letter-spacing:.45px}
+.jbr-auto-rolls-v1120[readonly]{background:#f1f6f7;color:#173b45;font-weight:950;cursor:not-allowed}
+.pack-receipt-input-v1120{margin-top:8px;padding:12px;border:1px solid #b9dddd;background:linear-gradient(135deg,#f2fbfb,#fff);border-radius:14px}
+.pack-receipt-input-v1120 input{font-size:20px;font-weight:950;color:#0b6669}
+.pack-receipt-summary-v1120{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:8px;margin:10px 0}
+.pack-receipt-summary-v1120>div{border:1px solid #d6e5e8;border-radius:12px;padding:10px;background:#fff}
+.pack-receipt-summary-v1120 span{display:block;font-size:9px;font-weight:900;color:#667c86;text-transform:uppercase;letter-spacing:.35px}
+.pack-receipt-summary-v1120 b{display:block;margin-top:4px;font-size:17px;font-weight:1000;color:#173b45}
+.pack-receipt-summary-v1120 small{display:block;margin-top:3px;font-size:9px;color:#758892}
+.pack-receipt-summary-v1120 .shortage{background:#fff4f1;border-color:#efc2b8}.pack-receipt-summary-v1120 .shortage b{color:#b4362a}
+.pack-receipt-summary-v1120 .over{background:#fff8e8;border-color:#ead59c}.pack-receipt-summary-v1120 .over b{color:#8a6100}
+@media(max-width:850px){.pack-receipt-summary-v1120{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.pack-receipt-summary-v1120{grid-template-columns:1fr}}
