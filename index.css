@@ -7091,3 +7091,6 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .pack-receipt-summary-v1120 .over{background:#fff8e8;border-color:#ead59c}.pack-receipt-summary-v1120 .over b{color:#8a6100}
 @media(max-width:850px){.pack-receipt-summary-v1120{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.pack-receipt-summary-v1120{grid-template-columns:1fr}}
+
+/* V1.1.21 — JBR production remaining */
+.pp-stat.difference b{font-variant-numeric:tabular-nums}

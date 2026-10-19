@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.20</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.21</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.20</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.21</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -17151,10 +17151,11 @@ window.toggleBpSeparateDeliveryButton = function(){
     const canManage=currentUser?.role==='admin'||hasPerm('production_manage');
     grid.innerHTML=filtered.length?filtered.map(g=>{
       const active=activeJobsForGroupV1038(g);
-      const pending=Math.max(0,Number(g.requested||0)+Number(g.ongoing||0));
       const activeQty=active.reduce((n,r)=>n+Number(r.requestQty||0),0);
+      const jbrAllocated=Math.min(activeQty,Math.max(0,Number(window.jbrCutForProductV1121?.(g.key)||0)));
+      const toCut=Math.max(0,activeQty-jbrAllocated);
       const latest=g.latestUpdatedAt?new Date(g.latestUpdatedAt).toLocaleString():'-';
-      return `<div class="pp-card"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag">${active.length} active job${active.length===1?'':'s'}</span></div><div class="pp-stats"><div class="pp-stat total"><span>Requested</span><b>${money(g.requested)}</b><small>${g.requestedJobs} job${g.requestedJobs===1?'':'s'}</small></div><div class="pp-stat ongoing"><span>Ongoing</span><b>${money(g.ongoing)}</b><small>${g.ongoingJobs} job${g.ongoingJobs===1?'':'s'}</small></div><div class="pp-stat finished"><span>Finished</span><b>${money(g.finished)}</b><small>${g.finishedJobs} job${g.finishedJobs===1?'':'s'}</small></div><div class="pp-stat difference"><span>Pending</span><b>${money(pending)}</b><small>${esc(g.unit)}</small></div></div><div class="pp-card-foot"><div class="pp-mini">Factory batch: <b>${money(activeQty)} ${esc(g.unit)}</b> • Latest: ${esc(latest)}</div>${canManage&&active.length?`<button class="btn primary sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">Open Product</button>`:active.length?'<span class="small">Production manage permission required</span>':'<span class="tag">No active work</span>'}</div></div>`;
+      return `<div class="pp-card" data-product-key="${esc(g.key)}"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag">${active.length} active job${active.length===1?'':'s'}</span></div><div class="pp-stats"><div class="pp-stat total"><span>Original Request</span><b>${money(activeQty)}</b><small>${active.length} active job${active.length===1?'':'s'}</small></div><div class="pp-stat ongoing"><span>JBR Cut / Allocated</span><b>${money(jbrAllocated)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat difference"><span>Still To Cut</span><b>${money(toCut)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat finished"><span>Finished</span><b>${money(g.finished)}</b><small>${g.finishedJobs} job${g.finishedJobs===1?'':'s'}</small></div></div><div class="pp-card-foot"><div class="pp-mini">Production balance: <b>${money(toCut)} ${esc(g.unit)}</b> • Original ${money(activeQty)} • JBR allocated ${money(jbrAllocated)} • Latest: ${esc(latest)}</div>${canManage&&active.length?`<button class="btn primary sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">Open Product</button>`:active.length?'<span class="small">Production manage permission required</span>':'<span class="tag">No active work</span>'}</div></div>`;
     }).join(''):'<div class="empty" style="grid-column:1/-1">No matching production products.</div>';
   }
 
@@ -17579,6 +17580,11 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!jobs.length)return toast('No active production jobs for this product');
 
     const totalQty=jobs.reduce((n,r)=>n+Number(r.requestQty||0),0);
+    const jbrAllocated=Math.min(totalQty,Math.max(0,Number(window.jbrCutForProductV1121?.(g.key)||0)));
+    const remainingQty=Math.max(0,totalQty-jbrAllocated);
+    const jobBalances=typeof window.jbrJobBalancesV1121==='function'
+      ? window.jbrJobBalancesV1121(g.key,jobs)
+      : jobs.map(r=>({job:r,original:Number(r.requestQty||0),allocated:0,remaining:Number(r.requestQty||0)}));
     const status=batchStatusV1040(jobs);
     const maxFlow=Math.max(...jobs.map(r=>idxV1040(r.status)));
     const minFlow=Math.min(...jobs.map(r=>idxV1040(r.status)));
@@ -17599,7 +17605,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('productionProductDetailBody').innerHTML=`
       <div class="pp-detail-spec">
         <b>Factory Batch — ${esc(g.size)} / ${esc(g.material)}</b>
-        <div class="small">${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)} • ${jobs.length} source job${jobs.length===1?'':'s'} combined • ${money(totalQty)} ${esc(g.unit)}</div>
+        <div class="small">${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)} • ${jobs.length} source job${jobs.length===1?'':'s'} combined • Original ${money(totalQty)} ${esc(g.unit)} • JBR Cut ${money(jbrAllocated)} • Still To Cut ${money(remainingQty)}</div>
       </div>
       ${flowPillsV1040(status||jobs.reduce((a,r)=>idxV1040(r.status)>idxV1040(a)?r.status:a,'Requested'))}
       <div class="notice" style="margin:10px 0"><b>Combined factory control:</b> one update is written to all ${jobs.length} source production jobs. Productions Summary continues to show them separately.</div>
@@ -17615,7 +17621,7 @@ window.toggleBpSeparateDeliveryButton = function(){
         <div class="field"><label>Priority</label><select id="batchProdPriorityV1038"><option value="" ${!priority?'selected':''}>Keep / Mixed</option><option value="normal" ${priority==='normal'?'selected':''}>Normal</option><option value="urgent" ${priority==='urgent'?'selected':''}>Urgent</option></select></div>
         <div class="field full"><label>Production / QC Note</label><textarea id="batchProdNoteV1038" placeholder="This note will be added to every source job">${esc(note)}</textarea></div>
       </div>
-      <div class="prod-summary-note"><b>${jobs.length} source jobs remain separate:</b> ${jobs.map(r=>`${esc(r.orderNo)} (${money(r.requestQty)} ${esc(r.unit||g.unit)})`).join(' • ')}</div>
+      <div class="prod-summary-note"><b>${jobs.length} source jobs remain separate:</b> ${jobBalances.map(x=>`${esc(x.job.orderNo)} (Original ${money(x.original)} → JBR Cut ${money(x.allocated)} → Remaining ${money(x.remaining)} ${esc(x.job.unit||g.unit)})`).join(' • ')}</div>
       <div class="actions">
         ${!allQC?`<button class="btn primary" onclick="saveGroupedFactoryBatchV1038('${encodeURIComponent(g.key)}')">Save Batch Update</button>`:''}
         ${allAtLeastInProduction
@@ -19541,8 +19547,14 @@ window.toggleBpSeparateDeliveryButton = function(){
     }catch(_){}
 
     closeModal('jbrInModalV1055');
+    try{
+      if(typeof window.jbrRefreshProductBalanceV1121==='function'){
+        await window.jbrRefreshProductBalanceV1121(g.key,true);
+      }
+    }catch(e){console.error('JBR production balance refresh',e)}
+    try{renderProductionProducts()}catch(_){}
     try{openProductionProductDetailsV103(encodeURIComponent(g.key))}catch(_){}
-    toast(`${ui.code} saved to database. Actual cut: ${money(actual)} rolls.`);
+    toast(`${ui.code} saved to database. Actual cut: ${money(actual)} rolls. Production remaining updated.`);
   };
 
   window.deleteJbrInV1055=async function(encodedKey,id){
@@ -19559,7 +19571,13 @@ window.toggleBpSeparateDeliveryButton = function(){
       );
       jbrCloudCacheV1055.delete(g.key);
       await jbrRenderListV1055(g);
-      toast(`${row.code} deleted`);
+      try{
+        if(typeof window.jbrRefreshProductBalanceV1121==='function'){
+          await window.jbrRefreshProductBalanceV1121(g.key,true);
+        }
+      }catch(e){console.error('JBR production balance refresh',e)}
+      try{renderProductionProducts()}catch(_){}
+      toast(`${row.code} deleted. Production remaining updated.`);
     }catch(e){toast(`Delete failed: ${e.message}`)}
   };
 
@@ -27376,6 +27394,89 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
   });
 
   setTimeout(syncSearchFromNativeV1119,0);
+})();
+</script>
+
+
+<script>
+/* SoftCreation V1.1.21 — JBR allocation to Production Remaining. */
+(function(){
+  const cutCache=new Map();
+  const loading=new Map();
+  let hydrateTimer=null;
+
+  function cutFor(key){
+    return Math.max(0,Number(cutCache.get(String(key||''))||0));
+  }
+  window.jbrCutForProductV1121=cutFor;
+
+  window.jbrJobBalancesV1121=function(productKey,jobs){
+    let remainingCut=cutFor(productKey);
+    return (jobs||[]).map(job=>{
+      const original=Math.max(0,Number(job?.requestQty||0));
+      const allocated=Math.min(original,remainingCut);
+      const remaining=Math.max(0,original-allocated);
+      remainingCut=Math.max(0,remainingCut-allocated);
+      return {job,original,allocated,remaining};
+    });
+  };
+
+  window.jbrRefreshProductBalanceV1121=async function(productKey,force=false){
+    const key=String(productKey||'');
+    if(!key)return 0;
+    if(!force && cutCache.has(key))return cutFor(key);
+    if(loading.has(key))return loading.get(key);
+    const task=(async()=>{
+      try{
+        if(typeof window.jbrCloudStatsV1055!=='function')return cutFor(key);
+        const stats=await window.jbrCloudStatsV1055(key,true);
+        const cut=Math.max(0,Number(stats?.actualCut||0));
+        cutCache.set(key,cut);
+        return cut;
+      }finally{loading.delete(key)}
+    })();
+    loading.set(key,task);
+    return task;
+  };
+
+  async function hydrateAll(force=false){
+    if(typeof productionProductGroupsV103!=='function')return;
+    const groups=productionProductGroupsV103();
+    let changed=false;
+    for(const g of groups){
+      if(!g?.key)continue;
+      const before=cutFor(g.key);
+      try{
+        const after=await window.jbrRefreshProductBalanceV1121(g.key,force);
+        if(after!==before)changed=true;
+      }catch(e){console.error('JBR balance hydrate',g.key,e)}
+    }
+    if(changed){
+      try{window.__jbrBalanceInternalRenderV1121=true;renderProductionProducts()}catch(_){}
+      finally{window.__jbrBalanceInternalRenderV1121=false}
+    }
+  }
+  window.jbrHydrateProductionBalancesV1121=hydrateAll;
+
+  function install(){
+    if(window.__jbrBalanceV1121Installed)return;
+    window.__jbrBalanceV1121Installed=true;
+    const baseRender=window.renderProductionProducts;
+    if(typeof baseRender==='function'){
+      window.renderProductionProducts=function(){
+        const result=baseRender.apply(this,arguments);
+        if(!window.__jbrBalanceInternalRenderV1121){
+          clearTimeout(hydrateTimer);
+          hydrateTimer=setTimeout(()=>hydrateAll(false),30);
+        }
+        return result;
+      };
+      try{renderProductionProducts=window.renderProductionProducts}catch(_){}
+    }
+    setTimeout(()=>hydrateAll(true),350);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
+  else install();
 })();
 </script>
 
