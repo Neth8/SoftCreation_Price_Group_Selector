@@ -7165,3 +7165,8 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .printer-device-actions-v1125{display:flex;flex-direction:column;gap:7px;min-width:104px}
 .printer-device-actions-v1125 .btn{width:100%;white-space:nowrap}
 @media(max-width:650px){.printer-device-actions-v1125{width:100%;flex-direction:row}.printer-device-actions-v1125 .btn{width:auto;flex:1}}
+
+
+/* V1.1.26 — USB printer actions */
+.printer-device-actions-v1125{min-width:112px}
+.printer-device-actions-v1125 .btn.red{background:#d74a4a;color:#fff}
