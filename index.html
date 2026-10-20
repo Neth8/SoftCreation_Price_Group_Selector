@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.24</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.25</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.24</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.25</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -27647,6 +27647,94 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
     el.textContent=msg;
   }
 
+  /* V1.1.25 — USB ESC/POS test printing */
+  function concatBytesV1125(parts){
+    const arrays=parts.map(p=>{
+      if(p instanceof Uint8Array)return p;
+      if(Array.isArray(p))return new Uint8Array(p);
+      return new TextEncoder().encode(String(p??''));
+    });
+    const total=arrays.reduce((n,a)=>n+a.length,0);
+    const out=new Uint8Array(total);
+    let offset=0;
+    arrays.forEach(a=>{out.set(a,offset);offset+=a.length});
+    return out;
+  }
+
+  function testReceiptBytesV1125(device){
+    const when=new Date().toLocaleString();
+    const line='--------------------------------\n';
+    return concatBytesV1125([
+      [0x1B,0x40],
+      [0x1B,0x61,0x01],
+      [0x1B,0x45,0x01],
+      'SOFTCREATION\n',
+      'USB PRINTER TEST\n',
+      [0x1B,0x45,0x00],
+      '\n',
+      [0x1B,0x61,0x00],
+      line,
+      'Connection: OK\n',
+      `Printer: ${device?.productName||'USB Receipt Printer'}\n`,
+      `VID: ${hexV1124(device?.vendorId)}\n`,
+      `PID: ${hexV1124(device?.productId)}\n`,
+      `Time: ${when}\n`,
+      line,
+      'If you can read this receipt,\n',
+      'WebUSB printing is working.\n',
+      '\n\n\n',
+      [0x1D,0x56,0x42,0x00]
+    ]);
+  }
+
+  async function sendUsbTestV1125(session){
+    if(!session?.device)throw new Error('USB printer session not found.');
+    if(!session.connected)throw new Error('Printer is not connected.');
+    if(session.endpointNumber==null)throw new Error('No writable USB OUT endpoint is available.');
+    const device=session.device;
+    if(!device.opened)await device.open();
+    if(!device.configuration){
+      const configValue=device.configurations?.[0]?.configurationValue||1;
+      await device.selectConfiguration(configValue);
+    }
+    if(session.interfaceNumber!=null){
+      try{await device.claimInterface(session.interfaceNumber)}catch(_){}
+    }
+    const data=testReceiptBytesV1125(device);
+    try{
+      const result=await device.transferOut(session.endpointNumber,data);
+      if(result?.status && result.status!=='ok')throw new Error(`USB transfer status: ${result.status}`);
+      return result;
+    }catch(firstError){
+      try{
+        await device.clearHalt('out',session.endpointNumber);
+        const result=await device.transferOut(session.endpointNumber,data);
+        if(result?.status && result.status!=='ok')throw new Error(`USB transfer status: ${result.status}`);
+        return result;
+      }catch(_){
+        throw firstError;
+      }
+    }
+  }
+
+  window.testUsbPrinterV1125=async function(encodedKey){
+    const key=decodeURIComponent(encodedKey||'');
+    const session=usbSessionsV1124.get(key);
+    if(!session)return printerHubMessageV1124('Printer session was not found. Refresh the USB list and reconnect.','bad');
+    const btn=[...document.querySelectorAll('[data-usb-test-key]')].find(x=>x.dataset.usbTestKey===key);
+    if(btn){btn.disabled=true;btn.textContent='Printing…'}
+    try{
+      printerHubMessageV1124('Sending ESC/POS test receipt to the USB printer…','working');
+      await sendUsbTestV1125(session);
+      printerHubMessageV1124('Test receipt sent successfully. Check the printer.','ok');
+    }catch(e){
+      console.error('USB test print',e);
+      printerHubMessageV1124('Test print failed: '+(e?.message||e),'bad');
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='Test Print'}
+    }
+  };
+
   function supportStateV1124(){
     const hasUsb=!!navigator.usb;
     const secure=!!window.isSecureContext;
@@ -27698,10 +27786,11 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
       }
       const candidates=interfaceCandidatesV1124(device);
       if(!candidates.length){
-        session.status='Connected — no writable printer endpoint found';
-        session.connected=true;
+        session.status='Authorized — no writable printer endpoint found';
+        session.connected=false;
         session.interfaceNumber=null;
         session.endpointNumber=null;
+        session.error='No writable USB OUT endpoint found';
         return session;
       }
       const c=candidates[0];
@@ -27740,7 +27829,12 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
           <small>VID ${hexV1124(device.vendorId)} • PID ${hexV1124(device.productId)}${device.serialNumber?` • S/N ${esc(device.serialNumber)}`:''}</small>
           <small class="printer-device-status-v1124">${esc(status)}</small>
         </div>
-        <button class="btn ${connected?'green':'primary'} sm" type="button" onclick="connectAuthorizedUsbV1124('${encodeURIComponent(key)}')">${connected?'Connected':'Connect'}</button>
+        <div class="printer-device-actions-v1125">
+          <button class="btn ${connected?'green':'primary'} sm" type="button" onclick="connectAuthorizedUsbV1124('${encodeURIComponent(key)}')">${connected?'Connected':'Connect'}</button>
+          ${connected&&session?.endpointNumber!=null
+            ? `<button class="btn navy sm" type="button" data-usb-test-key="${esc(key)}" onclick="testUsbPrinterV1125('${encodeURIComponent(key)}')">Test Print</button>`
+            : ''}
+        </div>
       </div>`;
     }).join('');
     host.innerHTML=rows||'<div class="empty">No authorized USB printers yet. Connect the printer to the Android device with USB OTG, then press <b>Find USB Printer</b>.</div>';
@@ -27792,7 +27886,7 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
       const device=await navigator.usb.requestDevice({filters:[]});
       const session=await connectDeviceV1124(device);
       await refreshAuthorizedUsbV1124(false);
-      printerHubMessageV1124(session.connected?'USB printer connected and ready for the next printing implementation.':'Printer permission was granted, but the writable interface could not be claimed. '+(session.error||''),session.connected?'ok':'bad');
+      printerHubMessageV1124(session.connected?'USB printer connected and ready. Use Test Print on the printer card.':'Printer permission was granted, but the writable interface could not be claimed. '+(session.error||''),session.connected?'ok':'bad');
     }catch(e){
       if(e?.name==='NotFoundError')return printerHubMessageV1124('No USB printer selected.','');
       printerHubMessageV1124('USB connection failed: '+(e?.message||e),'bad');
@@ -27844,18 +27938,18 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
                 <button id="printerUsbConnectV1124" class="btn primary" type="button" onclick="findUsbPrinterV1124()">Find USB Printer</button>
               </div>
               <div id="printerUsbSupportV1124" class="printer-support-grid-v1124"></div>
-              <div class="printer-usb-note-v1124"><b>How it works:</b> connect the receipt printer to the Android phone/tablet using USB OTG, tap <b>Find USB Printer</b>, then choose the printer in Chrome's USB permission dialog. The site must be served over HTTPS.</div>
+              <div class="printer-usb-note-v1124"><b>How it works:</b> connect the receipt printer to the Android phone/tablet using USB OTG, tap <b>Find USB Printer</b>, then choose the printer in Chrome's USB permission dialog. After it shows Connected, press <b>Test Print</b> on that printer card to send a real ESC/POS receipt directly from this screen.</div>
               <div class="actions"><button class="btn ghost sm" type="button" onclick="refreshUsbPrintersV1124()">Refresh Authorized Devices</button></div>
               <div id="printerUsbMessageV1124" class="printer-usb-message-v1124"></div>
               <div id="printerUsbListV1124" class="printer-device-list-v1124"></div>
             </div>
 
             <div id="printerTabBluetoothV1124" class="printer-tab-pane-v1124" hidden>
-              <div class="printer-placeholder-v1124"><b>Bluetooth Printers</b><span>Placeholder only in v1.1.24. Bluetooth discovery / connection will be implemented next.</span></div>
+              <div class="printer-placeholder-v1124"><b>Bluetooth Printers</b><span>Placeholder only in v1.1.25. Bluetooth discovery / connection will be implemented next.</span></div>
             </div>
 
             <div id="printerTabNetworkV1124" class="printer-tab-pane-v1124" hidden>
-              <div class="printer-placeholder-v1124"><b>Network Printers</b><span>Placeholder only in v1.1.24. LAN / Wi-Fi printer connection will be implemented next.</span></div>
+              <div class="printer-placeholder-v1124"><b>Network Printers</b><span>Placeholder only in v1.1.25. LAN / Wi-Fi printer connection will be implemented next.</span></div>
             </div>
           </div>
         </div>

@@ -7159,3 +7159,9 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   .printer-device-card-v1124{grid-template-columns:auto 1fr}.printer-device-card-v1124 .btn{grid-column:1/-1}
   .dispatch-ready-job-head-v1124{flex-direction:column}.dispatch-ready-balance-v1124{text-align:left}
 }
+
+
+/* V1.1.25 — USB test print */
+.printer-device-actions-v1125{display:flex;flex-direction:column;gap:7px;min-width:104px}
+.printer-device-actions-v1125 .btn{width:100%;white-space:nowrap}
+@media(max-width:650px){.printer-device-actions-v1125{width:100%;flex-direction:row}.printer-device-actions-v1125 .btn{width:auto;flex:1}}
