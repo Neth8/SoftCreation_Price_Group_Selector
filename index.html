@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.23</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.24</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,10 +48,31 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.23</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.24</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
+
+  <!-- PRINTER CONNECTION HUB -->
+  <button
+    id="printerHubBtnV1124"
+    class="printer-hub-btn-v1124"
+    type="button"
+    onclick="openPrinterHubV1124()"
+    aria-label="Printer connections"
+    title="Printer connections"
+  >
+    <span class="printer-hub-icon-v1124" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9V2h12v7"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8" rx="1"/>
+        <path d="M18 12h.01"/>
+      </svg>
+    </span>
+    <span class="printer-hub-text-v1124">Printers</span>
+    <span id="printerHubDotV1124" class="printer-hub-dot-v1124"></span>
+  </button>
 
   <!-- APP / CLOUD REFRESH -->
   <button
@@ -17154,8 +17175,40 @@ window.toggleBpSeparateDeliveryButton = function(){
       const activeQty=active.reduce((n,r)=>n+Number(r.requestQty||0),0);
       const jbrAllocated=Math.min(activeQty,Math.max(0,Number(window.jbrCutForProductV1121?.(g.key)||0)));
       const toCut=Math.max(0,activeQty-jbrAllocated);
+      const dispatchBalance=(g.jobs||[]).reduce((n,r)=>{
+        const flow=['Requested','Approved','Planned','In Production','QC Check','Finished','Dispatched','Received','GRN Closed'];
+        const idx=flow.indexOf(String(r?.status||'Requested'));
+        if(idx<flow.indexOf('Finished'))return n;
+        const produced=Math.max(0,Number(r?.finishedQty||r?.packing?.total||r?.batchPackingV1040?.total||r?.requestQty||0));
+        const dispatched=(r?.dispatches||[]).reduce((s,d)=>s+Math.max(0,Number(d?.qty||0)),0);
+        return n+Math.max(0,produced-dispatched);
+      },0);
+      const historicalRequest=(g.jobs||[]).reduce((n,r)=>n+Math.max(0,Number(r.requestQty||0)),0);
+      const displayOriginal=active.length?activeQty:historicalRequest;
       const latest=g.latestUpdatedAt?new Date(g.latestUpdatedAt).toLocaleString():'-';
-      return `<div class="pp-card" data-product-key="${esc(g.key)}"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag">${active.length} active job${active.length===1?'':'s'}</span></div><div class="pp-stats"><div class="pp-stat total"><span>Original Request</span><b>${money(activeQty)}</b><small>${active.length} active job${active.length===1?'':'s'}</small></div><div class="pp-stat ongoing"><span>JBR Cut / Allocated</span><b>${money(jbrAllocated)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat difference"><span>Still To Cut</span><b>${money(toCut)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat finished"><span>Finished</span><b>${money(g.finished)}</b><small>${g.finishedJobs} job${g.finishedJobs===1?'':'s'}</small></div></div><div class="pp-card-foot"><div class="pp-mini">Production balance: <b>${money(toCut)} ${esc(g.unit)}</b> • Original ${money(activeQty)} • JBR allocated ${money(jbrAllocated)} • Latest: ${esc(latest)}</div>${canManage&&active.length?`<button class="btn primary sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">Open Product</button>`:active.length?'<span class="small">Production manage permission required</span>':'<span class="tag">No active work</span>'}</div></div>`;
+      const stageLabel=active.length
+        ? `${active.length} active job${active.length===1?'':'s'}`
+        : dispatchBalance>0
+          ? 'Finished — Dispatch Ready'
+          : g.finishedJobs>0
+            ? 'Finished / Logistics'
+            : 'No active work';
+      const actions=[];
+      if(canManage&&active.length){
+        actions.push(`<button class="btn primary sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">Open Product</button>`);
+      }else if(active.length){
+        actions.push('<span class="small">Production manage permission required</span>');
+      }
+      if(canManage&&dispatchBalance>0){
+        actions.push(`<button class="btn navy sm product-dispatch-btn-v1124" onclick="openProductDispatchV1124('${encodeURIComponent(g.key)}')">Dispatch ${money(dispatchBalance)}</button>`);
+      }
+      if(!actions.length)actions.push(`<span class="tag">${esc(stageLabel)}</span>`);
+      const balanceCopy=active.length
+        ? `Production balance: <b>${money(toCut)} ${esc(g.unit)}</b> • Original ${money(activeQty)} • JBR allocated ${money(jbrAllocated)}`
+        : dispatchBalance>0
+          ? `<b>Dispatch Ready:</b> ${money(dispatchBalance)} ${esc(g.unit)} packed and waiting for dispatch`
+          : `<b>Production completed:</b> ${money(g.finished)} ${esc(g.unit)}`;
+      return `<div class="pp-card ${dispatchBalance>0&&!active.length?'dispatch-ready-v1124':''}" data-product-key="${esc(g.key)}"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag ${dispatchBalance>0&&!active.length?'dispatch-ready-tag-v1124':''}">${esc(stageLabel)}</span></div><div class="pp-stats"><div class="pp-stat total"><span>Original Request</span><b>${money(displayOriginal)}</b><small>${g.totalJobs} total job${g.totalJobs===1?'':'s'}</small></div><div class="pp-stat ongoing"><span>JBR Cut / Allocated</span><b>${money(active.length?jbrAllocated:g.finished)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat difference"><span>${dispatchBalance>0&&!active.length?'Dispatch Balance':'Still To Cut'}</span><b>${money(dispatchBalance>0&&!active.length?dispatchBalance:toCut)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat finished"><span>Finished</span><b>${money(g.finished)}</b><small>${g.finishedJobs} job${g.finishedJobs===1?'':'s'}</small></div></div><div class="pp-card-foot"><div class="pp-mini">${balanceCopy} • Latest: ${esc(latest)}</div>${actions.join('')}</div></div>`;
     }).join(''):'<div class="empty" style="grid-column:1/-1">No matching production products.</div>';
   }
 
@@ -21515,69 +21568,10 @@ window.toggleBpSeparateDeliveryButton = function(){
   };
 
   function bindFastDispatchButtonsV1064(){
-    const grid=document.getElementById('productionProductsGrid');
-    if(!grid)return;
-
-    let groups=[];
-    try{groups=productionProductGroupsV103()||[]}catch(e){
-      console.error('Dispatch groups',e);
-      return;
-    }
-
-    dispatchRegistryV1064.clear();
-    const cards=[...grid.querySelectorAll('.pp-card')];
-
-    cards.forEach((card,index)=>{
-      const title=card.querySelector('.pp-card-title')?.textContent?.trim()||'';
-      const spec=card.querySelector('.pp-spec')?.textContent||'';
-
-      const g=groups.find(x=>
-        String(x.size||'').trim()===title &&
-        spec.includes(String(x.material||'')) &&
-        spec.includes(String(x.layout||'')) &&
-        spec.includes(String(x.pcs||0))
-      );
-      if(!g)return;
-
-      const foot=card.querySelector('.pp-card-foot');
-      if(!foot)return;
-
-      /* V1.0.65: enforce exactly one Products-card Dispatch button. */
-      foot.querySelectorAll(
-        '.product-dispatch-btn-v1059,.product-dispatch-btn-v1060,.product-dispatch-btn-v1064'
-      ).forEach(x=>x.remove());
-
-      const balance=(g.jobs||[]).reduce((n,r)=>n+availableQtyV1064(r),0);
-      const hasQC=(g.jobs||[]).some(r=>String(r.status||'')==='QC Check');
-      const hasFinished=(g.jobs||[]).some(r=>flowIndexV1064(r.status)>=flowIndexV1064('Finished'));
-
-      [...foot.querySelectorAll('.tag')].forEach(tag=>{
-        if(tag.textContent.trim()==='No active work'){
-          tag.textContent=
-            balance>0?'Finished — Dispatch Ready':
-            hasQC?'QC Check':
-            hasFinished?'Finished / Logistics':
-            'No active work';
-        }
-      });
-
-      if(balance<=0)return;
-      if(currentUser?.role!=='admin'&&!hasPerm('production_manage'))return;
-
-      const token=`PD-${index}-${Date.now()}`;
-      dispatchRegistryV1064.set(token,g);
-
-      const btn=document.createElement('button');
-      btn.type='button';
-      btn.className='btn navy sm product-dispatch-btn-v1064';
-      btn.textContent=`Dispatch ${money(balance)}`;
-      btn.setAttribute('aria-label',`Dispatch ${money(balance)} ${g.unit||'Rolls'} for ${g.size}`);
-      btn.setAttribute(
-        'onclick',
-        `event.preventDefault();event.stopPropagation();openFastProductDispatchV1064('${token}');return false;`
-      );
-      foot.appendChild(btn);
-    });
+    /* V1.1.24: Products-card Dispatch state is now owned directly by
+       renderGroupedFactoryProductsV1038 + openProductDispatchV1124.
+       Keep this legacy hook as a no-op to avoid duplicate Dispatch buttons. */
+    return;
   }
 
   function installDispatchV1064(){
@@ -27519,6 +27513,371 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
     }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+</script>
+
+
+<script>
+/* =========================================================
+   SoftCreation V1.1.24
+   A) Products -> Packed -> Dispatch Ready state fix
+   B) Printer Connection Hub (USB active; BT/Network placeholders)
+   ========================================================= */
+(function(){
+  const FLOW_V1124=['Requested','Approved','Planned','In Production','QC Check','Finished','Dispatched','Received','GRN Closed'];
+  const usbSessionsV1124=new Map();
+
+  function flowIndexV1124(status){
+    const i=FLOW_V1124.indexOf(String(status||'Requested'));
+    return i<0?0:i;
+  }
+
+  function producedV1124(r){
+    const vals=[r?.finishedQty,r?.packing?.total,r?.batchPackingV1040?.total];
+    for(const v of vals){const n=Number(v||0);if(n>0)return n}
+    return flowIndexV1124(r?.status)>=flowIndexV1124('Finished')?Math.max(0,Number(r?.requestQty||0)):0;
+  }
+
+  function dispatchedV1124(r){
+    return (r?.dispatches||[]).reduce((n,d)=>n+Math.max(0,Number(d?.qty||0)),0);
+  }
+
+  function availableV1124(r){
+    if(flowIndexV1124(r?.status)<flowIndexV1124('Finished'))return 0;
+    return Math.max(0,producedV1124(r)-dispatchedV1124(r));
+  }
+
+  function physicalPackingV1124(r){
+    /* V1.1.23 normalizes same-job physical packing before the final dispatch modal.
+       For this selector, prefer exact r.packing first so boxes remain separate. */
+    const p=r?.packing||r?.batchPackingV1040||{};
+    const boxes=Array.isArray(p?.boxes)?p.boxes:[];
+    const loose=Math.max(0,Number(p?.loose||0));
+    return {boxes,loose,total:boxes.reduce((n,b)=>n+Math.max(0,Number(b?.rolls||0)),0)+loose};
+  }
+
+  function ensureProductDispatchModalV1124(){
+    let modal=$('productDispatchModalV1124');
+    if(modal)return modal;
+    document.body.insertAdjacentHTML('beforeend',`
+      <div id="productDispatchModalV1124" class="modal">
+        <div class="modal-card product-dispatch-modal-v1124">
+          <div class="modal-head">
+            <div><b>Dispatch Ready</b><div id="productDispatchMetaV1124" class="small"></div></div>
+            <button class="closex" type="button" onclick="closeModal('productDispatchModalV1124')">×</button>
+          </div>
+          <div id="productDispatchBodyV1124" class="modal-body"></div>
+        </div>
+      </div>`);
+    return $('productDispatchModalV1124');
+  }
+
+  window.openProductDispatchV1124=function(encodedKey){
+    if(currentUser?.role!=='admin'&&!hasPerm('production_manage')){
+      return requirePerm('production_manage','dispatch finished production');
+    }
+    const key=decodeURIComponent(encodedKey||'');
+    const g=(productionProductGroupsV103()||[]).find(x=>x.key===key);
+    if(!g)return toast('Product not found');
+
+    const jobs=(g.jobs||[])
+      .filter(r=>availableV1124(r)>0)
+      .sort((a,b)=>(Date.parse(b?.finishedAt||b?._spgsUpdatedAt||0)||0)-(Date.parse(a?.finishedAt||a?._spgsUpdatedAt||0)||0));
+
+    const total=jobs.reduce((n,r)=>n+availableV1124(r),0);
+    const modal=ensureProductDispatchModalV1124();
+    $('productDispatchMetaV1124').textContent=`${g.size} • ${g.material} • ${g.layout} • ${money(g.pcs)} pcs/roll • ${money(total)} ${g.unit||'Rolls'} available`;
+
+    if(!jobs.length){
+      $('productDispatchBodyV1124').innerHTML='<div class="empty">No packed / Finished balance is available to dispatch.</div>';
+      modal.classList.add('show');
+      return;
+    }
+
+    $('productDispatchBodyV1124').innerHTML=`
+      <div class="notice"><b>Packing is complete.</b> Select the finished job below. The next screen keeps every physical box and Loose Rolls as separate dispatch units.</div>
+      <div class="dispatch-ready-list-v1124">
+        ${jobs.map(r=>{
+          try{window.ensureSameJobPhysicalPackingV1123?.(r,true)}catch(_){}
+          const p=physicalPackingV1124(r);
+          const packageChips=[
+            ...p.boxes.map((b,i)=>`<span class="dispatch-package-chip-v1124"><b>Box ${esc(String(b?.boxNo||String(i+1).padStart(2,'0')))}</b> ${money(Number(b?.rolls||0))}</span>`),
+            ...(p.loose>0?[`<span class="dispatch-package-chip-v1124 loose"><b>Loose</b> ${money(p.loose)}</span>`]:[])
+          ].join('');
+          return `<div class="dispatch-ready-job-v1124">
+            <div class="dispatch-ready-job-head-v1124">
+              <div><b>${esc(r.orderNo||'-')}</b><span>${esc(r.customerName||'-')} • ${esc(r.status||'-')}</span></div>
+              <div class="dispatch-ready-balance-v1124"><span>Available</span><b>${money(availableV1124(r))}</b></div>
+            </div>
+            <div class="dispatch-package-list-v1124">${packageChips||'<span class="small">No package breakdown</span>'}</div>
+            <div class="actions"><button class="btn navy" type="button" onclick="closeModal('productDispatchModalV1124');openDispatchLoadingV81('${r.id}')">Open Dispatch</button></div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    modal.classList.add('show');
+  };
+
+  /* Force a final Products refresh after packing save so the same card immediately
+     changes from active production to Finished — Dispatch Ready. */
+  const baseSavePackingV1124=window.savePackingV81;
+  if(typeof baseSavePackingV1124==='function'){
+    window.savePackingV81=async function(){
+      const result=await baseSavePackingV1124.apply(this,arguments);
+      setTimeout(()=>{
+        try{renderProductionProducts()}catch(e){console.error('V1.1.24 Products refresh',e)}
+      },0);
+      return result;
+    };
+    try{savePackingV81=window.savePackingV81}catch(_){}
+  }
+
+  /* ------------------------- Printer Hub ------------------------- */
+  function usbKeyV1124(device){
+    return [device.vendorId,device.productId,device.serialNumber||'',device.productName||''].join(':');
+  }
+
+  function hexV1124(n){
+    return '0x'+Number(n||0).toString(16).padStart(4,'0').toUpperCase();
+  }
+
+  function printerHubMessageV1124(msg,type=''){
+    const el=$('printerUsbMessageV1124');
+    if(!el)return;
+    el.className='printer-usb-message-v1124 '+type;
+    el.textContent=msg;
+  }
+
+  function supportStateV1124(){
+    const hasUsb=!!navigator.usb;
+    const secure=!!window.isSecureContext;
+    const status=$('printerUsbSupportV1124');
+    if(status){
+      status.innerHTML=`
+        <div><span>WebUSB</span><b class="${hasUsb?'ok':'bad'}">${hasUsb?'Supported':'Not supported'}</b></div>
+        <div><span>Secure Context</span><b class="${secure?'ok':'bad'}">${secure?'HTTPS / secure':'HTTPS required'}</b></div>
+        <div><span>Current Browser</span><b>${esc(navigator.userAgent.includes('Android')?'Android browser':'Desktop browser')}</b></div>`;
+    }
+    const connect=$('printerUsbConnectV1124');
+    if(connect)connect.disabled=!(hasUsb&&secure);
+  }
+
+  function interfaceCandidatesV1124(device){
+    const out=[];
+    const cfg=device.configuration;
+    if(!cfg)return out;
+    (cfg.interfaces||[]).forEach(intf=>{
+      (intf.alternates||[]).forEach(alt=>{
+        const endpoints=(alt.endpoints||[]);
+        const bulkOut=endpoints.find(e=>e.direction==='out'&&e.type==='bulk');
+        const anyOut=endpoints.find(e=>e.direction==='out');
+        if(alt.interfaceClass===7 || bulkOut || anyOut){
+          out.push({
+            interfaceNumber:intf.interfaceNumber,
+            alternateSetting:alt.alternateSetting,
+            interfaceClass:alt.interfaceClass,
+            endpoint:bulkOut||anyOut||null,
+            printerClass:alt.interfaceClass===7
+          });
+        }
+      });
+    });
+    return out.sort((a,b)=>Number(b.printerClass)-Number(a.printerClass));
+  }
+
+  async function connectDeviceV1124(device){
+    const key=usbKeyV1124(device);
+    const session=usbSessionsV1124.get(key)||{device,status:'Authorized'};
+    session.device=device;
+    usbSessionsV1124.set(key,session);
+
+    try{
+      if(!device.opened)await device.open();
+      if(!device.configuration){
+        const configValue=device.configurations?.[0]?.configurationValue||1;
+        await device.selectConfiguration(configValue);
+      }
+      const candidates=interfaceCandidatesV1124(device);
+      if(!candidates.length){
+        session.status='Connected — no writable printer endpoint found';
+        session.connected=true;
+        session.interfaceNumber=null;
+        session.endpointNumber=null;
+        return session;
+      }
+      const c=candidates[0];
+      await device.claimInterface(c.interfaceNumber);
+      if(Number.isInteger(c.alternateSetting) && c.alternateSetting!==0){
+        try{await device.selectAlternateInterface(c.interfaceNumber,c.alternateSetting)}catch(_){}
+      }
+      session.status=c.printerClass?'Connected — USB Printer interface':'Connected — writable USB interface';
+      session.connected=true;
+      session.interfaceNumber=c.interfaceNumber;
+      session.endpointNumber=c.endpoint?.endpointNumber??null;
+      session.interfaceClass=c.interfaceClass;
+      localStorage.setItem('softcreation_usb_printer_v1124',JSON.stringify({vendorId:device.vendorId,productId:device.productId,serialNumber:device.serialNumber||'',productName:device.productName||''}));
+      return session;
+    }catch(e){
+      session.status='Authorized — connection failed: '+(e?.message||e);
+      session.connected=false;
+      session.error=String(e?.message||e);
+      return session;
+    }
+  }
+
+  function renderUsbDevicesV1124(devices=[]){
+    const host=$('printerUsbListV1124');
+    if(!host)return;
+    const rows=devices.map(device=>{
+      const key=usbKeyV1124(device);
+      const session=usbSessionsV1124.get(key);
+      const connected=!!session?.connected;
+      const status=session?.status||'Authorized — click Connect';
+      return `<div class="printer-device-card-v1124 ${connected?'connected':''}">
+        <div class="printer-device-icon-v1124">USB</div>
+        <div class="printer-device-main-v1124">
+          <b>${esc(device.productName||'USB Device')}</b>
+          <span>${esc(device.manufacturerName||'Unknown manufacturer')}</span>
+          <small>VID ${hexV1124(device.vendorId)} • PID ${hexV1124(device.productId)}${device.serialNumber?` • S/N ${esc(device.serialNumber)}`:''}</small>
+          <small class="printer-device-status-v1124">${esc(status)}</small>
+        </div>
+        <button class="btn ${connected?'green':'primary'} sm" type="button" onclick="connectAuthorizedUsbV1124('${encodeURIComponent(key)}')">${connected?'Connected':'Connect'}</button>
+      </div>`;
+    }).join('');
+    host.innerHTML=rows||'<div class="empty">No authorized USB printers yet. Connect the printer to the Android device with USB OTG, then press <b>Find USB Printer</b>.</div>';
+    const dot=$('printerHubDotV1124');
+    if(dot)dot.classList.toggle('connected',[...usbSessionsV1124.values()].some(x=>x.connected));
+  }
+
+  async function refreshAuthorizedUsbV1124(autoConnect=false){
+    if(!navigator.usb){renderUsbDevicesV1124([]);return []}
+    try{
+      const devices=await navigator.usb.getDevices();
+      devices.forEach(d=>{
+        const key=usbKeyV1124(d);
+        if(!usbSessionsV1124.has(key))usbSessionsV1124.set(key,{device:d,status:'Authorized',connected:false});
+      });
+      if(autoConnect){
+        const preferred=JSON.parse(localStorage.getItem('softcreation_usb_printer_v1124')||'null');
+        if(preferred){
+          const match=devices.find(d=>d.vendorId===preferred.vendorId&&d.productId===preferred.productId&&(!preferred.serialNumber||d.serialNumber===preferred.serialNumber));
+          if(match)await connectDeviceV1124(match);
+        }
+      }
+      renderUsbDevicesV1124(devices);
+      return devices;
+    }catch(e){
+      printerHubMessageV1124('USB refresh failed: '+(e?.message||e),'bad');
+      return [];
+    }
+  }
+
+  window.connectAuthorizedUsbV1124=async function(encodedKey){
+    const key=decodeURIComponent(encodedKey||'');
+    const devices=await navigator.usb.getDevices();
+    const device=devices.find(d=>usbKeyV1124(d)===key);
+    if(!device)return printerHubMessageV1124('USB device is no longer attached.','bad');
+    printerHubMessageV1124('Connecting to USB printer…','working');
+    const s=await connectDeviceV1124(device);
+    await refreshAuthorizedUsbV1124(false);
+    printerHubMessageV1124(s.connected?'USB printer connected.':'Permission granted, but the printer interface could not be opened. '+(s.error||''),s.connected?'ok':'bad');
+  };
+
+  window.findUsbPrinterV1124=async function(){
+    if(!navigator.usb)return printerHubMessageV1124('WebUSB is not supported by this browser. Use Chrome/Chromium on Android or desktop.','bad');
+    if(!window.isSecureContext)return printerHubMessageV1124('WebUSB requires HTTPS (or localhost during development).','bad');
+    try{
+      printerHubMessageV1124('Choose the connected USB receipt printer from the browser device picker…','working');
+      /* Empty filters intentionally allow the browser to show all WebUSB-accessible
+         USB devices. The user explicitly chooses the receipt printer. */
+      const device=await navigator.usb.requestDevice({filters:[]});
+      const session=await connectDeviceV1124(device);
+      await refreshAuthorizedUsbV1124(false);
+      printerHubMessageV1124(session.connected?'USB printer connected and ready for the next printing implementation.':'Printer permission was granted, but the writable interface could not be claimed. '+(session.error||''),session.connected?'ok':'bad');
+    }catch(e){
+      if(e?.name==='NotFoundError')return printerHubMessageV1124('No USB printer selected.','');
+      printerHubMessageV1124('USB connection failed: '+(e?.message||e),'bad');
+    }
+  };
+
+  window.refreshUsbPrintersV1124=async function(){
+    printerHubMessageV1124('Refreshing authorized USB devices…','working');
+    const devices=await refreshAuthorizedUsbV1124(false);
+    printerHubMessageV1124(`${devices.length} authorized USB device${devices.length===1?'':'s'} found.`,'ok');
+  };
+
+  window.printerHubTabV1124=function(tab){
+    ['usb','bluetooth','network'].forEach(x=>{
+      $('printerTabBtn'+x[0].toUpperCase()+x.slice(1)+'V1124')?.classList.toggle('active',x===tab);
+      const pane=$('printerTab'+x[0].toUpperCase()+x.slice(1)+'V1124');
+      if(pane)pane.hidden=x!==tab;
+    });
+  };
+
+  window.openPrinterHubV1124=function(){
+    const modal=$('printerHubModalV1124');
+    if(!modal)return;
+    modal.classList.add('show');
+    printerHubTabV1124('usb');
+    supportStateV1124();
+    refreshAuthorizedUsbV1124(true);
+  };
+
+  function ensurePrinterHubUiV1124(){
+    if($('printerHubModalV1124'))return;
+    document.body.insertAdjacentHTML('beforeend',`
+      <div id="printerHubModalV1124" class="modal printer-hub-modal-v1124">
+        <div class="modal-card printer-hub-card-v1124">
+          <div class="modal-head">
+            <div><b>Printer Connections</b><div class="small">Connect receipt / label printers to this device</div></div>
+            <button class="closex" type="button" onclick="closeModal('printerHubModalV1124')">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="printer-tabs-v1124">
+              <button id="printerTabBtnUsbV1124" class="printer-tab-btn-v1124 active" type="button" onclick="printerHubTabV1124('usb')">USB</button>
+              <button id="printerTabBtnBluetoothV1124" class="printer-tab-btn-v1124" type="button" onclick="printerHubTabV1124('bluetooth')">Bluetooth <small>Next</small></button>
+              <button id="printerTabBtnNetworkV1124" class="printer-tab-btn-v1124" type="button" onclick="printerHubTabV1124('network')">Network <small>Next</small></button>
+            </div>
+
+            <div id="printerTabUsbV1124" class="printer-tab-pane-v1124">
+              <div class="printer-usb-hero-v1124">
+                <div><b>USB Receipt Printer</b><span>Android Chrome / Chromium + USB OTG • WebUSB</span></div>
+                <button id="printerUsbConnectV1124" class="btn primary" type="button" onclick="findUsbPrinterV1124()">Find USB Printer</button>
+              </div>
+              <div id="printerUsbSupportV1124" class="printer-support-grid-v1124"></div>
+              <div class="printer-usb-note-v1124"><b>How it works:</b> connect the receipt printer to the Android phone/tablet using USB OTG, tap <b>Find USB Printer</b>, then choose the printer in Chrome's USB permission dialog. The site must be served over HTTPS.</div>
+              <div class="actions"><button class="btn ghost sm" type="button" onclick="refreshUsbPrintersV1124()">Refresh Authorized Devices</button></div>
+              <div id="printerUsbMessageV1124" class="printer-usb-message-v1124"></div>
+              <div id="printerUsbListV1124" class="printer-device-list-v1124"></div>
+            </div>
+
+            <div id="printerTabBluetoothV1124" class="printer-tab-pane-v1124" hidden>
+              <div class="printer-placeholder-v1124"><b>Bluetooth Printers</b><span>Placeholder only in v1.1.24. Bluetooth discovery / connection will be implemented next.</span></div>
+            </div>
+
+            <div id="printerTabNetworkV1124" class="printer-tab-pane-v1124" hidden>
+              <div class="printer-placeholder-v1124"><b>Network Printers</b><span>Placeholder only in v1.1.24. LAN / Wi-Fi printer connection will be implemented next.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>`);
+  }
+
+  function installV1124(){
+    ensurePrinterHubUiV1124();
+    supportStateV1124();
+    if(navigator.usb){
+      navigator.usb.addEventListener('connect',()=>refreshAuthorizedUsbV1124(false));
+      navigator.usb.addEventListener('disconnect',e=>{
+        const key=usbKeyV1124(e.device);
+        usbSessionsV1124.delete(key);
+        refreshAuthorizedUsbV1124(false);
+      });
+      refreshAuthorizedUsbV1124(true);
+    }
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installV1124,{once:true});
+  else installV1124();
 })();
 </script>
 
