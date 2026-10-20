@@ -38,7 +38,7 @@
 <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.27</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.29</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="admin" autocomplete="username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -48,7 +48,7 @@
 
       <div class="brand app-brand" role="button" tabindex="0" onclick="showView('dashboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('dashboard')}">
         <div class="brandmark"><span class="s">Soft</span><span class="c">Creation</span></div>
-        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.27</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
+        <div class="brandtext"><b>Business Operations System <span class="shell-version">v1.1.29</span></b><span>Quotation • Production • Procurement • Fulfilment</span></div>
       </div>
 
 <div class="topbar-actions">
@@ -3431,7 +3431,7 @@ function enhanceProductionWorkflowV8(){
   [['production','Production'],['productionproducts','Products'],['stores','Stores / GRN']].forEach(([id,label])=>{const b=document.createElement('button');b.className='navbtn';b.dataset.view=id;b.textContent=label;b.onclick=()=>showView(id);nav.insertBefore(b,settings)});
   const host=document.querySelector('main')||document.querySelector('.container')||document.querySelector('.app');
   const sections=`<section id="production" class="view"><div class="panel"><div class="panel-title">Production Planning & Factory Control <button class="btn sm" style="background:#fff;color:#087f83" onclick="renderProductionBoard()">Refresh</button></div><div class="panel-body"><div id="prodNotifications"></div><div id="prodKpis" class="prod-kpis"></div><div class="listbar"><input id="prodSearch" class="search" placeholder="Search order / PI / customer / size" oninput="renderProductionBoard()"><select id="prodStatusFilter" onchange="renderProductionBoard()"><option value="">All statuses</option><option>Requested</option><option>Approved</option><option>Planned</option><option>In Production</option><option>QC Check</option><option>Finished</option><option>Dispatched</option><option>Received</option><option>GRN Closed</option></select></div><div id="prodBoard" class="prod-board"></div></div></div></section>
-  <section id="productionproducts" class="view"><div class="panel"><div class="panel-title"><span>Products — Live Production Summary</span><button class="btn sm" style="background:#fff;color:#087f83" onclick="renderProductionProducts()">Refresh</button></div><div class="panel-body"><div class="notice" style="margin-bottom:12px">Same product specifications are consolidated across all production jobs. <b>Ongoing</b> includes Requested, Approved, Planned, In Production and QC Check. <b>Finished</b> includes Finished and all Logistics stages.</div><div id="productionProductsKpis" class="pp-kpis"></div><div class="listbar"><input id="productionProductsSearch" class="search" placeholder="Search size / material / layout / pcs" oninput="renderProductionProducts()"><select id="productionProductsMaterial" onchange="renderProductionProducts()"><option value="">All materials</option></select></div><div id="productionProductsGrid" class="pp-grid"></div></div></div></section>
+  <section id="productionproducts" class="view"><div class="panel"><div class="panel-title"><span>Products — Live Production Summary</span><button class="btn sm" style="background:#fff;color:#087f83" onclick="renderProductionProducts()">Refresh</button></div><div class="panel-body"><div class="notice" style="margin-bottom:12px">Same product specifications are consolidated across production jobs. Each job appears in <b>one current flow stage only</b>: Requested → Planned → Production / QC → Finished → Logistics. JBR cut can exceed requested quantity; any excess is shown separately as extra factory output / stock.</div><div id="productionProductsKpis" class="pp-kpis"></div><div class="listbar"><input id="productionProductsSearch" class="search" placeholder="Search size / material / layout / pcs" oninput="renderProductionProducts()"><select id="productionProductsMaterial" onchange="renderProductionProducts()"><option value="">All materials</option></select></div><div id="productionProductsGrid" class="pp-grid"></div></div></div></section>
   <section id="stores" class="view"><div class="panel"><div class="panel-title">Stores Receiving, Variance & GRN</div><div class="panel-body"><div class="notice">Factory dispatch records appear here. Stores must count the actual quantity. Any shortage or excess requires a reason before GRN can be completed.</div><div id="storesQueue" style="margin-top:12px"></div></div></div></section>`;
   const firstModal=document.querySelector('.modal');firstModal.insertAdjacentHTML('beforebegin',sections);
   document.body.insertAdjacentHTML('beforeend',`<div id="productionProductDetailModal" class="modal"><div class="modal-card" style="max-width:1100px"><div class="modal-head"><div><b>Product Production Details</b><div id="productionProductDetailMeta" class="small"></div></div><button class="closex" onclick="closeModal('productionProductDetailModal')">×</button></div><div id="productionProductDetailBody" class="modal-body"></div></div></div>
@@ -17161,38 +17161,56 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
     const q=String($('productionProductsSearch')?.value||'').trim().toLowerCase(),material=$('productionProductsMaterial')?.value||'';
     const filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc,...g.jobs.map(r=>r.customerName||''),...g.jobs.map(r=>r.piSerial||'')].join(' ').toLowerCase().includes(q)));
-    const totals=groups.reduce((a,g)=>({requested:a.requested+g.requested,ongoing:a.ongoing+g.ongoing,finished:a.finished+g.finished}),{requested:0,ongoing:0,finished:0});
+
+    const stageQty=(g,statuses,finished=false)=>(g.jobs||[]).filter(r=>statuses.includes(String(r.status||'Requested'))).reduce((n,r)=>n+(finished?productionProductQtyV103(r,true):Math.max(0,Number(r.requestQty||0))),0);
+    const totals=groups.reduce((a,g)=>{
+      a.requested+=stageQty(g,['Requested']);
+      a.planned+=stageQty(g,['Approved','Planned']);
+      a.production+=stageQty(g,['In Production','QC Check']);
+      a.finished+=stageQty(g,['Finished'],true);
+      a.logistics+=stageQty(g,['Dispatched','Received','GRN Closed'],true);
+      return a;
+    },{requested:0,planned:0,production:0,finished:0,logistics:0});
+
     if($('productionProductsKpis'))$('productionProductsKpis').innerHTML=[
-      ['Unique Products',groups.length,'factory batches'],
-      ['Requested',totals.requested,'not started'],
-      ['Ongoing',totals.ongoing,'active production'],
-      ['Finished',totals.finished,'incl. logistics']
+      ['Requested',totals.requested,'waiting to start'],
+      ['Planned',totals.planned,'approved / planned'],
+      ['In Production',totals.production,'production / QC'],
+      ['Finished',totals.finished,'dispatch ready'],
+      ['Logistics',totals.logistics,'dispatched / received']
     ].map(([k,v,n])=>`<div class="pp-kpi"><span>${k}</span><b>${money(v)}</b><div class="small">${n}</div></div>`).join('');
 
     const canManage=currentUser?.role==='admin'||hasPerm('production_manage');
     grid.innerHTML=filtered.length?filtered.map(g=>{
       const active=activeJobsForGroupV1038(g);
-      const activeQty=active.reduce((n,r)=>n+Number(r.requestQty||0),0);
-      const jbrAllocated=Math.min(activeQty,Math.max(0,Number(window.jbrCutForProductV1121?.(g.key)||0)));
-      const toCut=Math.max(0,activeQty-jbrAllocated);
+      const requestedQty=stageQty(g,['Requested']);
+      const plannedQty=stageQty(g,['Approved','Planned']);
+      const productionQty=stageQty(g,['In Production','QC Check']);
+      const finishedQty=stageQty(g,['Finished'],true);
+      const logisticsQty=stageQty(g,['Dispatched','Received','GRN Closed'],true);
+      const totalRequested=(g.jobs||[]).reduce((n,r)=>n+Math.max(0,Number(r.requestQty||0)),0);
+      const jbrCut=Math.max(0,Number(window.jbrCutForProductV1121?.(g.key)||0));
+      const excessCut=Math.max(0,jbrCut-totalRequested);
+      const remainingAgainstRequest=Math.max(0,totalRequested-jbrCut);
       const dispatchBalance=(g.jobs||[]).reduce((n,r)=>{
-        const flow=['Requested','Approved','Planned','In Production','QC Check','Finished','Dispatched','Received','GRN Closed'];
-        const idx=flow.indexOf(String(r?.status||'Requested'));
-        if(idx<flow.indexOf('Finished'))return n;
+        if(String(r?.status||'')!=='Finished')return n;
         const produced=Math.max(0,Number(r?.finishedQty||r?.packing?.total||r?.batchPackingV1040?.total||r?.requestQty||0));
         const dispatched=(r?.dispatches||[]).reduce((s,d)=>s+Math.max(0,Number(d?.qty||0)),0);
         return n+Math.max(0,produced-dispatched);
       },0);
-      const historicalRequest=(g.jobs||[]).reduce((n,r)=>n+Math.max(0,Number(r.requestQty||0)),0);
-      const displayOriginal=active.length?activeQty:historicalRequest;
       const latest=g.latestUpdatedAt?new Date(g.latestUpdatedAt).toLocaleString():'-';
-      const stageLabel=active.length
-        ? `${active.length} active job${active.length===1?'':'s'}`
-        : dispatchBalance>0
-          ? 'Finished — Dispatch Ready'
-          : g.finishedJobs>0
-            ? 'Finished / Logistics'
-            : 'No active work';
+      const stageLabel=finishedQty>0||dispatchBalance>0
+        ? 'Finished — Dispatch Ready'
+        : productionQty>0
+          ? 'In Production'
+          : plannedQty>0
+            ? 'Planned'
+            : requestedQty>0
+              ? 'Requested'
+              : logisticsQty>0
+                ? 'Logistics'
+                : 'No active work';
+
       const actions=[];
       if(canManage&&active.length){
         actions.push(`<button class="btn primary sm" onclick="openProductionProductDetailsV103('${encodeURIComponent(g.key)}')">Open Product</button>`);
@@ -17203,12 +17221,30 @@ window.toggleBpSeparateDeliveryButton = function(){
         actions.push(`<button class="btn navy sm product-dispatch-btn-v1124" onclick="openProductDispatchV1124('${encodeURIComponent(g.key)}')">Dispatch ${money(dispatchBalance)}</button>`);
       }
       if(!actions.length)actions.push(`<span class="tag">${esc(stageLabel)}</span>`);
-      const balanceCopy=active.length
-        ? `Production balance: <b>${money(toCut)} ${esc(g.unit)}</b> • Original ${money(activeQty)} • JBR allocated ${money(jbrAllocated)}`
-        : dispatchBalance>0
-          ? `<b>Dispatch Ready:</b> ${money(dispatchBalance)} ${esc(g.unit)} packed and waiting for dispatch`
-          : `<b>Production completed:</b> ${money(g.finished)} ${esc(g.unit)}`;
-      return `<div class="pp-card ${dispatchBalance>0&&!active.length?'dispatch-ready-v1124':''}" data-product-key="${esc(g.key)}"><div class="pp-card-head"><div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div><span class="tag ${dispatchBalance>0&&!active.length?'dispatch-ready-tag-v1124':''}">${esc(stageLabel)}</span></div><div class="pp-stats"><div class="pp-stat total"><span>Original Request</span><b>${money(displayOriginal)}</b><small>${g.totalJobs} total job${g.totalJobs===1?'':'s'}</small></div><div class="pp-stat ongoing"><span>JBR Cut / Allocated</span><b>${money(active.length?jbrAllocated:g.finished)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat difference"><span>${dispatchBalance>0&&!active.length?'Dispatch Balance':'Still To Cut'}</span><b>${money(dispatchBalance>0&&!active.length?dispatchBalance:toCut)}</b><small>${esc(g.unit)}</small></div><div class="pp-stat finished"><span>Finished</span><b>${money(g.finished)}</b><small>${g.finishedJobs} job${g.finishedJobs===1?'':'s'}</small></div></div><div class="pp-card-foot"><div class="pp-mini">${balanceCopy} • Latest: ${esc(latest)}</div>${actions.join('')}</div></div>`;
+
+      const cutNote=excessCut>0
+        ? `<b class="pp-overcut-v1128">JBR Cut ${money(jbrCut)} • +${money(excessCut)} extra output / stock</b>`
+        : `JBR Cut <b>${money(jbrCut)}</b> • Still to cut against requests <b>${money(remainingAgainstRequest)}</b>`;
+
+      return `<div class="pp-card ${dispatchBalance>0?'dispatch-ready-v1124':''}" data-product-key="${esc(g.key)}">
+        <div class="pp-card-head">
+          <div><div class="pp-card-title">${esc(g.size)}</div><div class="pp-spec">${esc(g.material)} • ${esc(g.layout)} • ${money(g.pcs)} pcs / ${esc(g.unit==='Rolls'?'roll':g.unit)}</div></div>
+          <span class="tag ${dispatchBalance>0?'dispatch-ready-tag-v1124':''}">${esc(stageLabel)}</span>
+        </div>
+        <div class="pp-flow-v1128">
+          <div class="pp-flow-stage requested ${requestedQty>0?'active':''}"><span>1. Requested</span><b>${money(requestedQty)}</b><small>current jobs only</small></div>
+          <div class="pp-flow-arrow-v1128">→</div>
+          <div class="pp-flow-stage planned ${plannedQty>0?'active':''}"><span>2. Planned</span><b>${money(plannedQty)}</b><small>approved / planned</small></div>
+          <div class="pp-flow-arrow-v1128">→</div>
+          <div class="pp-flow-stage production ${productionQty>0?'active':''}"><span>3. Production</span><b>${money(productionQty)}</b><small>in production / QC</small></div>
+          <div class="pp-flow-arrow-v1128">→</div>
+          <div class="pp-flow-stage finished ${finishedQty>0?'active':''}"><span>4. Finished</span><b>${money(finishedQty)}</b><small>dispatch ready</small></div>
+          <div class="pp-flow-arrow-v1128">→</div>
+          <div class="pp-flow-stage logistics ${logisticsQty>0?'active':''}"><span>5. Logistics</span><b>${money(logisticsQty)}</b><small>dispatched / received</small></div>
+        </div>
+        <div class="pp-cut-strip-v1128"><span>Total requested across jobs <b>${money(totalRequested)}</b></span><span>${cutNote}</span>${dispatchBalance>0?`<span>Dispatch balance <b>${money(dispatchBalance)}</b></span>`:''}</div>
+        <div class="pp-card-foot"><div class="pp-mini">Each job is counted in one current stage only • ${g.totalJobs} total job${g.totalJobs===1?'':'s'} • Latest: ${esc(latest)}</div>${actions.join('')}</div>
+      </div>`;
     }).join(''):'<div class="empty" style="grid-column:1/-1">No matching production products.</div>';
   }
 
@@ -19160,9 +19196,29 @@ window.toggleBpSeparateDeliveryButton = function(){
     };
   }
 
-  /* V1.1.20 JBR automatic target allocation. */
+  /* V1.1.28 JBR cut planning.
+     Requested quantity is a suggested target only. Factory may deliberately
+     cut more rolls for stock, up to the physical Max Full Rolls of the JBR. */
   let jbrRequestedTotalV1120=0;
   let jbrExistingAllocatedV1120=0;
+  let jbrActualManualV1128=false;
+
+  window.jbrMarkActualManualV1128=function(){
+    jbrActualManualV1128=true;
+    try{jbrActualLengthPreviewV1066()}catch(_){}
+    const input=$('jbrActualRollsV1055');
+    const hint=$('jbrActualAutoHintV1120');
+    if(input&&hint){
+      const entered=Math.max(0,Math.floor(Number(input.value||0)));
+      const requested=Math.max(0,Number(jbrRequestedTotalV1120||0));
+      const existing=Math.max(0,Number(jbrExistingAllocatedV1120||0));
+      const remaining=Math.max(0,requested-existing);
+      const extra=Math.max(0,entered-remaining);
+      hint.innerHTML=extra>0
+        ? `Manual cut plan <b>${money(entered)}</b>. This is <b>+${money(extra)}</b> above the remaining requested ${money(remaining)} and will be treated as extra factory output / stock.`
+        : `Manual cut plan <b>${money(entered)}</b>. Remaining requested target is ${money(remaining)}.`;
+    }
+  };
 
   function jbrAutoActualV1120(theoreticalRolls){
     const requested=Math.max(0,Number(jbrRequestedTotalV1120||0));
@@ -19172,14 +19228,16 @@ window.toggleBpSeparateDeliveryButton = function(){
     const auto=Math.max(0,Math.floor(Math.min(remaining,maxFull)));
     const input=$('jbrActualRollsV1055');
     if(input){
-      input.value=String(auto);
-      input.readOnly=true;
-      input.setAttribute('aria-readonly','true');
-      input.title=`Auto target: min(remaining requested ${money(remaining)}, max full rolls ${money(maxFull)})`;
+      input.readOnly=false;
+      input.removeAttribute('readonly');
+      input.removeAttribute('aria-readonly');
+      input.max=String(maxFull);
+      if(!jbrActualManualV1128)input.value=String(auto);
+      input.title=`Suggested ${money(auto)} from remaining request ${money(remaining)}. You may increase it up to Max Full Rolls ${money(maxFull)}.`;
     }
     const hint=$('jbrActualAutoHintV1120');
-    if(hint){
-      hint.innerHTML=`Auto-filled from remaining Requested <b>${money(remaining)}</b>, capped by Max Full Rolls <b>${money(maxFull)}</b>. Packing will record the actual rolls physically received.`;
+    if(hint && !jbrActualManualV1128){
+      hint.innerHTML=`Suggested from remaining Requested <b>${money(remaining)}</b>. You may cut more for stock up to this JBR's Max Full Rolls <b>${money(maxFull)}</b>. Packing will record the physical rolls received.`;
     }
     return {requested,existing,remaining,maxFull,auto};
   }
@@ -19353,9 +19411,9 @@ window.toggleBpSeparateDeliveryButton = function(){
                   </div>
 
                   <div class="field">
-                    <label>Actual Cut Rolls <span class="jbr-auto-badge-v1120">AUTO</span></label>
-                    <input id="jbrActualRollsV1055" class="jbr-auto-rolls-v1120" type="number" min="0" step="1" value="0" readonly aria-readonly="true">
-                    <div id="jbrActualAutoHintV1120" class="hint">Auto-filled from Requested, capped by Max Full Rolls. Packing records the physically received quantity.</div>
+                    <label>Actual Cut Rolls <span class="jbr-auto-badge-v1120">SUGGESTED</span></label>
+                    <input id="jbrActualRollsV1055" class="jbr-auto-rolls-v1120" type="number" min="0" step="1" value="0" oninput="jbrMarkActualManualV1128()">
+                    <div id="jbrActualAutoHintV1120" class="hint">Requested rolls are used as a suggested target only. Factory may cut extra rolls for stock up to Max Full Rolls.</div>
                   </div>
                   <div class="field">
                     <label>JBR Process Status</label>
@@ -19417,7 +19475,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('jbrBatchSummaryV1055').innerHTML=`
       <div class="jbr-summary-stat-v1055"><span>Requested</span><b>${money(requested)}</b><small>${esc(g.unit||'Rolls')}</small></div>
       <div class="jbr-summary-stat-v1055"><span>JBRs Added</span><b>${stats.count}</b><small>database records</small></div>
-      <div class="jbr-summary-stat-v1055"><span>Actual Cut</span><b>${money(stats.actualCut)}</b><small>${diff===0?'matches request':diff>0?`+${money(diff)} over request`:`${money(Math.abs(diff))} remaining`}</small></div>
+      <div class="jbr-summary-stat-v1055 ${diff>0?'jbr-overcut-v1128':''}"><span>Actual Cut</span><b>${money(stats.actualCut)}</b><small>${diff===0?'matches requested target':diff>0?`+${money(diff)} extra output / stock`:`${money(Math.abs(diff))} still to cut`}</small></div>
       <div class="jbr-summary-stat-v1055 waste"><span>Confirmed Waste</span><b>${money(stats.wasteRolls)}</b><small>${stats.reusable} JBR${stats.reusable===1?'':'s'} still reusable / incomplete</small></div>`;
   }
 
@@ -19513,6 +19571,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('jbrPcsV1055').value=Number(g.pcs||0)||'';
     jbrRequestedTotalV1120=jbrJobsV1055(g).reduce((n,r)=>n+Math.max(0,Number(r.requestQty||0)),0);
     jbrExistingAllocatedV1120=0;
+    jbrActualManualV1128=false;
     $('jbrActualRollsV1055').value='0';
     $('jbrStatusV1055').value='Not Die Cut';
     $('jbrNoteV1055').value='';
@@ -25923,7 +25982,80 @@ window.pcConfirmReturn=async function(){
   }
 }
 window.pcSendMessage=async function(id){const text=String(document.getElementById('pcMessageText')?.value||'').trim();if(!text)return toast('Enter a message');try{await pcRpc('spgs_pc_add_message',{p_request_id:id,p_message:text,p_username:currentUser?.username||'',p_display_name:currentUser?.display||currentUser?.username||''});await pcRefresh(false);toast('Message sent')}catch(e){console.error(e);toast(e.message)}}
-function pcDemandHTML(){const groups=pcDemandGroups();return `<div class="pc-card"><div class="pc-card-head"><div><h3>Live Sales Order production demand</h3><p>Ordered − dispatched − cancelled − quantities reserved by open Production Control requests.</p></div></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Item</th><th class="num">SO Demand</th><th class="num">Cover</th><th class="num">Safety</th><th class="num">HO Stock</th><th class="num">Pipeline</th><th class="num">Recommended</th></tr></thead><tbody>${groups.map(g=>`<tr><td><b>${pcEsc(pcLineLabel(g))}</b><small>${g.orders.length} open SO line(s)</small></td><td class="num">${pcMoney(g.demand)}</td><td class="num">${pcMoney(g.cover)}</td><td class="num">${pcMoney(g.safety)}</td><td class="num">${pcMoney(g.stock)}</td><td class="num">${pcMoney(g.pipeline)}</td><td class="num"><b>${pcMoney(g.recommended)}</b></td></tr>`).join('')||'<tr><td colspan="7">No current Sales Order demand.</td></tr>'}</tbody></table></div></div>`}
+window.pcDemandProductionPDFV1128=async function(){
+  const groups=pcDemandGroups();
+  if(!groups.length)return toast('No current Sales Order demand to export.');
+  try{
+    if(typeof window.jbrRefreshProductBalanceV1121==='function'){
+      for(const g of groups){
+        try{await window.jbrRefreshProductBalanceV1121(g.key,true)}catch(_){}
+      }
+    }
+    const ok=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);
+    if(!ok||!window.jspdf)return toast('PDF library unavailable');
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    const W=210,H=297,M=14,contentW=W-M*2;
+    let y=16,page=1;
+    const num=v=>Number(v||0);
+    const money=v=>num(v).toLocaleString(undefined,{maximumFractionDigits:2});
+    const safe=v=>String(v??'').replace(/[^\x20-\x7E]/g,' ').replace(/\s+/g,' ').trim();
+    const newPage=()=>{pdf.addPage();page++;y=16;header(false)};
+    const ensure=h=>{if(y+h>H-16)newPage()};
+    const text=(t,x=M,size=9,style='normal',max=contentW)=>{pdf.setFont('helvetica',style);pdf.setFontSize(size);const lines=pdf.splitTextToSize(safe(t),max);ensure(lines.length*(size*.36)+2);pdf.text(lines,x,y);y+=lines.length*(size*.36)+2;return lines};
+    const rule=()=>{ensure(4);pdf.setDrawColor(185);pdf.line(M,y,W-M,y);y+=4};
+    const header=first=>{
+      pdf.setTextColor(8,127,131);pdf.setFont('helvetica','bold');pdf.setFontSize(first?18:13);pdf.text('SOFTCREATION',M,y);y+=first?8:6;
+      pdf.setTextColor(25);pdf.setFontSize(first?14:11);pdf.text('Production Demand & Cut Report',M,y);y+=6;
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(90);pdf.text(`Generated ${new Date().toLocaleString()}  |  Page ${page}`,M,y);y+=5;
+      rule();pdf.setTextColor(25);
+    };
+    header(true);
+
+    const totalDemand=groups.reduce((n,g)=>n+num(g.demand),0);
+    const totalRecommended=groups.reduce((n,g)=>n+num(g.recommended),0);
+    const totalCut=groups.reduce((n,g)=>n+num(window.jbrCutForProductV1121?.(g.key)||0),0);
+    text(`SUMMARY  |  Open SO Demand ${money(totalDemand)} rolls  |  Recommended ${money(totalRecommended)} rolls  |  JBR Cut ${money(totalCut)} rolls`,M,9,'bold');
+    text('JBR Cut may exceed requested production quantity. Positive variances are shown as + Extra Output / Stock.',M,8,'normal');
+    rule();
+
+    groups.forEach((g,idx)=>{
+      const jobs=(state.productionRequests||[]).filter(r=>pcLineKey(r)===g.key);
+      const requested=jobs.reduce((n,r)=>n+num(r.requestQty),0);
+      const jbrCut=num(window.jbrCutForProductV1121?.(g.key)||0);
+      const finished=jobs.reduce((n,r)=>['Finished','Dispatched','Received','GRN Closed'].includes(String(r.status||''))?n+num(r.finishedQty||r.packing?.total||r.requestQty):n,0);
+      const cutVar=jbrCut-requested;
+      ensure(36);
+      pdf.setFillColor(239,250,250);pdf.roundedRect(M,y,contentW,9,2,2,'F');
+      pdf.setTextColor(8,127,131);pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.text(`${idx+1}. ${safe(pcLineLabel(g))}`,M+3,y+6);y+=13;pdf.setTextColor(25);
+      text(`SO Demand: ${money(g.demand)}   Cover: ${money(g.cover)}   Safety: ${money(g.safety)}   HO Stock: ${money(g.stock)}   Pipeline: ${money(g.pipeline)}   Recommended: ${money(g.recommended)}`,M,8,'normal');
+      text(`Production Jobs Requested: ${money(requested)}   JBR Cut: ${money(jbrCut)}   ${cutVar>0?`+ Extra Output / Stock: ${money(cutVar)}`:cutVar<0?`Still To Cut: ${money(Math.abs(cutVar))}`:'Cut matches requested'}   Finished: ${money(finished)}`,M,8,'bold');
+
+      if(g.orders.length){
+        text('SALES ORDER LINES',M,8,'bold');
+        g.orders.forEach(o=>text(`${o.sourceSoNo} | ${o.customer||'-'} | Ordered ${money(o.ordered)} | Dispatched ${money(o.dispatched)} | Allocated ${money(o.allocated)} | Open ${money(o.available)} | Need ${o.requiredDate||'-'}`,M+2,7.5,'normal',contentW-2));
+      }
+      if(jobs.length){
+        text('PRODUCTION JOBS',M,8,'bold');
+        jobs.forEach(r=>{
+          const fq=['Finished','Dispatched','Received','GRN Closed'].includes(String(r.status||''))?num(r.finishedQty||r.packing?.total||r.requestQty):0;
+          text(`${r.orderNo||'-'} | ${r.status||'-'} | Requested ${money(r.requestQty)} | Finished ${money(fq)} | Need ${r.needDate||'-'}${r.productionControlRequestNo?` | PC ${r.productionControlRequestNo}`:''}`,M+2,7.5,'normal',contentW-2);
+        });
+      }else{
+        text('PRODUCTION JOBS: No released production job for this item yet.',M,7.5,'normal');
+      }
+      rule();
+    });
+
+    const stamp=today().replaceAll('-','');
+    pdf.save(`SoftCreation_Production_Demand_Cut_Report_${stamp}.pdf`);
+    toast('Production Demand & Cut PDF generated.');
+  }catch(e){
+    console.error('Production demand PDF',e);
+    toast('Could not generate Production Demand PDF: '+(e?.message||e));
+  }
+};
+function pcDemandHTML(){const groups=pcDemandGroups();return `<div class="pc-card"><div class="pc-card-head"><div><h3>Live Sales Order production demand</h3><p>Ordered − dispatched − cancelled − quantities reserved by open Production Control requests.</p></div><button class="btn navy sm" type="button" onclick="pcDemandProductionPDFV1128()">Download Demand / Cut PDF</button></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Item</th><th class="num">SO Demand</th><th class="num">JBR Cut</th><th class="num">+ Extra / Balance</th><th class="num">Cover</th><th class="num">Safety</th><th class="num">HO Stock</th><th class="num">Pipeline</th><th class="num">Recommended</th></tr></thead><tbody>${groups.map(g=>{const requested=(state.productionRequests||[]).filter(r=>pcLineKey(r)===g.key).reduce((n,r)=>n+pcNum(r.requestQty),0);const cut=pcNum(window.jbrCutForProductV1121?.(g.key)||0);const diff=cut-requested;return `<tr><td><b>${pcEsc(pcLineLabel(g))}</b><small>${g.orders.length} open SO line(s) • ${((state.productionRequests||[]).filter(r=>pcLineKey(r)===g.key)).length} production job(s)</small></td><td class="num">${pcMoney(g.demand)}</td><td class="num"><b>${pcMoney(cut)}</b></td><td class="num ${diff>0?'pc-plus-v1128':''}">${diff>0?`+${pcMoney(diff)} extra`:diff<0?`${pcMoney(Math.abs(diff))} to cut`:'0'}</td><td class="num">${pcMoney(g.cover)}</td><td class="num">${pcMoney(g.safety)}</td><td class="num">${pcMoney(g.stock)}</td><td class="num">${pcMoney(g.pipeline)}</td><td class="num"><b>${pcMoney(g.recommended)}</b></td></tr>`}).join('')||'<tr><td colspan="9">No current Sales Order demand.</td></tr>'}</tbody></table></div></div>`}
 const showBase=window.showView;
 window.showView=function(id){if(id==='productioncontrol'&&!pcHas('production_control_view'))return requirePerm('production_control_view','open Production Control');const r=showBase.apply(this,arguments);if(id==='productioncontrol')pcRefresh(false);return r};
 try{showView=window.showView}catch(_){}
