@@ -25829,7 +25829,31 @@ function pcLineLabel(l){return [l?.desc,l?.size,l?.material,l?.layout,l?.pcs?`${
 function pcPolicy(k){return pcCloud.policies.find(x=>x.item_key===k)||{safety_stock_qty:0,available_stock_qty:0,cover_weeks:2}}
 const pcOpenReqStatuses=()=>new Set(['Pending Approval','Approved']),pcOpenProdStatuses=()=>new Set(['Requested','Approved','Planned','In Production','QC Check']);
 function pcFulfilmentForSO(so){return (state.dealerFulfilments||[]).find(p=>p.sourceSOId===so.id||p.id===so.fulfilmentPlanId)||null}
-function pcDispatchedForSOLine(so,i){const p=pcFulfilmentForSO(so);if(!p)return 0;const s=new Set(['Handed to Courier','In Transit','Delivered']);return (p.consignments||[]).filter(c=>s.has(String(c.status||''))).reduce((n,c)=>n+pcNum((c.allocations||[]).find(a=>Number(a.lineIndex)===Number(i))?.qty),0)}
+let pcOrdexaSent=new Map(),pcOrdexaReady=false,pcOrdexaConflicts=[];
+async function pcLoadOrdexaSent(){
+ pcOrdexaReady=false;
+ const rows=await pcRpc('spgs_pc_ordexa_dispatch_totals',{});
+ if(!Array.isArray(rows))throw new Error('Unexpected Ordexa dispatch totals response');
+ const next=new Map();
+ for(const r of rows){next.set(String(r.source_so_id)+'|'+String(r.source_line_index),pcNum(r.sent_qty));}
+ pcOrdexaSent=next;pcOrdexaReady=true;pcOrdexaConflicts=[];
+ for(const so of (state.salesOrders||[]))for(let i=0;i<(so.lines||[]).length;i++){
+   const existing=pcLegacyDispatchedForSOLine(so,i),cloud=pcOrdexaSent.get(String(so.id)+'|'+i)||0;
+   if(existing>0&&cloud>0)pcOrdexaConflicts.push((so.soNo||so.id)+' line '+i);
+ }
+ if(pcOrdexaConflicts.length)console.error('SPGS duplicate dispatch source requires reconciliation',pcOrdexaConflicts);
+}
+function pcLegacyDispatchedForSOLine(so,i){const p=pcFulfilmentForSO(so);if(!p)return 0;const statuses=new Set(['Handed to Courier','In Transit','Delivered']);return (p.consignments||[]).filter(c=>statuses.has(String(c.status||''))).reduce((n,c)=>n+pcNum((c.allocations||[]).find(a=>Number(a.lineIndex)===Number(i))?.qty),0)}
+function pcDispatchedForSOLine(so,i){
+ const old=pcLegacyDispatchedForSOLine(so,i),now=pcOrdexaSent.get(String(so.id)+'|'+i)||0;
+ // Overlapping sources are an unresolved reconciliation conflict; do not sum.
+ return Math.max(old,now);
+}
+async function pcCheckDispatchSafe(){
+ await pcLoadOrdexaSent();
+ if(pcOrdexaConflicts.length)throw new Error('Dispatch records overlap in old fulfilments and Ordexa: '+pcOrdexaConflicts.slice(0,4).join(', ')+'. Reconcile before releasing production.');
+}
+
 function pcDeliveredMovementWeeks(k){const now=Date.now(),w=7*86400000,b=[0,0,0,0];(state.dealerFulfilments||[]).forEach(p=>(p.consignments||[]).forEach(c=>{if(c.status!=='Delivered')return;const t=Date.parse(c.deliveredDate||c.updatedAt||0);if(!t)return;const bi=Math.floor((now-t)/w);if(bi<0||bi>3)return;(c.allocations||[]).forEach(a=>{const l=p.lines?.[Number(a.lineIndex)];if(l&&pcLineKey(l)===k)b[3-bi]+=pcNum(a.qty)})}));return b}
 function pcAllocatedToOpenRequests(soid,i){const ids=new Set(pcCloud.lines.filter(l=>{const r=pcCloud.requests.find(x=>x.id===l.request_id);return r&&pcOpenReqStatuses().has(r.status)}).map(l=>l.id));return pcCloud.allocations.filter(a=>ids.has(a.request_line_id)&&a.source_so_id===soid&&Number(a.source_so_line_index)===Number(i)).reduce((n,a)=>n+pcNum(a.allocated_qty),0)}
 function pcPipelineForItem(k){return (state.productionRequests||[]).filter(r=>pcOpenProdStatuses().has(String(r.status||''))&&pcLineKey(r)===k).reduce((n,r)=>n+pcNum(r.requestQty),0)}
@@ -25863,7 +25887,7 @@ function pcInstallUI(){
   document.body.insertAdjacentHTML('beforeend',`<div id="pcReturnModal" class="modal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><b>Return Production Request</b><button class="closex" onclick="closeModal('pcReturnModal')">×</button></div><div class="modal-body"><div class="field"><label>Return Reason</label><textarea id="pcReturnReason" placeholder="Explain what HO Stores must correct"></textarea></div><div class="actions"><button class="btn amber" onclick="pcConfirmReturn()">Return to HO Stores</button></div></div></div></div>`);
 }
 window.pcGo=function(v){pcView=v;pcRender()}
-window.pcRefresh=async function(showToast=false){try{await pcLoadCloud();await pcConsumeReleases();await pcLoadCloud();pcRender();if(showToast)toast('Production Control live data refreshed')}catch(e){console.error(e);const b=document.getElementById('pcBody');if(b)b.innerHTML=`<div class="notice"><b>Production Control database is not ready.</b><br>${pcEsc(e.message)}<br><br>Run <b>01_PRODUCTION_CONTROL_DATABASE.sql</b> in Supabase, then refresh.</div>`;if(showToast)toast('Production Control refresh failed')}}
+window.pcRefresh=async function(showToast=false){try{await pcLoadOrdexaSent();await pcLoadCloud();await pcConsumeReleases();await pcLoadCloud();pcRender();if(showToast)toast('Production Control live data refreshed')}catch(e){console.error(e);const b=document.getElementById('pcBody');if(b)b.innerHTML=`<div class="notice"><b>Production Control database is not ready.</b><br>${pcEsc(e.message)}<br><br>Run <b>01_PRODUCTION_CONTROL_DATABASE.sql</b> in Supabase, then refresh.</div>`;if(showToast)toast('Production Control refresh failed')}}
 function pcRenderKpis(){const g=pcDemandGroups(),open=g.reduce((n,x)=>n+x.demand,0),awaiting=pcCloud.requests.filter(r=>r.status==='Pending Approval').length,pipeline=(state.productionRequests||[]).filter(r=>pcOpenProdStatuses().has(String(r.status||''))).reduce((n,r)=>n+pcNum(r.requestQty),0),stock=pcCloud.policies.reduce((n,p)=>n+pcNum(p.available_stock_qty),0),el=document.getElementById('pcKpis');if(el)el.innerHTML=[['OPEN SALES DEMAND',open,'Rolls not allocated to an open PR'],['AWAITING APPROVAL',awaiting,'Manager decisions required'],['PRODUCTION PIPELINE',pipeline,'Current productionRequests'],['HO AVAILABLE STOCK',stock,'Production Control stock']].map(x=>`<div class="pc-kpi"><small>${x[0]}</small><strong>${pcMoney(x[1])}</strong><span>${x[2]}</span></div>`).join('')}
 function pcRender(){
   const role=String(currentUser?.role||'').toLowerCase();
@@ -25911,6 +25935,10 @@ window.pcRemoveBasket=function(i){pcBasket.splice(i,1);pcRender()}
 window.pcAddToBasket=function(){const g=pcGroup(pcPlannerItemKey);if(!g)return;const qty=pcNum(document.getElementById('pcQty')?.value),reason=String(document.getElementById('pcOverride')?.value||'').trim();if(!Number.isInteger(qty)||qty<=0)return toast('Enter a positive whole quantity.');if(qty<g.demand)return toast('Quantity must cover linked SO demand.');if(Math.abs(qty-g.recommended)>.001&&!reason)return toast('Enter an override reason.');if(pcBasket.some(x=>x.itemKey===g.key))return toast('This item is already in the basket.');pcBasket.push({itemKey:g.key,sourceItemId:g.sourceItemId,label:pcLineLabel(g),desc:g.desc,size:g.size,material:g.material,layout:g.layout,pcs:g.pcs,unit:g.unit,requestedQty:qty,soDemand:g.demand,cover:g.cover,safety:g.safety,stock:g.stock,pipeline:g.pipeline,recommended:g.recommended,overrideReason:reason,coverWeeks:g.coverWeeks,allocations:g.orders.filter(o=>o.available>0).map(o=>({source_so_id:o.sourceSoId,source_so_no:o.sourceSoNo,source_so_line_index:o.lineIndex,customer_name:o.customer,required_date:o.requiredDate,qty:o.available}))});pcRender();toast('Item added to request')}
 window.pcSavePolicy=async function(){const g=pcGroup(pcPlannerItemKey);if(!g)return;try{await pcRpc('spgs_pc_upsert_item_policy',{p_item_key:g.key,p_source_item_id:g.sourceItemId||'',p_safety_stock_qty:pcNum(document.getElementById('pcSafety')?.value),p_available_stock_qty:pcNum(document.getElementById('pcStock')?.value),p_cover_weeks:pcNum(document.getElementById('pcCoverWeeks')?.value)||2,p_username:currentUser?.username||''});await pcRefresh(false);toast('Stock policy saved')}catch(e){console.error(e);toast(e.message)}}
 window.pcSubmitRequest=async function(){
+  const oldDispatchSnapshot=JSON.stringify([...pcOrdexaSent.entries()].sort());
+  try{await pcCheckDispatchSafe()}catch(e){pcOrdexaReady=false;toast('Production blocked: '+e.message);return}
+  if(pcBasket.length&&oldDispatchSnapshot!==JSON.stringify([...pcOrdexaSent.entries()].sort())){toast('Dispatch balances changed: rebuild production request basket before submitting.');pcBasket=[];pcRender();return}
+
   const role=String(currentUser?.role||'').toLowerCase();
   if(role==='manager')return toast('Managers cannot create Production Control requests.');
   if(!pcHas('production_control_create'))return requirePerm('production_control_create','submit Production Control requests');if(!pcBasket.length)return toast('Add at least one item.');const due=document.getElementById('pcDue')?.value;if(!due)return toast('Choose Required at HO date.');const payload={workspace:PC_WORKSPACE,required_date:due,material_mode:document.getElementById('pcMaterial')?.value||'Factory to arrange material',reason:String(document.getElementById('pcRequestReason')?.value||'').trim(),user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},lines:pcBasket.map(x=>({item_key:x.itemKey,source_item_id:x.sourceItemId,description:x.desc,size_label:x.size,material:x.material,layout:x.layout,pcs_per_roll:x.pcs,unit:x.unit,requested_qty:x.requestedQty,so_demand_qty:x.soDemand,stock_cover_qty:x.cover,safety_stock_qty:x.safety,available_stock_qty:x.stock,pipeline_qty:x.pipeline,recommended_qty:x.recommended,override_reason:x.overrideReason,cover_weeks:x.coverWeeks,allocations:x.allocations}))};try{const r=await pcRpc('spgs_pc_create_request',{p_payload:payload});pcBasket=[];pcView='register';pcSelectedRequest=r?.id||'';await pcRefresh(false);toast(`${r?.request_no||'Production request'} submitted`)}catch(e){console.error(e);toast(e.message)}}
@@ -25938,6 +25966,10 @@ function pcRequestDetailHTML(r){
   <div class="pc-card"><h3>Audit Trail</h3>${audit.map(a=>`<div class="pc-audit"><b>${pcEsc(a.action)}</b><span>${pcEsc(a.detail||'')}</span><small>${pcEsc(a.display_name||a.username)} • ${new Date(a.created_at).toLocaleString()}</small></div>`).join('')||'<p class="pc-muted">No audit entries.</p>'}</div></div>`;
 }
 window.pcApproveRequest=async function(id){
+  try{await pcCheckDispatchSafe()}catch(e){pcOrdexaReady=false;toast('Approval blocked: '+e.message);return}
+  const disputed=pcCloud.allocations.filter(a=>pcRequestLines(id).some(l=>l.id===a.request_line_id)).filter(a=>{const so=(state.salesOrders||[]).find(s=>s.id===a.source_so_id);return so&&pcDispatchedForSOLine(so,a.source_so_line_index)>0});
+  if(disputed.length){toast('Approval blocked: '+disputed.length+' allocated SO lines already have dispatches. Reconcile/revise request first.');return}
+
   const role=String(currentUser?.role||'').toLowerCase();
   if(role==='sales')return toast('Sales users cannot approve Production Control requests.');
   if(!pcHas('production_control_approve'))return requirePerm('production_control_approve','approve Production Control requests');
