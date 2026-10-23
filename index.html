@@ -18960,7 +18960,52 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!w)return toast('Allow pop-ups to print the Factory report');
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Factory Job Report</title><style>
       body{font:12px Arial;color:#173439;padding:20px}h1{color:#098f91}.factory-table{width:100%;border-collapse:collapse}.factory-table th,.factory-table td{border:1px solid #dbe6e7;padding:7px;text-align:left}.factory-job-head{margin:12px 0}.factory-job-head b{font-size:18px;display:block}.factory-job-head span{color:#60767b}.factory-cost-total{display:flex;justify-content:flex-end;gap:20px;margin-top:12px;font-size:16px}.btn,.notice{display:none}@page{size:A4 landscape;margin:12mm}
-    </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}</body></html>`);
+    </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}<script>
+/* SPGS status badge patch: shared dispatch totals, read-only. */
+(function(){
+  const colors={"Fully Sent":"#16885b","Partially Sent":"#ba7910","New":"#087fbd","Unknown":"#788396"};
+  let lastLoad=0, inFlight=null, ready=false;
+  let statusCache={};
+  function statusFor(so){return ready?(statusCache[String(so?.id||'')]||'Unknown'):'Unknown';}
+  function decorate(){
+    const host=document.querySelector('#soList91');if(!host)return;
+    const rows=host.querySelectorAll('table tbody tr');
+    for(const row of rows){
+      const serial=row.querySelector('td:first-child b')?.textContent?.trim();
+      const so=(state.salesOrders||[]).find(x=>x.soNo===serial);
+      if(!so)continue;
+      const status=statusFor(so),color=colors[status]||colors.Unknown;
+      let badge=row.querySelector('.spgs-ordexa-status-v2');
+      if(!badge){badge=document.createElement('span');badge.className='spgs-ordexa-status-v2';row.querySelector('td:first-child')?.appendChild(badge);}
+      badge.textContent=status;badge.style.backgroundColor=color;
+      badge.title=status==='Unknown'?'Dispatch status not verified from Supabase':'Based on shared physical dispatch totals';
+      row.style.borderLeft='4px solid '+color;
+    }
+  }
+  async function refresh(force=false){
+    if(typeof window.spgsGetSalesOrderStatusesV2!=='function')return;
+    if(inFlight)return inFlight;
+    if(!force&&Date.now()-lastLoad<15000){decorate();return;}
+    inFlight=(async()=>{try{ready=false;decorate();statusCache=await window.spgsGetSalesOrderStatusesV2();ready=true;lastLoad=Date.now();}catch(err){ready=false;console.warn('SPGS status read unavailable',err);}finally{inFlight=null;decorate();}})();
+    return inFlight;
+  }
+  function install(){
+    if(window.__spgsSoStatusInstalled)return;
+    if(typeof window.renderSalesOrders91!=='function')return;
+    window.__spgsSoStatusInstalled=true;
+    const original=window.renderSalesOrders91;
+    window.renderSalesOrders91=function(){const res=original.apply(this,arguments);decorate();void refresh();return res;};
+    try{renderSalesOrders91=window.renderSalesOrders91;}catch(_){ }
+    if(document.querySelector('#salesorders.active'))void refresh(true);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.querySelector('#salesorders.active'))void refresh(true);});
+    document.querySelector('[data-view="salesorders"]')?.addEventListener('click',()=>{setTimeout(()=>refresh(true),200);});
+    document.querySelector('#appRefreshBtnV1079')?.addEventListener('click',()=>setTimeout(()=>refresh(true),400));
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+</script>
+
+</body></html>`);
     w.document.close();w.focus();setTimeout(()=>w.print(),250);
   };
   window.exportFactoryBackup=function(){
@@ -25849,6 +25894,24 @@ function pcDispatchedForSOLine(so,i){
  // Overlapping sources are an unresolved reconciliation conflict; do not sum.
  return Math.max(old,now);
 }
+
+// Read-only status bridge for Sales Orders list; inside Production Control closure.
+window.spgsGetSalesOrderStatusesV2=async function(){
+ await pcLoadOrdexaSent();
+ const statuses={};
+ for(const so of (state.salesOrders||[])){
+   let ordered=0,sent=0,invalid=false;
+   for(let i=0;i<(so.lines||[]).length;i++){
+     const l=so.lines[i];if(l.use===false)continue;
+     const qty=Number(l.qty||0), shipped=Number(pcDispatchedForSOLine(so,i));
+     if(!Number.isFinite(qty)||qty<0||!Number.isFinite(shipped)){invalid=true;break;}
+     ordered+=qty;sent+=Math.min(qty,Math.max(0,shipped));
+   }
+   statuses[String(so.id)]=invalid||ordered<=0?'Unknown':sent>=ordered-0.00001?'Fully Sent':sent>0?'Partially Sent':'New';
+ }
+ return statuses;
+};
+
 async function pcCheckDispatchSafe(){
  await pcLoadOrdexaSent();
  if(pcOrdexaConflicts.length)throw new Error('Dispatch records overlap in old fulfilments and Ordexa: '+pcOrdexaConflicts.slice(0,4).join(', ')+'. Reconcile before releasing production.');
