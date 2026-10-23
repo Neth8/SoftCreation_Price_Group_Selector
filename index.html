@@ -18960,50 +18960,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!w)return toast('Allow pop-ups to print the Factory report');
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Factory Job Report</title><style>
       body{font:12px Arial;color:#173439;padding:20px}h1{color:#098f91}.factory-table{width:100%;border-collapse:collapse}.factory-table th,.factory-table td{border:1px solid #dbe6e7;padding:7px;text-align:left}.factory-job-head{margin:12px 0}.factory-job-head b{font-size:18px;display:block}.factory-job-head span{color:#60767b}.factory-cost-total{display:flex;justify-content:flex-end;gap:20px;margin-top:12px;font-size:16px}.btn,.notice{display:none}@page{size:A4 landscape;margin:12mm}
-    </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}<script>
-/* SPGS status badge patch: shared dispatch totals, read-only. */
-(function(){
-  const colors={"Fully Sent":"#16885b","Partially Sent":"#ba7910","New":"#087fbd","Unknown":"#788396"};
-  let lastLoad=0, inFlight=null, ready=false;
-  let statusCache={};
-  function statusFor(so){return ready?(statusCache[String(so?.id||'')]||'Unknown'):'Unknown';}
-  function decorate(){
-    const host=document.querySelector('#soList91');if(!host)return;
-    const rows=host.querySelectorAll('table tbody tr');
-    for(const row of rows){
-      const serial=row.querySelector('td:first-child b')?.textContent?.trim();
-      const so=(state.salesOrders||[]).find(x=>x.soNo===serial);
-      if(!so)continue;
-      const status=statusFor(so),color=colors[status]||colors.Unknown;
-      let badge=row.querySelector('.spgs-ordexa-status-v2');
-      if(!badge){badge=document.createElement('span');badge.className='spgs-ordexa-status-v2';row.querySelector('td:first-child')?.appendChild(badge);}
-      badge.textContent=status;badge.style.backgroundColor=color;
-      badge.title=status==='Unknown'?'Dispatch status not verified from Supabase':'Based on shared physical dispatch totals';
-      row.style.borderLeft='4px solid '+color;
-    }
-  }
-  async function refresh(force=false){
-    if(typeof window.spgsGetSalesOrderStatusesV2!=='function')return;
-    if(inFlight)return inFlight;
-    if(!force&&Date.now()-lastLoad<15000){decorate();return;}
-    inFlight=(async()=>{try{ready=false;decorate();statusCache=await window.spgsGetSalesOrderStatusesV2();ready=true;lastLoad=Date.now();}catch(err){ready=false;console.warn('SPGS status read unavailable',err);}finally{inFlight=null;decorate();}})();
-    return inFlight;
-  }
-  function install(){
-    if(window.__spgsSoStatusInstalled)return;
-    if(typeof window.renderSalesOrders91!=='function')return;
-    window.__spgsSoStatusInstalled=true;
-    const original=window.renderSalesOrders91;
-    window.renderSalesOrders91=function(){const res=original.apply(this,arguments);decorate();void refresh();return res;};
-    try{renderSalesOrders91=window.renderSalesOrders91;}catch(_){ }
-    if(document.querySelector('#salesorders.active'))void refresh(true);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.querySelector('#salesorders.active'))void refresh(true);});
-    document.querySelector('[data-view="salesorders"]')?.addEventListener('click',()=>{setTimeout(()=>refresh(true),200);});
-    document.querySelector('#appRefreshBtnV1079')?.addEventListener('click',()=>setTimeout(()=>refresh(true),400));
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-})();
-</script>
+    </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}
 
 </body></html>`);
     w.document.close();w.focus();setTimeout(()=>w.print(),250);
@@ -25895,6 +25852,19 @@ function pcDispatchedForSOLine(so,i){
  return Math.max(old,now);
 }
 
+// Read-only per-line dispatch snapshot for the existing Open Plan modal.
+// Uses the same freshly verified quantities as Production Control.
+window.spgsGetSalesOrderPlanProgressV4=async function(sourceSoId){
+ await pcLoadOrdexaSent();
+ const so=(state.salesOrders||[]).find(x=>String(x.id)===String(sourceSoId));
+ if(!so)throw new Error('Linked Sales Order not found in current workspace');
+ return {sourceSoId:String(so.id),salesOrderNo:String(so.soNo||''),lines:(so.lines||[]).map((l,i)=>{
+   const ordered=Math.max(0,Number(l.qty||0));
+   const sent=Math.max(0,Math.min(ordered,Number(pcDispatchedForSOLine(so,i))||0));
+   return {index:i,ordered,sent,remaining:Math.max(0,ordered-sent)};
+ })};
+};
+
 // Read-only status bridge for Sales Orders list; inside Production Control closure.
 window.spgsGetSalesOrderStatusesV2=async function(){
  await pcLoadOrdexaSent();
@@ -27739,6 +27709,72 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
       try{openDispatchLoadingV81=window.openDispatchLoadingV81}catch(_){}
     }
   }
+
+  // The original Open Plan UI used only locally recorded consignments.
+  // Add a verified dispatch view from the same Supabase totals used by Production Control.
+  function installPlanDispatchSyncV4(){
+    if(window.__spgsPlanDispatchV4||typeof window.openDfPlan!=='function')return;
+    window.__spgsPlanDispatchV4=true;
+    const original=window.openDfPlan;
+    let generation=0;
+    window.openDfPlan=function(planId){
+      const out=original.apply(this,arguments);
+      const id=String(planId),token=++generation;
+      const plan=(state.dealerFulfilments||[]).find(p=>String(p.id)===id);
+      if(!plan||String(plan.sourceType||'').toUpperCase()!=='SO'||!plan.sourceSOId)return out;
+      const body=document.getElementById('dfPlanBody');
+      if(!body)return out;
+      const notice=document.createElement('div');notice.className='spgs-plan-live-note';
+      notice.textContent='Checking confirmed Ordexa physical dispatches...';
+      body.prepend(notice);
+      (async()=>{
+        try{
+          if(typeof window.spgsGetSalesOrderPlanProgressV4!=='function')throw new Error('Production Control dispatch service unavailable');
+          const result=await window.spgsGetSalesOrderPlanProgressV4(plan.sourceSOId);
+          if(token!==generation||!document.getElementById('dfPlanModal')?.classList.contains('show'))return;
+          if((state.dealerFulfilments||[]).find(p=>String(p.id)===id)!==plan)return;
+          const source=(state.salesOrders||[]).find(x=>String(x.id)===String(plan.sourceSOId));
+          if(!source||result.lines.length!==plan.lines.length)throw new Error('Sales Order line mapping changed. Verify before dispatching.');
+          const ordered=result.lines.reduce((n,l)=>n+l.ordered,0);
+          const sent=result.lines.reduce((n,l)=>n+l.sent,0);
+          const remaining=result.lines.reduce((n,l)=>n+l.remaining,0);
+          const label=remaining<0.00001?'Fully Sent':sent>0?'Partially Sent':'New Order';
+          const ui=document.getElementById('dfPlanBody');
+          if(!ui)return;
+          const qty=n=>Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
+          const stats=ui.querySelectorAll(':scope > .df-grid .df-stat');
+          if(stats.length>=4){
+            stats[0].querySelector('b').textContent=qty(ordered);
+            stats[2].querySelector('small').textContent='Physically Sent (Verified)';
+            stats[2].querySelector('b').textContent=qty(sent);
+            stats[3].querySelector('small').textContent='Not Yet Sent';
+            stats[3].querySelector('b').textContent=qty(remaining);
+          }
+          const headings=Array.from(ui.querySelectorAll('h4'));
+          const orderItems=headings.find(h=>h.textContent.trim()==='Order Items');
+          const table=orderItems?.nextElementSibling;
+          if(table?.tagName==='TABLE'){
+            const ths=table.querySelectorAll('thead th');
+            if(ths.length>=4)ths[3].textContent='Not Yet Sent';
+            const trs=table.querySelectorAll('tbody tr');
+            result.lines.forEach((line,i)=>{const tds=trs[i]?.querySelectorAll('td');if(tds?.length>=4)tds[3].innerHTML='<b>'+qty(line.remaining)+'</b>';});
+          }
+          const active=notice.isConnected?notice:ui.querySelector('.spgs-plan-live-note');
+          if(active){active.className='spgs-plan-live-note is-ready';active.replaceChildren();
+            const status=document.createElement('strong');status.textContent=label;
+            status.className='spgs-plan-state '+(remaining<0.00001?'is-full':sent>0?'is-partial':'is-new');
+            active.append(status,document.createTextNode('  ·  '+qty(sent)+' of '+qty(ordered)+' physically sent through verified records. Existing consignments shown below are historical and are not edited.'));
+          }
+        }catch(e){
+          if(token!==generation)return;
+          const active=notice.isConnected?notice:document.getElementById('dfPlanBody')?.querySelector('.spgs-plan-live-note');
+          if(active){active.className='spgs-plan-live-note is-error';active.textContent='Live dispatch totals unavailable: '+String(e?.message||e)+'. Do not rely on the older consignment totals for dispatch decisions.';}
+        }
+      })();
+      return out;
+    };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installPlanDispatchSyncV4,{once:true});else installPlanDispatchSyncV4();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
 </script>
@@ -28395,4 +28431,67 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
 
 
 
+
+<script>
+/* SPGS live dispatch status chips v3 — derived from the verified dispatch ledger. */
+(function(){
+  const labels={'Fully Sent':'Fully Sent','Partially Sent':'Partially Sent','New':'New Order','Unknown':'Status Unavailable'};
+  const classes={'Fully Sent':'fully','Partially Sent':'partial','New':'new','Unknown':'unknown'};
+  const POLL_MS=12000;
+  let lastRead=0, pending=null, ready=false, lastError='', cache=Object.create(null);
+  const isOpen=()=>!!document.querySelector('#salesorders.active');
+  function statusFor(so){return ready?(cache[String(so?.id||'')]||'Unknown'):'Unknown';}
+  function renderChips(){
+    const host=document.querySelector('#soList91');if(!host)return;
+    const byNumber=new Map((state.salesOrders||[]).map(x=>[String(x.soNo||''),x]));
+    host.querySelectorAll('table tbody tr').forEach(row=>{
+      const first=row.querySelector('td:first-child');
+      const serial=first?.querySelector('b')?.textContent?.trim();
+      const so=byNumber.get(serial);if(!so||!first)return;
+      const status=statusFor(so),type=classes[status]||'unknown';
+      let wrap=first.querySelector('.spgs-live-chip-slot');
+      if(!wrap){wrap=document.createElement('span');wrap.className='spgs-live-chip-slot';first.appendChild(wrap);}
+      let chip=wrap.querySelector('.spgs-live-chip');
+      if(!chip){chip=document.createElement('span');wrap.appendChild(chip);}
+      chip.className='spgs-live-chip is-'+type;
+      chip.textContent=labels[status]||labels.Unknown;
+      chip.title=status==='Unknown'?(lastError||'Awaiting verified dispatch totals'):'Calculated from confirmed physical dispatch quantities';
+      chip.setAttribute('aria-label','Physical dispatch: '+(labels[status]||labels.Unknown));
+      row.classList.remove('spgs-so-fully','spgs-so-partial','spgs-so-new','spgs-so-unknown');
+      row.classList.add('spgs-so-'+type);
+    });
+  }
+  async function refresh(force=false){
+    if(!isOpen()||typeof window.spgsGetSalesOrderStatusesV2!=='function')return;
+    if(pending)return pending;
+    if(!force&&Date.now()-lastRead<POLL_MS){renderChips();return;}
+    pending=(async()=>{
+      try{
+        const next=await window.spgsGetSalesOrderStatusesV2();
+        if(!next||typeof next!=='object')throw new Error('Invalid dispatch status response');
+        cache=next;ready=true;lastError='';lastRead=Date.now();
+      }catch(e){
+        // Never show a stale Fully Sent badge when the verification service fails.
+        ready=false;lastError='Live status check failed: '+String(e?.message||e);
+        lastRead=Date.now();console.warn('SPGS live status refresh',e);
+      }finally{pending=null;renderChips();}
+    })();
+    return pending;
+  }
+  function install(){
+    if(window.__spgsSoStatusInstalledV3||typeof window.renderSalesOrders91!=='function')return;
+    window.__spgsSoStatusInstalledV3=true;
+    const original=window.renderSalesOrders91;
+    window.renderSalesOrders91=function(){const r=original.apply(this,arguments);renderChips();void refresh();return r;};
+    try{renderSalesOrders91=window.renderSalesOrders91;}catch(_){ }
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh(true);});
+    document.querySelector('[data-view="salesorders"]')?.addEventListener('click',()=>{setTimeout(()=>refresh(true),100);});
+    document.querySelector('#appRefreshBtnV1079')?.addEventListener('click',()=>{setTimeout(()=>refresh(true),300);});
+    // Poll only while the Sales Orders tab is visible. No database mutation occurs.
+    setInterval(()=>{if(!document.hidden&&isOpen())void refresh();},POLL_MS);
+    if(isOpen())void refresh(true);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+</script>
 </body></html>

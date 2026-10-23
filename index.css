@@ -7344,3 +7344,26 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
   #productionProductsGrid .pp-flow-v1128{grid-template-columns:1fr}
   #productionProductsGrid .pp-flow-stage.logistics{grid-column:auto}
 }
+
+/* SPGS physical-dispatch status — polished non-interactive chips */
+#soList91 .spgs-live-chip-slot{display:inline-flex;vertical-align:middle;margin-left:9px;white-space:nowrap}
+#soList91 .spgs-live-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid transparent;border-radius:999px;font-size:10.5px;font-weight:800;line-height:1.35;letter-spacing:.01em;box-shadow:none;cursor:default;user-select:none}
+#soList91 .spgs-live-chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+#soList91 .spgs-live-chip.is-fully{background:#e3f6ec;color:#11623c;border-color:#b3e4c9}
+#soList91 .spgs-live-chip.is-partial{background:#fff3d8;color:#925d0b;border-color:#efd39c}
+#soList91 .spgs-live-chip.is-new{background:#e6f2ff;color:#1b5e99;border-color:#bed9f6}
+#soList91 .spgs-live-chip.is-unknown{background:#edf0f4;color:#5e6978;border-color:#d6dee7}
+#soList91 tr.spgs-so-fully td:first-child{box-shadow:inset 3px 0 #16885b}
+#soList91 tr.spgs-so-partial td:first-child{box-shadow:inset 3px 0 #cd922c}
+#soList91 tr.spgs-so-new td:first-child{box-shadow:inset 3px 0 #3985ca}
+#soList91 tr.spgs-so-unknown td:first-child{box-shadow:inset 3px 0 #8b97a6}
+@media(max-width:700px){#soList91 .spgs-live-chip-slot{margin:6px 0 0;display:flex}#soList91 .spgs-live-chip{font-size:10px}}
+
+/* SPGS Open Plan verified dispatch summary */
+.spgs-plan-live-note{display:flex;align-items:center;flex-wrap:wrap;gap:8px;border:1px solid #bdd9e1;background:#eef7fb;color:#30566a;padding:11px 13px;border-radius:11px;font-size:12px;line-height:1.5;margin-bottom:12px}
+.spgs-plan-live-note.is-error{background:#fff4ef;color:#993e28;border-color:#f5c8bd}
+.spgs-plan-live-note.is-ready{background:#f6fafb;color:#385361}
+.spgs-plan-state{display:inline-flex;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;white-space:nowrap}
+.spgs-plan-state.is-full{background:#d9f5e7;color:#126745}
+.spgs-plan-state.is-partial{background:#fff1cc;color:#805712}
+.spgs-plan-state.is-new{background:#e7eef5;color:#405769}
