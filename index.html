@@ -25881,6 +25881,24 @@ window.spgsGetSalesOrderStatusesV2=async function(){
  }
  return statuses;
 };
+// Extended read-only order progress: quantities come from exactly the same source
+// as Production Control. This endpoint does NOT provide a dispatch event timestamp.
+window.spgsGetSalesOrderProgressV3=async function(){
+ await pcLoadOrdexaSent();
+ const statuses={};
+ for(const so of (state.salesOrders||[])){
+   let ordered=0,sent=0,invalid=false;
+   for(let i=0;i<(so.lines||[]).length;i++){
+     const l=so.lines[i];if(l.use===false)continue;
+     const qty=Number(l.qty||0), shipped=Number(pcDispatchedForSOLine(so,i));
+     if(!Number.isFinite(qty)||qty<0||!Number.isFinite(shipped)){invalid=true;break;}
+     ordered+=qty;sent+=Math.min(qty,Math.max(0,shipped));
+   }
+   const status=invalid||ordered<=0?'Unknown':sent>=ordered-0.00001?'Fully Sent':sent>0?'Partially Sent':'New';
+   statuses[String(so.id)]={status,ordered,sent,remaining:Math.max(0,ordered-sent),lastDispatchAt:null};
+ }
+ return statuses;
+};
 
 async function pcCheckDispatchSafe(){
  await pcLoadOrdexaSent();
@@ -25921,6 +25939,24 @@ function pcInstallUI(){
 }
 window.pcGo=function(v){pcView=v;pcRender()}
 window.pcRefresh=async function(showToast=false){try{await pcLoadOrdexaSent();await pcLoadCloud();await pcConsumeReleases();await pcLoadCloud();pcRender();if(showToast)toast('Production Control live data refreshed')}catch(e){console.error(e);const b=document.getElementById('pcBody');if(b)b.innerHTML=`<div class="notice"><b>Production Control database is not ready.</b><br>${pcEsc(e.message)}<br><br>Run <b>01_PRODUCTION_CONTROL_DATABASE.sql</b> in Supabase, then refresh.</div>`;if(showToast)toast('Production Control refresh failed')}}
+
+// Refresh Production Control every 12s while visible; read-only, no release consumption.
+// Never overlap requests, interrupt editing, or replace the existing manual Refresh.
+let pcAutoRefreshBusyV20261024=false;
+async function pcAutoRefreshV20261024(){
+ if(pcAutoRefreshBusyV20261024||document.hidden||!document.querySelector('#productioncontrol.active'))return;
+ const active=document.activeElement;
+ if(active&&document.querySelector('#productioncontrol')?.contains(active)&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))return;
+ pcAutoRefreshBusyV20261024=true;
+ try{
+   await pcLoadOrdexaSent();
+   await pcLoadCloud();
+   if(!document.hidden&&document.querySelector('#productioncontrol.active'))pcRender();
+ }catch(err){console.warn('Production Control automatic refresh failed',err);}
+ finally{pcAutoRefreshBusyV20261024=false;}
+}
+setInterval(()=>{void pcAutoRefreshV20261024();},12000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void pcAutoRefreshV20261024();});
 function pcRenderKpis(){const g=pcDemandGroups(),open=g.reduce((n,x)=>n+x.demand,0),awaiting=pcCloud.requests.filter(r=>r.status==='Pending Approval').length,pipeline=(state.productionRequests||[]).filter(r=>pcOpenProdStatuses().has(String(r.status||''))).reduce((n,r)=>n+pcNum(r.requestQty),0),stock=pcCloud.policies.reduce((n,p)=>n+pcNum(p.available_stock_qty),0),el=document.getElementById('pcKpis');if(el)el.innerHTML=[['OPEN SALES DEMAND',open,'Rolls not allocated to an open PR'],['AWAITING APPROVAL',awaiting,'Manager decisions required'],['PRODUCTION PIPELINE',pipeline,'Current productionRequests'],['HO AVAILABLE STOCK',stock,'Production Control stock']].map(x=>`<div class="pc-kpi"><small>${x[0]}</small><strong>${pcMoney(x[1])}</strong><span>${x[2]}</span></div>`).join('')}
 function pcRender(){
   const role=String(currentUser?.role||'').toLowerCase();
@@ -28438,7 +28474,7 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
   const labels={'Fully Sent':'Fully Sent','Partially Sent':'Partially Sent','New':'New Order','Unknown':'Status Unavailable'};
   const classes={'Fully Sent':'fully','Partially Sent':'partial','New':'new','Unknown':'unknown'};
   const POLL_MS=12000;
-  let lastRead=0, pending=null, ready=false, lastError='', cache=Object.create(null);
+  let lastRead=0, pending=null, ready=false, lastError='', cache=Object.create(null), progress=Object.create(null);
   const isOpen=()=>!!document.querySelector('#salesorders.active');
   function statusFor(so){return ready?(cache[String(so?.id||'')]||'Unknown'):'Unknown';}
   function renderChips(){
@@ -28455,7 +28491,15 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
       if(!chip){chip=document.createElement('span');wrap.appendChild(chip);}
       chip.className='spgs-live-chip is-'+type;
       chip.textContent=labels[status]||labels.Unknown;
-      chip.title=status==='Unknown'?(lastError||'Awaiting verified dispatch totals'):'Calculated from confirmed physical dispatch quantities';
+      const p=progress[String(so.id)];
+      if(status==='Unknown')chip.title=lastError||'Verified dispatch totals unavailable';
+      else if(p){
+        const fmt=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
+        const heading=status==='Fully Sent'?'Order fully dispatched':status==='Partially Sent'?'Order partially dispatched':'No physical dispatch recorded';
+        chip.title=heading+'\nSent: '+fmt(p.sent)+' of '+fmt(p.ordered)+'\nRemaining: '+fmt(p.remaining)+
+          (p.lastDispatchAt?'\nLast dispatch: '+new Date(p.lastDispatchAt).toLocaleString():'\nDispatch date/time: Not available from dispatch totals')+
+          '\nVerified: '+new Date(lastRead).toLocaleString();
+      }else chip.title='Physical dispatch data verified';
       chip.setAttribute('aria-label','Physical dispatch: '+(labels[status]||labels.Unknown));
       row.classList.remove('spgs-so-fully','spgs-so-partial','spgs-so-new','spgs-so-unknown');
       row.classList.add('spgs-so-'+type);
@@ -28467,12 +28511,15 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
     if(!force&&Date.now()-lastRead<POLL_MS){renderChips();return;}
     pending=(async()=>{
       try{
-        const next=await window.spgsGetSalesOrderStatusesV2();
+        const detailed=typeof window.spgsGetSalesOrderProgressV3==='function';
+        const next=detailed?await window.spgsGetSalesOrderProgressV3():await window.spgsGetSalesOrderStatusesV2();
         if(!next||typeof next!=='object')throw new Error('Invalid dispatch status response');
-        cache=next;ready=true;lastError='';lastRead=Date.now();
+        progress=detailed?next:Object.create(null);
+        cache=detailed?Object.fromEntries(Object.entries(next).map(([id,p])=>[id,p.status])):next;
+        ready=true;lastError='';lastRead=Date.now();
       }catch(e){
         // Never show a stale Fully Sent badge when the verification service fails.
-        ready=false;lastError='Live status check failed: '+String(e?.message||e);
+        ready=false;progress=Object.create(null);lastError='Live status check failed: '+String(e?.message||e);
         lastRead=Date.now();console.warn('SPGS live status refresh',e);
       }finally{pending=null;renderChips();}
     })();
