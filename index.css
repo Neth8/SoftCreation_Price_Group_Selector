@@ -7367,3 +7367,50 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .spgs-plan-state.is-full{background:#d9f5e7;color:#126745}
 .spgs-plan-state.is-partial{background:#fff1cc;color:#805712}
 .spgs-plan-state.is-new{background:#e7eef5;color:#405769}
+
+/* Android all-in-one POS: JBR overlay touch/scroll isolation (v1.1.31) */
+#jbrInModalV1055.show{
+  z-index:1605;
+  align-items:center;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+}
+#jbrInModalV1055 .jbr-modal-card-v1055{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  overflow:hidden;
+  overscroll-behavior:contain;
+  -webkit-transform:translateZ(0);
+  transform:translateZ(0);
+}
+#jbrInModalV1055 .modal-head{flex:0 0 auto;}
+#jbrInModalV1055 .modal-body{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+}
+@media(max-width:800px), (pointer:coarse){
+  #jbrInModalV1055{padding:4px;align-items:stretch;}
+  #jbrInModalV1055 .jbr-modal-card-v1055{
+    width:100%!important;
+    max-width:100%!important;
+    height:calc(100dvh - 8px);
+    max-height:calc(100dvh - 8px);
+    margin:0;
+    border-radius:12px;
+  }
+  #jbrInModalV1055 .modal-body{max-height:none!important;}
+  #jbrInModalV1055 .jbr-summary-v1055{grid-template-columns:repeat(2,minmax(0,1fr));}
+  #jbrInModalV1055 input,#jbrInModalV1055 select,#jbrInModalV1055 textarea{font-size:16px;}
+  #jbrInModalV1055 .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+}
+@supports not (height:100dvh){
+  @media(max-width:800px), (pointer:coarse){
+    #jbrInModalV1055 .jbr-modal-card-v1055{height:calc(100vh - 8px);max-height:calc(100vh - 8px);}
+  }
+}

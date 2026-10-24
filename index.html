@@ -19366,7 +19366,7 @@ window.toggleBpSeparateDeliveryButton = function(){
             </div>
             <div class="jbr-modal-head-actions-v1055">
               <button id="jbrViewToggleV1055" class="btn jbr-view-btn-v1055 sm" type="button" onclick="toggleJbrViewV1055()">View JBRs</button>
-              <button class="closex" type="button" onclick="closeModal('jbrInModalV1055')">×</button>
+              <button class="closex" type="button" onclick="closeJbrAndroidV1131()">×</button>
             </div>
           </div>
           <div class="modal-body">
@@ -19471,7 +19471,7 @@ window.toggleBpSeparateDeliveryButton = function(){
   async function jbrRenderSummaryV1055(g){
     const jobs=jbrJobsV1055(g);
     const requested=jobs.reduce((n,r)=>n+Number(r.requestQty||0),0);
-    const stats=await jbrStatsV1055(g.key,true);
+    const stats=await jbrStatsV1055(g.key,false);
     const diff=stats.actualCut-requested;
 
     $('jbrBatchSummaryV1055').innerHTML=`
@@ -19553,6 +19553,20 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
   };
 
+  // Android POS/WebView: never stack the Product Details and JBR dialogs.
+  // Keep the parent DOM intact so navigating Back preserves product state.
+  let jbrParentWasOpenV1131=false;
+  window.closeJbrAndroidV1131=function(restoreParent=true){
+    const modal=$('jbrInModalV1055');
+    if(modal){modal.classList.remove('show');modal.style.display='';}
+    const parent=$('productionProductDetailModal');
+    if(parent && restoreParent && jbrParentWasOpenV1131){
+      parent.classList.add('show');
+      parent.style.display='';
+    }
+    jbrParentWasOpenV1131=false;
+  };
+
   window.openJbrInV1055=async function(encodedKey){
     if(currentUser?.role!=='admin'&&!hasPerm('production_manage'))return requirePerm('production_manage','manage production JBRs');
     const g=jbrGroupV1055(encodedKey);
@@ -19578,7 +19592,14 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('jbrStatusV1055').value='Not Die Cut';
     $('jbrNoteV1055').value='';
 
+    // Mobile: one visible dialog at a time; competing scrolling layers can
+    // swallow taps and create the appearance of a frozen screen.
+    const parentModalV1131=$('productionProductDetailModal');
+    jbrParentWasOpenV1131=!!parentModalV1131?.classList.contains('show');
+    if(jbrParentWasOpenV1131)parentModalV1131.classList.remove('show');
     $('jbrInModalV1055').classList.add('show');
+    const jbrBodyV1131=$('jbrInModalV1055')?.querySelector('.modal-body');
+    if(jbrBodyV1131)jbrBodyV1131.scrollTop=0;
     jbrCalcV1055();
     await toggleJbrViewV1055('add');
 
@@ -19664,7 +19685,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       if(typeof audit==='function')audit('PRODUCT_JBR_IN',`${ui.code} | ${g.size}/${g.material} | ${ui.jbrWidth}mm x ${ui.jbrLengthM}m | cut ${actual} rolls`);
     }catch(_){}
 
-    closeModal('jbrInModalV1055');
+    closeJbrAndroidV1131(false);
     try{
       if(typeof window.jbrRefreshProductBalanceV1121==='function'){
         await window.jbrRefreshProductBalanceV1121(g.key,true);
