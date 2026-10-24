@@ -3902,7 +3902,7 @@ buildDocHTML=function(doc,forPrint=false){
 const PROD_FLOW_V81=['Requested','Approved','Planned','In Production','QC Check','Finished','Dispatched','Received','GRN Closed'];
 function flowIndexV81(s){return PROD_FLOW_V81.indexOf(s)}
 function boxesTotalV81(boxes=[]){return boxes.reduce((n,b)=>n+Number(b.rolls||0),0)}
-function boxRowsV81(boxes=[],prefix='pack'){return boxes.map((b,i)=>`<div class="box-count-row" data-i="${i}"><b>Box ${String(i+1).padStart(2,'0')}</b><input class="${prefix}-box-no" value="${esc(b.boxNo||String(i+1).padStart(2,'0'))}" placeholder="Box No"><input class="${prefix}-box-rolls" type="number" min="0" step="1" value="${Number(b.rolls||0)}" oninput="updateBoxTotalV81('${prefix}')" placeholder="Rolls"><input class="${prefix}-box-note" value="${esc(b.note||'')}" placeholder="Note / size"><button class="btn red sm" type="button" onclick="removeBoxRowV81(this,'${prefix}')">×</button></div>`).join('')}
+function boxRowsV81(boxes=[],prefix='pack'){return boxes.map((b,i)=>`<div class="box-count-row" data-i="${i}"><b>Box ${String(i+1).padStart(2,'0')}</b><input class="${prefix}-box-no" value="${esc(b.boxNo||String(i+1).padStart(2,'0'))}" placeholder="Box No"><input class="${prefix}-box-rolls" type="number" min="0" step="1" value="${b.rolls!==undefined&&b.rolls!==null&&String(b.rolls)!==''?esc(String(b.rolls)):''}" oninput="updateBoxTotalV81('${prefix}')" placeholder="Rolls"><input class="${prefix}-box-note" value="${esc(b.note||'')}" placeholder="Note / size"><button class="btn red sm" type="button" onclick="removeBoxRowV81(this,'${prefix}')">×</button></div>`).join('')}
 function addBoxRowV81(prefix='pack',box={}){const h=$(prefix+'BoxRows'),i=h.children.length;h.insertAdjacentHTML('beforeend',boxRowsV81([{boxNo:box.boxNo||String(i+1).padStart(2,'0'),rolls:box.rolls||'',note:box.note||''}],prefix));updateBoxTotalV81(prefix)}
 function removeBoxRowV81(btn,prefix){btn.closest('.box-count-row').remove();updateBoxTotalV81(prefix)}
 function readBoxesV81(prefix){return [...document.querySelectorAll(`#${prefix}BoxRows .box-count-row`)].map((r,i)=>({boxNo:r.querySelector(`.${prefix}-box-no`).value.trim()||String(i+1).padStart(2,'0'),rolls:Number(r.querySelector(`.${prefix}-box-rolls`).value||0),note:r.querySelector(`.${prefix}-box-note`).value.trim()})).filter(x=>x.rolls>0)}
@@ -17160,7 +17160,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       if(materialSelect.dataset.sig!==sig){materialSelect.innerHTML='<option value="">All materials</option>'+materials.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');materialSelect.dataset.sig=sig;if(materials.includes(selected))materialSelect.value=selected}
     }
     const q=String($('productionProductsSearch')?.value||'').trim().toLowerCase(),material=$('productionProductsMaterial')?.value||'';
-    const filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc,...g.jobs.map(r=>r.customerName||''),...g.jobs.map(r=>r.piSerial||'')].join(' ').toLowerCase().includes(q)));
+    const filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc,...g.jobs.map(r=>r.customerName||''),...g.jobs.map(r=>r.piSerial||'')].join(' ').toLowerCase().includes(q))).filter(g=>{const statuses=['Requested','Approved','Planned','In Production','QC Check','Finished','Dispatched','Received','GRN Closed'];return (g.jobs||[]).some(r=>statuses.includes(String(r.status||'Requested'))&&( ['Finished','Dispatched','Received','GRN Closed'].includes(String(r.status||'Requested'))?Math.max(0,Number(productionProductQtyV103(r,true)||0)):Math.max(0,Number(r.requestQty||0)))>0);});
 
     const stageQty=(g,statuses,finished=false)=>(g.jobs||[]).filter(r=>statuses.includes(String(r.status||'Requested'))).reduce((n,r)=>n+(finished?productionProductQtyV103(r,true):Math.max(0,Number(r.requestQty||0))),0);
     const totals=groups.reduce((a,g)=>{
@@ -19582,19 +19582,24 @@ window.toggleBpSeparateDeliveryButton = function(){
     jbrCalcV1055();
     await toggleJbrViewV1055('add');
 
-    try{
+    // Cloud reconciliation runs separately; the operator can use the form immediately.
+    Promise.resolve().then(async()=>{try{
       await jbrMigrateLocalOnceV1055(g);
+      if(!$('jbrInModalV1055')?.classList.contains('show')||$('jbrProductKeyV1055')?.value!==encodeURIComponent(g.key))return;
       const statsV1120=await jbrStatsV1055(g.key,true);
+      if(!$('jbrInModalV1055')?.classList.contains('show')||$('jbrProductKeyV1055')?.value!==encodeURIComponent(g.key))return;
       jbrExistingAllocatedV1120=Math.max(0,Number(statsV1120?.actualCut||0));
       jbrCalcV1055();
       await jbrRenderSummaryV1055(g);
     }catch(e){
       console.error(e);
-      $('jbrBatchSummaryV1055').innerHTML=`<div class="notice" style="grid-column:1/-1"><b>Database setup required:</b> ${esc(e.message)}<br>Run <b>supabase_jbr_migration.sql</b> once in Supabase SQL Editor.</div>`;
-    }
+      if($('jbrInModalV1055')?.classList.contains('show'))$('jbrBatchSummaryV1055').innerHTML=`<div class="notice" style="grid-column:1/-1"><b>JBR loading unavailable:</b> ${esc(e.message)}</div>`;
+    }});
   };
 
+  let jbrSaveBusyOct24=false;
   window.saveJbrInV1055=async function(){
+    if(jbrSaveBusyOct24)return toast('JBR save is already running');
     const encodedKey=$('jbrProductKeyV1055')?.value||'';
     const g=jbrGroupV1055(encodedKey);
     if(!g)return toast('Product batch not found');
@@ -19639,6 +19644,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     };
 
     let saved;
+    jbrSaveBusyOct24=true;
     try{
       const rows=await jbrFetchV1055(`/${JBR_TABLE_V1055}`,{
         method:'POST',
@@ -19650,7 +19656,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     }catch(e){
       console.error(e);
       return toast(`JBR was NOT saved: ${e.message}`);
-    }
+    }finally{jbrSaveBusyOct24=false;}
 
     jbrCloudCacheV1055.delete(g.key);
     const ui=jbrRowToUiV1055(saved);
@@ -27894,11 +27900,12 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
     }
 
     $('productDispatchBodyV1124').innerHTML=`
-      <div class="notice"><b>Packing is complete.</b> Select the finished job below. The next screen keeps every physical box and Loose Rolls as separate dispatch units.</div>
+      <div class="notice"><b>Physical finished stock.</b> Select a finished job below. Available quantity includes any QC-accepted, packed rolls above the original production request. Each box and Loose Rolls remain separate. <b>Important:</b> dispatch against a customer Sales Order must still respect its authorized remaining quantity; surplus requires a separately approved allocation or stock transfer.</div>
       <div class="dispatch-ready-list-v1124">
         ${jobs.map(r=>{
           try{window.ensureSameJobPhysicalPackingV1123?.(r,true)}catch(_){}
           const p=physicalPackingV1124(r);
+          const surplus=Math.max(0,producedV1124(r)-Math.max(0,Number(r.requestQty||0)));
           const packageChips=[
             ...p.boxes.map((b,i)=>`<span class="dispatch-package-chip-v1124"><b>Box ${esc(String(b?.boxNo||String(i+1).padStart(2,'0')))}</b> ${money(Number(b?.rolls||0))}</span>`),
             ...(p.loose>0?[`<span class="dispatch-package-chip-v1124 loose"><b>Loose</b> ${money(p.loose)}</span>`]:[])
@@ -27908,7 +27915,7 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
               <div><b>${esc(r.orderNo||'-')}</b><span>${esc(r.customerName||'-')} • ${esc(r.status||'-')}</span></div>
               <div class="dispatch-ready-balance-v1124"><span>Available</span><b>${money(availableV1124(r))}</b></div>
             </div>
-            <div class="dispatch-package-list-v1124">${packageChips||'<span class="small">No package breakdown</span>'}</div>
+            <div class="dispatch-package-list-v1124">${packageChips||'<span class="small">No package breakdown</span>'}</div>${surplus>0?`<div class="notice" style="margin-top:8px"><b>+${money(surplus)} extra packed rolls</b> above this job’s requested ${money(r.requestQty||0)}. Do not treat surplus as authorized SO demand; dispatch only after allocation is approved.</div>`:''}
             <div class="actions"><button class="btn navy" type="button" onclick="closeModal('productDispatchModalV1124');openDispatchLoadingV81('${r.id}')">Open Dispatch</button></div>
           </div>`;
         }).join('')}
