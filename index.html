@@ -28114,27 +28114,37 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
       return;
     }
 
+    // One visible dispatch action, existing per-job ledger remains untouched.
+    // Routing uses the first eligible finished job; other jobs remain visible for traceability.
+    const dispatchTarget = jobs[0];
     $('productDispatchBodyV1124').innerHTML=`
-      <div class="notice"><b>Physical finished stock.</b> Select a finished job below. Available quantity includes any QC-accepted, packed rolls above the original production request. Each box and Loose Rolls remain separate. <b>Important:</b> dispatch against a customer Sales Order must still respect its authorized remaining quantity; surplus requires a separately approved allocation or stock transfer.</div>
+      <div class="notice"><b>Dispatch ready packing batch.</b> Contributing production jobs are listed below for reference. Physical cartons are selected in the existing Dispatch Packing Batch screen. Dispatch accounting is still tied to a production job.</div>
       <div class="dispatch-ready-list-v1124">
-        ${jobs.map(r=>{
-          try{window.ensureSameJobPhysicalPackingV1123?.(r,true)}catch(_){}
-          const p=physicalPackingV1124(r);
-          const surplus=Math.max(0,producedV1124(r)-Math.max(0,Number(r.requestQty||0)));
-          const packageChips=[
-            ...p.boxes.map((b,i)=>`<span class="dispatch-package-chip-v1124"><b>Box ${esc(String(b?.boxNo||String(i+1).padStart(2,'0')))}</b> ${money(Number(b?.rolls||0))}</span>`),
-            ...(p.loose>0?[`<span class="dispatch-package-chip-v1124 loose"><b>Loose</b> ${money(p.loose)}</span>`]:[])
-          ].join('');
-          return `<div class="dispatch-ready-job-v1124">
+        ${jobs.map(r=>`
+          <div class="dispatch-ready-job-v1124">
             <div class="dispatch-ready-job-head-v1124">
-              <div><b>${esc(r.orderNo||'-')}</b><span>${esc(r.customerName||'-')} • ${esc(r.status||'-')}</span></div>
+              <div><b>${esc(r.orderNo||'-')}</b><span>${esc(r.customerName||'-')} • PI ${esc(r.piSerial||'-')} • ${esc(r.status||'-')}</span></div>
               <div class="dispatch-ready-balance-v1124"><span>Available</span><b>${money(availableV1124(r))}</b></div>
             </div>
-            <div class="dispatch-package-list-v1124">${packageChips||'<span class="small">No package breakdown</span>'}</div>${surplus>0?`<div class="notice" style="margin-top:8px"><b>+${money(surplus)} extra packed rolls</b> above this job’s requested ${money(r.requestQty||0)}. Do not treat surplus as authorized SO demand; dispatch only after allocation is approved.</div>`:''}
-            <div class="actions"><button class="btn navy" type="button" onclick="closeModal('productDispatchModalV1124');openDispatchLoadingV81('${r.id}')">Open Dispatch</button></div>
-          </div>`;
-        }).join('')}
-      </div>`;
+          </div>`).join('')}
+      </div>
+      <div class="actions" style="margin-top:16px">
+        <button class="btn navy" type="button" id="dispatchSingleActionV1131">Open Dispatch Packing Batch</button>
+      </div>
+      ${jobs.length>1?'<div class="small" style="margin-top:8px">Current dispatch records are allocated by production job. This action opens the first eligible job; it does not combine multiple job balances into one dispatch note.</div>':''}`;
+    const dispatchButton=$('dispatchSingleActionV1131');
+    if(dispatchButton){
+      dispatchButton.addEventListener('click',()=>{
+        const id=dispatchTarget?.id;
+        if(!id)return toast('No finished production job is available');
+        closeModal('productDispatchModalV1124');
+        if(typeof window.openDispatchLoadingV81==='function'){
+          window.openDispatchLoadingV81(id);
+        }else{
+          toast('Dispatch Packing Batch handler is unavailable');
+        }
+      });
+    }
     modal.classList.add('show');
   };
 
