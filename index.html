@@ -21337,10 +21337,10 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   function tuneFinanceUiV1060(){
     const title=document.querySelector('#finance .panel-title span');
-    if(title)title.textContent='Finance — Live Job Usage & Costing Support';
+    if(title)title.textContent='Finance — Job Total Costs & Production Usage';
 
     const notice=document.querySelector('#finance .panel-body > .notice');
-    if(notice)notice.innerHTML='<b>Operational usage report:</b> Finance shows what each production job actually used and produced. Profit / GP is intentionally not calculated here. Use the PDF report as the production-usage basis for your own costing.';
+    if(notice)notice.innerHTML='<b>Estimated job cost:</b> Finished rolls × saved cost per roll + recorded extra job costs. Jobs without a valid cost snapshot show Cost unavailable. Usage, packing and JBR details remain available; this is not an audited actual-cost report.';
 
     const margin=$('financeMarginV1059');
     if(margin)margin.remove();
@@ -21365,6 +21365,8 @@ window.toggleBpSeparateDeliveryButton = function(){
       return;
     }
 
+    try{await finLoadAdjustmentsV1059(force)}catch(e){console.warn('Finance extra cost load:',e)}
+
     const q=String($('financeSearchV1059')?.value||'').trim().toLowerCase();
     const sf=$('financeStatusV1059')?.value||'';
     rows=rows.filter(x=>
@@ -21372,7 +21374,20 @@ window.toggleBpSeparateDeliveryButton = function(){
       (!q||[x.r.orderNo,x.r.piSerial,x.r.customerName,x.r.size,x.r.material,x.r.layout].join(' ').toLowerCase().includes(q))
     );
 
+    function jobCostV20261026(x){
+      const r=x.r;
+      const {line}=finLineForJobV1059(r);
+      const c=finUnitCostV1059(r,line);
+      const rawQty=Number(x.produced||0);
+      const qty=Number.isFinite(rawQty)&&rawQty>=0?rawQty:0;
+      const known=!!c.snap && Number.isFinite(c.costPerRoll)&&c.costPerRoll>0;
+      const additions=finAdjustmentStatsV1059(r);
+      return {known,unit:c.costPerRoll,qty,base:known?c.costPerRoll*qty:null,
+              additions:additions.total,total:known?c.costPerRoll*qty+additions.total:null};
+    }
     const totals=rows.reduce((a,x)=>{
+      const c=jobCostV20261026(x);
+      if(c.known){a.estimatedCost+=c.total;a.costedJobs++}else{a.uncostedJobs++}
       a.jobs++;
       a.requested+=Number(x.r.requestQty||0);
       a.finished+=Number(x.produced||0);
@@ -21383,6 +21398,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     },{jobs:0,requested:0,finished:0,coreMm:0,jbrWaste:0,dispatched:0});
 
     $('financeKpisV1059').innerHTML=`
+      <div><span>Estimated Job Cost</span><b>LKR ${money(totals.estimatedCost)}</b><small>${money(totals.costedJobs)} costed jobs${totals.uncostedJobs?' • '+money(totals.uncostedJobs)+' awaiting cost':''}</small></div>
       <div><span>Jobs</span><b>${money(totals.jobs)}</b><small>filtered production jobs</small></div>
       <div><span>Requested Rolls</span><b>${money(totals.requested)}</b><small>job demand</small></div>
       <div><span>Finished Rolls</span><b>${money(totals.finished)}</b><small>recorded job output</small></div>
@@ -21392,6 +21408,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('financeJobsV1059').innerHTML=rows.length
       ? `<div class="finance-usage-cards-v1060">${rows.map(x=>{
           const r=x.r;
+          const c=jobCostV20261026(x);
           return `<div class="finance-usage-card-v1060">
             <div class="finance-usage-card-head-v1060">
               <div>
@@ -21402,6 +21419,9 @@ window.toggleBpSeparateDeliveryButton = function(){
             </div>
             <div class="finance-usage-product-v1060">${esc(r.size||'-')} • ${esc(r.material||'-')} • ${esc(r.layout||'-')} • ${money(r.pcs)} pcs / ${esc(r.unit||'Rolls')}</div>
             <div class="finance-usage-stats-v1060">
+              <div class="finance-total-cost-v20261026"><span>Total Job Cost (estimate)</span><b>${c.known?'LKR '+money(c.total):'Cost unavailable'}</b></div>
+              <div><span>Cost / Roll</span><b>${c.known?'LKR '+money(c.unit):'—'}</b></div>
+              <div><span>Extra Job Costs</span><b>LKR ${money(c.additions)}</b></div>
               <div><span>Requested</span><b>${money(r.requestQty||0)}</b></div>
               <div><span>Finished</span><b>${money(x.produced)}</b></div>
               <div><span>JBR Actual Cut</span><b>${money(x.jbrActual)}</b></div>
@@ -21419,7 +21439,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       : '<div class="empty">No matching production jobs.</div>';
 
     $('financeStatusNoteV1059').textContent=
-      `Last updated ${new Date().toLocaleTimeString()} • operational usage only • auto refresh every 20 seconds while Finance is open`;
+      `Last updated ${new Date().toLocaleTimeString()} • estimated costing + operational usage • auto refresh every 20 seconds while Finance is open`;
   };
 
   function jbrWasteTextV1060(x){
@@ -21658,10 +21678,23 @@ window.toggleBpSeparateDeliveryButton = function(){
     try{await usageLoadProductV1060(productKeyV1060(r),true)}
     catch(e){return toast(`Usage data unavailable: ${e.message}`)}
     const x=usageForJobV1060(r);
+    try{await finLoadAdjustmentsV1059(false)}catch(_){ }
+    const finLine=finLineForJobV1059(r).line;
+    const finCost=finUnitCostV1059(r,finLine);
+    const finExtras=finAdjustmentStatsV1059(r);
+    const finQty=Math.max(0,Number(x.produced||0));
+    const finKnown=!!finCost.snap&&Number.isFinite(finCost.costPerRoll)&&finCost.costPerRoll>0;
+    const finTotal=finKnown?finCost.costPerRoll*finQty+finExtras.total:null;
+    const finSummary=`<div class="finance-job-cost-summary-v20261026">
+      <strong>Total Job Cost (estimated)</strong>
+      <b>${finKnown?'LKR '+money(finTotal):'Cost unavailable — enter/verify unit cost'}</b>
+      <div>Finished: ${money(finQty)} rolls • Unit cost: ${finKnown?'LKR '+money(finCost.costPerRoll):'unavailable'} • Extra job costs: LKR ${money(finExtras.total)}</div>
+      <small>Snapshot estimate, not an audited actual material cost. Shared JBR costs and wastage are not allocated again.</small>
+    </div>`;
 
     $('financeJobMetaV1059').textContent=`${r.orderNo} • ${r.customerName||'-'} • ${r.size} • ${r.material}`;
     $('financeJobBodyV1059').innerHTML=
-      usageDetailHtmlV1060(x,false)+
+      finSummary+usageDetailHtmlV1060(x,false)+
       `<div class="actions"><button class="btn navy" type="button" onclick="generateJobUsagePdfV1060('${r.id}')">Generate Job Usage PDF</button></div>`;
     $('financeJobModalV1059').classList.add('show');
   };

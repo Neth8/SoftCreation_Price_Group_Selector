@@ -7476,3 +7476,11 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 /* Production Control: simplified request submission */
 .pc-request-submission-v1143 .pc-submission-counter-v1143{font-size:12px;color:#58717b;margin:8px 0 12px;}
 .pc-request-submission-v1143 .pc-submission-counter-v1143 b{color:#087f83;}
+
+/* Finance total job cost 2026-10-26 */
+.finance-usage-stats-v1060 .finance-total-cost-v20261026{border:1px solid #a9d9c7;background:#eaf8f0;border-radius:10px;padding:10px}
+.finance-usage-stats-v1060 .finance-total-cost-v20261026 b{color:#096b43;font-size:16px}
+.finance-job-cost-summary-v20261026{margin-bottom:14px;background:#eef8f3;border:1px solid #b2dcca;border-radius:14px;padding:15px;display:flex;flex-direction:column;gap:5px}
+.finance-job-cost-summary-v20261026 strong{font-size:13px;color:#255d4b}
+.finance-job-cost-summary-v20261026>b{font-size:25px;color:#096b43}
+.finance-job-cost-summary-v20261026 div,.finance-job-cost-summary-v20261026 small{font-size:11px;color:#557063}
