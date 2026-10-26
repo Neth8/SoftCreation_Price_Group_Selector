@@ -7459,3 +7459,20 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 @media(max-width:650px){.jbr-run-line-v1140{grid-template-columns:1fr 1fr}.jbr-run-line-v1140>b{grid-column:1/-1}}
 
 .spgs-allocation-warning-v1141{display:block;color:#a55a06;font-size:11px;font-weight:700;max-width:420px}
+
+/* v1.1.42: simplified Production Control planner */
+.pc-simple-stats-v1142{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+.pc-simple-stats-v1142>div{border:1px solid #d2e6e8;border-radius:12px;padding:12px;background:#f6fbfb;display:flex;flex-direction:column;gap:5px}
+.pc-simple-stats-v1142 small{font-size:11px;color:#526773;font-weight:700}
+.pc-simple-stats-v1142 strong{font-size:20px;color:#086e76}
+.pc-simple-note-v1142{background:#eaf7f3;border:1px solid #c1e2d9;padding:12px;border-radius:12px;font-size:12px;margin:10px 0}
+.pc-simple-entry-v1142{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.pc-order-details-v1142{border:1px solid #d5e4e9;border-radius:12px;padding:11px;margin:10px 0}
+.pc-order-details-v1142 summary{font-size:12px;font-weight:800;cursor:pointer}
+.pc-order-details-v1142>div>div{padding:7px 0;border-bottom:1px solid #e6eeee;font-size:11px}
+.pc-order-details-v1142 span{display:block;color:#586a76;margin-top:3px}
+@media(max-width:640px){.pc-simple-stats-v1142,.pc-simple-entry-v1142{grid-template-columns:1fr}}
+
+/* Production Control: simplified request submission */
+.pc-request-submission-v1143 .pc-submission-counter-v1143{font-size:12px;color:#58717b;margin:8px 0 12px;}
+.pc-request-submission-v1143 .pc-submission-counter-v1143 b{color:#087f83;}
