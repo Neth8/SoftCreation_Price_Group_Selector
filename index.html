@@ -5933,6 +5933,18 @@ window.spgsLoadProductionSeen=
     if(res.status===204)return null;
     const text=await res.text();return text?JSON.parse(text):null;
   }
+  // Stores-origin orders are intentionally READ-ONLY and are never inserted into state.salesOrders.
+  window.spgsReadStoresOrdersV4=async function(username){
+    const filter=username?'&created_by_username=eq.'+encodeURIComponent(username):'';
+    const rows=await spgsFetch('/softcreation_orders?select=id,order_no,pi_no,customer_id,customer_name,created_by_username,created_at,order_status,grand_total,po_ref&order=created_at.desc&limit=300'+filter);
+    return Array.isArray(rows)?rows:[];
+  };
+  window.spgsReadStoresOrderLinesV4=async function(id){
+    // UUID is validated before inclusion in PostgREST URL.
+    if(!/^[a-f0-9-]{36}$/i.test(String(id)))throw new Error('Invalid order ID');
+    const rows=await spgsFetch('/softcreation_order_lines?order_id=eq.'+encodeURIComponent(id)+'&select=line_no,description,size_label,material,layout,pcs_per_roll,qty,unit,unit_price&order=line_no.asc');
+    return Array.isArray(rows)?rows:[];
+  };
   function spgsUserFromRow(r){
     const base={id:r.id,username:r.username,password:r.password,display:r.display,role:r.role,active:r.active!==false,permissions:Array.isArray(r.permissions)?r.permissions:[],priceCategoryIds:Array.isArray(r.price_category_ids)?r.price_category_ids:[],quoteHandler:r.quote_handler||'',companyLinkType:r.company_link_type||'',companyLinkId:r.company_link_id||'',lastPortalCustomerKey:r.last_portal_customer_key||''};
     return {...(r.extra&&typeof r.extra==='object'?r.extra:{}),...base};
@@ -19265,11 +19277,28 @@ window.toggleBpSeparateDeliveryButton = function(){
     if($('jbrTheoreticalRollsV1055'))$('jbrTheoreticalRollsV1055').textContent=money(theoreticalRolls);
 
     jbrAutoActualV1120(theoreticalRolls);
+    try{window.jbrFlatUpdateV2?.()}catch(_){}
     try{jbrActualLengthPreviewV1066()}catch(_){}
 
     return {jbrWidth,jbrLengthM,labelWidth,labelHeight,gap,pcsPerRoll,lanes,pitch,labelsPerLane,theoreticalLabels,theoreticalRolls};
   }
   window.jbrCalcV1055=jbrCalcV1055;
+  // Lightweight standalone Flatbed calculation, based on softcreationflatbed.html.
+  // Never touches Supabase, summaries, or parent product DOM while typing.
+  window.jbrFlatUpdateV2=function(){
+    const feedEl=$('jbrFeedLengthFlatV2'), countEl=$('jbrPunchCountFlatV2');
+    if(!feedEl||!countEl)return;
+    const feed=Number(feedEl.value),count=Number(countEl.value);
+    const valid=feedEl.value!==''&&countEl.value!==''&&Number.isFinite(feed)&&feed>0&&Number.isSafeInteger(count)&&count>=0;
+    const fmt=(n)=>n.toLocaleString('en-US',{maximumFractionDigits:4});
+    const length=Number($('jbrLengthV1055')?.value||0);
+    const meters=valid?(feed*count/1000):null;
+    $('jbrFlatMetersV2').textContent=meters===null?'—':fmt(meters)+' m';
+    $('jbrFlatRemainV2').textContent=meters===null||!length?'—':fmt(Math.max(0,length-meters))+' m';
+    $('jbrFlatWarnV2').textContent=meters!==null&&length>0&&meters>length+0.0001?'Warning: machine reading exceeds the entered jumbo length. Verify counter or feed length.':'';
+    return {valid,feed,count,meters,length};
+  };
+
 
   async function jbrFetchV1055(path,options={}){
     const res=await fetch(JBR_REST_V1056+path,{
@@ -19383,6 +19412,20 @@ window.toggleBpSeparateDeliveryButton = function(){
                   </div>
                 </div>
 
+                <div class="sc-flat-jbr-machine-v2">
+                  <div class="sc-flat-jbr-heading-v2"><b>Flatbed Machine Readings</b><span>Enter the counter and actual feed length. Calculation is local and instant on Android.</span></div>
+                  <div class="sc-flat-jbr-fields-v2">
+                    <div class="field"><label>Feed / Punch Length (mm)</label><input id="jbrFeedLengthFlatV2" type="number" min="0.001" step="any" inputmode="decimal" placeholder="e.g. 42" oninput="jbrFlatUpdateV2()"></div>
+                    <div class="field"><label>Machine Punch Count</label><input id="jbrPunchCountFlatV2" type="number" min="0" step="1" inputmode="numeric" placeholder="Enter machine counter" oninput="jbrFlatUpdateV2()"></div>
+                  </div>
+                  <div class="sc-flat-jbr-results-v2">
+                    <div><span>Measured Material Used</span><b id="jbrFlatMetersV2">—</b></div>
+                    <div><span>JBR Material Balance</span><b id="jbrFlatRemainV2">—</b></div>
+                  </div>
+                  <div id="jbrFlatWarnV2" class="sc-flat-jbr-warn-v2" aria-live="polite"></div>
+                  <small>Actual Cut Rolls below is the verified finished output. Machine meters alone never create dispatchable stock.</small>
+                </div>
+                <details class="sc-flat-jbr-advanced-v2"><summary>JBR size and label setup · tap to edit</summary>
                 <div class="grid">
                   <div class="field">
                     <label>JBR Width (mm) *</label>
@@ -19412,6 +19455,8 @@ window.toggleBpSeparateDeliveryButton = function(){
                     <input id="jbrPcsV1055" type="number" min="1" step="1" oninput="jbrCalcV1055()">
                   </div>
 
+                </div></details>
+                <div class="grid sc-flat-jbr-core-v2">
                   <div class="field">
                     <label>Actual Cut Rolls <span class="jbr-auto-badge-v1120">SUGGESTED</span></label>
                     <input id="jbrActualRollsV1055" class="jbr-auto-rolls-v1120" type="number" min="0" step="1" value="0" oninput="jbrMarkActualManualV1128()">
@@ -19433,6 +19478,7 @@ window.toggleBpSeparateDeliveryButton = function(){
                   </div>
                 </div>
 
+                <details class="sc-flat-jbr-advanced-v2"><summary>Planning calculations · theoretical capacity</summary>
                 <div class="jbr-calc-grid-v1055">
                   <div><span>Across JBR</span><b id="jbrLanesV1055">0</b><small>lanes</small></div>
                   <div><span>Pitch</span><b id="jbrPitchV1055">0</b><small>height + gap</small></div>
@@ -19448,6 +19494,7 @@ window.toggleBpSeparateDeliveryButton = function(){
                   <div class="balance"><span>Theoretical Remaining Length</span><b id="jbrPreviewBalanceLengthV1066">0 m</b><small>original length − productive length</small></div>
                 </div>
 
+                </details>
                 <div class="actions">
                   <button class="btn primary" type="button" onclick="saveJbrInV1055()">Add JBR</button>
                 </div>
@@ -19591,6 +19638,9 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('jbrActualRollsV1055').value='0';
     $('jbrStatusV1055').value='Not Die Cut';
     $('jbrNoteV1055').value='';
+    $('jbrFeedLengthFlatV2').value=String((size.height||0)+2||'');
+    $('jbrPunchCountFlatV2').value='';
+    jbrFlatUpdateV2();
 
     // Mobile: one visible dialog at a time; competing scrolling layers can
     // swallow taps and create the appearance of a frozen screen.
@@ -19601,7 +19651,11 @@ window.toggleBpSeparateDeliveryButton = function(){
     const jbrBodyV1131=$('jbrInModalV1055')?.querySelector('.modal-body');
     if(jbrBodyV1131)jbrBodyV1131.scrollTop=0;
     jbrCalcV1055();
-    await toggleJbrViewV1055('add');
+    // Switch panes synchronously: no remote work on open.
+    $('jbrAddPaneV1055').hidden=false;
+    $('jbrViewPaneV1055').hidden=true;
+    $('jbrViewToggleV1055').textContent='View JBRs';
+    $('jbrModalTitleV1055').textContent='JBR In';
 
     // Cloud reconciliation runs separately; the operator can use the form immediately.
     Promise.resolve().then(async()=>{try{
@@ -19628,7 +19682,14 @@ window.toggleBpSeparateDeliveryButton = function(){
     const calc=jbrCalcV1055();
     const actual=Math.max(0,Math.floor(Number($('jbrActualRollsV1055')?.value||0)));
     const status=$('jbrStatusV1055')?.value||'Not Die Cut';
-    const note=String($('jbrNoteV1055')?.value||'').trim();
+    const userNote=String($('jbrNoteV1055')?.value||'').trim();
+    const machine=jbrFlatUpdateV2();
+    const feedPresent=String($('jbrFeedLengthFlatV2')?.value||'').trim()!=='';
+    const punchPresent=String($('jbrPunchCountFlatV2')?.value||'').trim()!=='';
+    if(feedPresent!==punchPresent || (punchPresent && !machine?.valid))return toast('Enter a valid feed length and whole-number punch count');
+    if(machine?.valid&&machine.length>0&&machine.meters>machine.length+0.0001)return toast('Measured material exceeds JBR length. Check machine readings.');
+    const machineNote=machine?.valid?`[Flatbed meter reading: ${machine.count} punches x ${machine.feed} mm = ${machine.meters.toFixed(4)} m; JBR balance ${(machine.length-machine.meters).toFixed(4)} m]`:'';
+    const note=[userNote,machineNote].filter(Boolean).join('\n');
 
     if(!(calc.jbrWidth>0))return toast('Enter JBR width');
     if(!(calc.jbrLengthM>0))return toast('Enter JBR length');
@@ -28567,6 +28628,67 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
     if(isOpen())void refresh(true);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+</script>
+<script>
+/* Stores-origin Sales Orders: independent read-only listing; NO state mutation or production handoff. */
+(function(){
+ 'use strict';
+ if(window.__scStoresReadOnlyV4)return;window.__scStoresReadOnlyV4=true;
+ const el=id=>document.getElementById(id);
+ const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ let rows=[],loaded=false,busy=false,readError='',lastRead=0,selectedId='';
+ function authorized(row){
+   if(typeof currentUser==='undefined'||!currentUser)return false;
+   if(currentUser.role==='admin')return true;
+   const user=String(currentUser.username||'');
+   if(user&&row.created_by_username===user)return true;
+   return false; // Non-admin query is also server-filtered by created_by_username.
+ }
+ function visible(){return el('salesorders')?.classList.contains('active')&&!el('loginScreen')?.offsetParent;}
+ function ensure(){
+   const list=el('soList91');if(!list||el('scStoresPanelV4'))return;
+   const section=document.createElement('section');section.id='scStoresPanelV4';section.className='sc-stores-ro';
+   section.innerHTML='<div class="sc-stores-head"><div><strong>Original / Stores Sales Orders</strong><span>Existing PI-generated orders · view only · no production handoff</span></div><button class="btn ghost sm" type="button" id="scStoresRefreshV4">Refresh Stores Orders</button></div><div id="scStoresStatusV4" class="small"></div><div id="scStoresListV4"></div><div id="scStoresDetailsV4" hidden></div>';
+   list.insertAdjacentElement('afterend',section);
+   el('scStoresRefreshV4').addEventListener('click',()=>refresh(true));
+ }
+ function render(){
+   ensure();const host=el('scStoresListV4'),status=el('scStoresStatusV4');if(!host||!status)return;
+   const search=(el('soSearch91')?.value||'').trim().toLowerCase();
+   const filtered=rows.filter(authorized).filter(r=>[r.order_no,r.pi_no,r.customer_name,r.po_ref].join(' ').toLowerCase().includes(search));
+   status.textContent=busy?'Loading Stores orders…':readError?'Stores orders unavailable: '+readError:loaded?filtered.length+' Stores order(s) shown · read only':'Stores orders not loaded yet';
+   host.innerHTML=filtered.length?'<div class="sc-stores-scroll"><table class="table"><thead><tr><th>Stores Order</th><th>Customer / PI</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>'+filtered.map(r=>'<tr><td><b>'+safe(r.order_no)+'</b><div class="small">'+safe((r.created_at||'').slice(0,10))+'</div></td><td><b>'+safe(r.customer_name)+'</b><div class="small">PI: '+safe(r.pi_no)+'</div></td><td>LKR '+(Number(r.grand_total)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td><span class="sc-stores-tag">'+safe(r.order_status||'unknown')+'</span></td><td><button type="button" class="btn ghost sm scStoresOpenV4" data-id="'+safe(r.id)+'">View Details</button></td></tr>').join('')+'</tbody></table></div>':(!busy&&!readError?'<div class="empty">No matching original / Stores Sales Orders.</div>':'');
+   host.querySelectorAll('.scStoresOpenV4').forEach(btn=>btn.addEventListener('click',()=>details(btn.dataset.id)));
+ }
+ async function details(id){
+   const r=rows.find(x=>x.id===id&&authorized(x)),host=el('scStoresDetailsV4');if(!r||!host)return;
+   selectedId=id;host.hidden=false;host.textContent='Loading order lines…';
+   try{
+     const lines=await window.spgsReadStoresOrderLinesV4(id);if(selectedId!==id)return;
+     host.innerHTML='<div class="sc-stores-details-head"><strong>'+safe(r.order_no)+' — '+safe(r.customer_name)+'</strong><button class="btn ghost sm" id="scStoresCloseV4" type="button">Close</button></div><div class="small">Source PI: '+safe(r.pi_no||'-')+' · Original order status: '+safe(r.order_status||'-')+' · Read-only (not a factory fulfilment plan)</div><div class="sc-stores-scroll"><table class="table"><thead><tr><th>Item</th><th>Size / Material</th><th>Qty</th><th>Unit price</th></tr></thead><tbody>'+lines.map(l=>'<tr><td>'+safe(l.description)+'</td><td>'+safe([l.size_label,l.material,l.layout,l.pcs_per_roll?l.pcs_per_roll+' pcs/roll':''].filter(Boolean).join(' · '))+'</td><td>'+safe(l.qty)+' '+safe(l.unit)+'</td><td>'+safe(l.unit_price)+'</td></tr>').join('')+'</tbody></table></div>';
+     el('scStoresCloseV4')?.addEventListener('click',()=>{selectedId='';host.hidden=true});
+   }catch(e){host.textContent='Unable to load item details: '+String(e?.message||e)}
+ }
+ async function refresh(force){
+   if(busy||!visible())return;if(!force&&Date.now()-lastRead<12000){render();return;}
+   if(typeof window.spgsReadStoresOrdersV4!=='function'){readError='Supabase client not ready';render();return;}
+   busy=true;readError='';render();
+   try{const user=typeof currentUser==='undefined'?null:currentUser;
+     if(!user)throw new Error('Please sign in');
+     const fresh=await window.spgsReadStoresOrdersV4(user.role==='admin'?'':String(user.username||'__no_user__'));rows=fresh;loaded=true;lastRead=Date.now();}
+   catch(e){readError=String(e?.message||e);rows=[];loaded=false;console.warn('Stores Orders read-only load failed',e)}
+   finally{busy=false;render()}
+ }
+ function boot(){ensure();
+   el('soSearch91')?.addEventListener('input',render);
+   document.querySelector('[data-view="salesorders"]')?.addEventListener('click',()=>setTimeout(()=>refresh(true),150));
+   el('appRefreshBtnV1079')?.addEventListener('click',()=>setTimeout(()=>refresh(true),400));
+   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&visible())void refresh(true)});
+   setInterval(()=>{if(!document.hidden&&visible())void refresh(false)},12000);
+   if(visible())void refresh(true);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
 </script>
 </body></html>

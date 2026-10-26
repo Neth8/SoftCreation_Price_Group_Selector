@@ -7414,3 +7414,33 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
     #jbrInModalV1055 .jbr-modal-card-v1055{height:calc(100vh - 8px);max-height:calc(100vh - 8px);}
   }
 }
+
+/* Lightweight Flatbed JBR entry — responsive Android all-in-one POS */
+#jbrInModalV1055 .sc-flat-jbr-machine-v2{border:1px solid #b8ddd4;background:#f2fbf7;border-radius:15px;padding:14px;margin:12px 0;contain:layout style}
+#jbrInModalV1055 .sc-flat-jbr-heading-v2 b{display:block;font-size:16px;color:#126347}
+#jbrInModalV1055 .sc-flat-jbr-heading-v2 span{display:block;color:#546d66;font-size:12px;margin:4px 0 12px}
+#jbrInModalV1055 .sc-flat-jbr-fields-v2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#jbrInModalV1055 .sc-flat-jbr-fields-v2 input{min-height:48px;font-size:19px;touch-action:manipulation}
+#jbrInModalV1055 .sc-flat-jbr-results-v2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+#jbrInModalV1055 .sc-flat-jbr-results-v2>div{background:#fff;border:1px solid #c6e4d5;border-radius:10px;padding:12px}
+#jbrInModalV1055 .sc-flat-jbr-results-v2 span{display:block;font-size:12px;color:#58736b}
+#jbrInModalV1055 .sc-flat-jbr-results-v2 b{font-size:23px;color:#126347;overflow-wrap:anywhere}
+#jbrInModalV1055 .sc-flat-jbr-warn-v2{color:#a62c25;font-weight:700;font-size:12px;margin-top:7px}
+#jbrInModalV1055 .sc-flat-jbr-machine-v2 small{display:block;color:#566e65;margin-top:8px}
+#jbrInModalV1055 .sc-flat-jbr-advanced-v2{border:1px solid #d5e2e5;border-radius:12px;margin:12px 0;padding:10px}
+#jbrInModalV1055 .sc-flat-jbr-advanced-v2>summary{cursor:pointer;font-weight:700;padding:7px;touch-action:manipulation}
+#jbrInModalV1055 .sc-flat-jbr-advanced-v2[open]>summary{margin-bottom:12px}
+#jbrInModalV1055 .sc-flat-jbr-core-v2{margin:12px 0}
+@media(max-width:640px){#jbrInModalV1055 .sc-flat-jbr-fields-v2,#jbrInModalV1055 .sc-flat-jbr-results-v2{grid-template-columns:1fr}#jbrInModalV1055 .sc-flat-jbr-machine-v2{padding:12px}#jbrInModalV1055 .sc-flat-jbr-results-v2 b{font-size:20px}}
+
+/* Stores Sales Orders — read-only independent listing */
+.sc-stores-ro{margin-top:20px;border:1px solid #cbdfe1;border-radius:14px;padding:15px;background:#f8fbfc}
+.sc-stores-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sc-stores-head strong{display:block;font-size:15px;color:#17344b}
+.sc-stores-head span{display:block;font-size:11px;color:#63798a;margin-top:3px}
+.sc-stores-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.sc-stores-tag{display:inline-block;background:#e8f1fa;border:1px solid #b8cfdf;color:#274f76;border-radius:100px;padding:4px 9px;font-size:11px;font-weight:750}
+#scStoresStatusV4{margin-bottom:8px;color:#63798a}
+#scStoresDetailsV4{margin-top:12px;padding:12px;border:1px solid #c2d7df;background:#fff;border-radius:12px}
+.sc-stores-details-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+@media(max-width:600px){.sc-stores-ro{padding:10px}.sc-stores-head{align-items:flex-start}}
