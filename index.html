@@ -3920,10 +3920,34 @@ function openPackingV81(id){const r=state.productionRequests.find(x=>x.id===id);
 function savePackingV81(){const r=state.productionRequests.find(x=>x.id===$('packingReqId').value);if(!r||flowIndexV81(r.status)>=flowIndexV81('Finished'))return toast('Finished production is locked');const boxes=readBoxesV81('pack'),loose=Number($('packLoose').value||0),total=boxesTotalV81(boxes)+loose,qc=$('packQC').value;if(!(total>0))return toast('Enter at least one packed or loose roll');if(qc==='Hold / Recheck')return toast('QC must pass before production can be finished');r.packing={boxes,loose,total,qc,note:$('packNote').value.trim(),packedBy:currentUser.display,packedAt:new Date().toISOString()};r.finishedQty=total;r.status='Finished';r.history.push({status:'Finished',note:`${boxes.length} boxes + ${loose} loose; total ${total} rolls; QC ${qc}`,by:currentUser.display,at:new Date().toISOString()});notifyV8(r.ownerUser,'Production Finished',`${r.orderNo}: ${money(total)} rolls packed in ${boxes.length} boxes.`,r.id);audit('PACK_FINISH_PRODUCTION',`${r.orderNo} ${boxes.length} boxes ${total} rolls`);saveState();closeModal('packingModal');renderProductionBoard();renderStoresQueueV8();toast('Packing saved. Production is now Finished and locked')}
 function productionAvailableV81(r){const dispatched=(r.dispatches||[]).reduce((n,d)=>n+Number(d.qty||0),0);return Math.max(0,Number(r.finishedQty||r.packing?.total||0)-dispatched)}
 function openDispatchLoadingV81(id){const r=state.productionRequests.find(x=>x.id===id);if(!r||flowIndexV81(r.status)<flowIndexV81('Finished'))return toast('Only a Finished production job can be dispatched');const available=productionAvailableV81(r);if(!(available>0))return toast('No finished balance remains');const used={};(r.dispatches||[]).forEach(d=>d.boxes?.forEach(b=>used[b.boxNo]=(used[b.boxNo]||0)+Number(b.qty||0)));$('dispatchLoadReqId').value=id;$('dispatchLoadingMeta').textContent=`${r.orderNo} • Finished ${money(r.finishedQty)} • Available ${money(available)} rolls`;$('dispatchLoadDate').value=today();$('dispatchLoadCarrier').value='';$('dispatchLoadNote').value='';$('dispatchLoose').value='0';$('dispatchBoxPick').innerHTML=(r.packing?.boxes||[]).map((b,i)=>{const remaining=Math.max(0,Number(b.rolls)-Number(used[b.boxNo]||0));return `<label class="dispatch-box-pick" style="opacity:${remaining>0?1:.45}"><input class="dispatch-box-check" type="checkbox" data-i="${i}" onchange="updateDispatchTotalV81()" ${remaining>0?'':'disabled'}><span><b>Box ${esc(b.boxNo)}</b><br><span class="small">Packed ${money(b.rolls)} • Already loaded ${money(used[b.boxNo]||0)} • Available ${money(remaining)}</span></span><input class="dispatch-box-qty" data-i="${i}" type="number" min="0" max="${remaining}" value="${remaining}" oninput="updateDispatchTotalV81()" ${remaining>0?'':'disabled'}></label>`}).join('');updateDispatchTotalV81();$('dispatchNoteModal').classList.add('show')}
-function selectedDispatchBoxesV81(){const r=state.productionRequests.find(x=>x.id===$('dispatchLoadReqId').value);return [...document.querySelectorAll('.dispatch-box-check:checked')].map(c=>{const i=Number(c.dataset.i),b=r.packing.boxes[i],qty=Number(document.querySelector(`.dispatch-box-qty[data-i="${i}"]`).value||0);return {boxNo:b.boxNo,packedRolls:Number(b.rolls),qty,note:b.note||''}}).filter(x=>x.qty>0)}
+/* V1.1.41 - Shared physical carton lookup: never copy shared cartons into
+   every source job's stored packing allocation. */
+function spgsPhysicalPackingV1141(r){
+  const snap=r?.packing?.sharedBatchPacking||r?.batchPackingV1040;
+  const ids=Array.isArray(snap?.sourceJobIds)?snap.sourceJobIds:[];
+  if(!snap||ids.length<2||!ids.some(id=>String(id)===String(r?.id)))return null;
+  const boxes=Array.isArray(snap.boxes)?snap.boxes:[];
+  if(!boxes.length && !(Number(snap.loose)>0))return null;
+  const jobs=(state.productionRequests||[]).filter(x=>ids.some(id=>String(id)===String(x.id)));
+  const used={};let looseUsed=0;
+  for(const job of jobs)for(const d of (job.dispatches||[])){
+    for(const b of (d.boxes||[])){
+      const k=String(b.boxNo||''); used[k]=(used[k]||0)+Number(b.qty||0);
+    }
+    looseUsed+=Number(d.loose||0);
+  }
+  return {snap,ids,jobs,boxes,used,looseUsed};
+}
+window.spgsPhysicalPackingV1141=spgsPhysicalPackingV1141;
+function selectedDispatchBoxesV81(){const r=state.productionRequests.find(x=>x.id===$('dispatchLoadReqId').value);return [...document.querySelectorAll('.dispatch-box-check:checked')].map(c=>{const i=Number(c.dataset.i),physical=spgsPhysicalPackingV1141(r),b=(physical?.boxes||r.packing.boxes)[i],qty=Number(document.querySelector(`.dispatch-box-qty[data-i="${i}"]`).value||0);return b?{boxNo:b.boxNo,packedRolls:Number(b.rolls),qty,note:b.note||''}:null}).filter(x=>x&&x.qty>0)}
 function updateDispatchTotalV81(){const boxes=selectedDispatchBoxesV81(),loose=Number($('dispatchLoose')?.value||0),r=state.productionRequests.find(x=>x.id===$('dispatchLoadReqId')?.value),qty=boxesTotalV81(boxes.map(x=>({rolls:x.qty})))+loose,avail=r?productionAvailableV81(r):0;$('dispatchLoadTotal').innerHTML=`Loading: <b>${boxes.length}</b> boxes + <b>${money(loose)}</b> loose rolls • Total: <b>${money(qty)}</b> • Available: <b>${money(avail)}</b>${qty>avail?' <span class="grn-bad">EXCEEDS AVAILABLE BALANCE</span>':''}`}
 function nextDispatchNoV81(){state.counters.dispatch=Number(state.counters.dispatch||0)+1;return `SC/DN/${today().replaceAll('-','')}/${String(state.counters.dispatch).padStart(3,'0')}`}
-function confirmDispatchLoadingV81(){const r=state.productionRequests.find(x=>x.id===$('dispatchLoadReqId').value);if(!r||flowIndexV81(r.status)<flowIndexV81('Finished'))return toast('This production job is locked or no longer available');const boxes=selectedDispatchBoxesV81(),loose=Number($('dispatchLoose').value||0),qty=boxes.reduce((n,b)=>n+b.qty,0)+loose,avail=productionAvailableV81(r);if(boxes.some(b=>b.qty>Number(document.querySelector(`.dispatch-box-qty[data-i="${(r.packing.boxes||[]).findIndex(x=>x.boxNo===b.boxNo)}"]`)?.max||0)))return toast('A carton load quantity exceeds its remaining packed count');if(!(qty>0))return toast('Select boxes or enter loose rolls');if(qty>avail+.001)return toast(`Dispatch cannot exceed available ${money(avail)} rolls`);if(!String($('dispatchLoadCarrier').value||'').trim())return toast('Enter driver / vehicle / courier');const d={id:uid('dispatch'),dispatchNo:nextDispatchNoV81(),requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,boxes,loose,qty,date:$('dispatchLoadDate').value||today(),carrier:$('dispatchLoadCarrier').value.trim(),note:$('dispatchLoadNote').value.trim(),by:currentUser.display,byUser:currentUser.username,at:new Date().toISOString(),locked:true};r.dispatches=r.dispatches||[];r.dispatches.push(d);r.dispatch=d;r.status=qty<avail?'Finished':'Dispatched';r.history.push({status:'Dispatched',note:`${d.dispatchNo}; ${boxes.length} boxes + ${loose} loose; ${qty} rolls`,by:currentUser.display,at:d.at});notifyV8(r.ownerUser,'Factory Dispatched',`${d.dispatchNo}: ${money(qty)} rolls / ${boxes.length} boxes dispatched.`,r.id);audit('LOCK_FACTORY_DISPATCH',`${d.dispatchNo} ${r.orderNo} ${qty} rolls`);saveState();closeModal('dispatchNoteModal');renderProductionBoard();renderStoresQueueV8();downloadDispatchPDFV81(d.id);toast('Dispatch locked. Dispatch Note PDF generated')}
+function confirmDispatchLoadingV81(){const r=state.productionRequests.find(x=>x.id===$('dispatchLoadReqId').value);if(!r||flowIndexV81(r.status)<flowIndexV81('Finished'))return toast('This production job is locked or no longer available');const boxes=selectedDispatchBoxesV81(),loose=Number($('dispatchLoose').value||0),qty=boxes.reduce((n,b)=>n+b.qty,0)+loose,avail=productionAvailableV81(r);const shared=spgsPhysicalPackingV1141(r);const physicalBoxes=shared?.boxes||r.packing.boxes||[];
+if(boxes.some(b=>b.qty>Number(document.querySelector(`.dispatch-box-qty[data-i="${physicalBoxes.findIndex(x=>String(x.boxNo)===String(b.boxNo))}"]`)?.max||0)))return toast('A carton load quantity exceeds its remaining packed count');
+if(shared){
+  if(boxes.some(b=>b.qty>Math.max(0,Number(physicalBoxes.find(x=>String(x.boxNo)===String(b.boxNo))?.rolls||0)-Number(shared.used[String(b.boxNo)]||0))+.001))return toast('One or more physical boxes have already been loaded from this shared batch');
+  if(loose>Math.max(0,Number(shared.snap.loose||0)-shared.looseUsed)+.001)return toast('Shared loose rolls already dispatched');
+}if(!(qty>0))return toast('Select boxes or enter loose rolls');if(qty>avail+.001)return toast(`Dispatch cannot exceed available ${money(avail)} rolls`);if(!String($('dispatchLoadCarrier').value||'').trim())return toast('Enter driver / vehicle / courier');const d={id:uid('dispatch'),dispatchNo:nextDispatchNoV81(),requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,boxes,loose,qty,date:$('dispatchLoadDate').value||today(),carrier:$('dispatchLoadCarrier').value.trim(),note:$('dispatchLoadNote').value.trim(),by:currentUser.display,byUser:currentUser.username,at:new Date().toISOString(),locked:true};r.dispatches=r.dispatches||[];r.dispatches.push(d);r.dispatch=d;r.status=qty<avail?'Finished':'Dispatched';r.history.push({status:'Dispatched',note:`${d.dispatchNo}; ${boxes.length} boxes + ${loose} loose; ${qty} rolls`,by:currentUser.display,at:d.at});notifyV8(r.ownerUser,'Factory Dispatched',`${d.dispatchNo}: ${money(qty)} rolls / ${boxes.length} boxes dispatched.`,r.id);audit('LOCK_FACTORY_DISPATCH',`${d.dispatchNo} ${r.orderNo} ${qty} rolls`);saveState();closeModal('dispatchNoteModal');renderProductionBoard();renderStoresQueueV8();downloadDispatchPDFV81(d.id);toast('Dispatch locked. Dispatch Note PDF generated')}
 function findDispatchV81(id){for(const r of state.productionRequests||[]){const d=(r.dispatches||[]).find(x=>x.id===id);if(d)return {r,d}}return null}
 async function pdfFromLetterheadV81(html,name){const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas),okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);if(!okC||!okP)return toast('PDF libraries unavailable');const h=document.createElement('div');h.className='paper';h.style='position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;padding:180px 52px 88px;box-sizing:border-box;background-size:100% 100%;color:#172f36;font-size:11px';h.innerHTML=html;document.body.appendChild(h);try{const c=await html2canvas(h,{scale:2,backgroundColor:'#fff',useCORS:true}),{jsPDF}=window.jspdf,p=new jsPDF({unit:'mm',format:'a4'});p.addImage(c.toDataURL('image/jpeg',.94),'JPEG',0,0,210,297);p.save(name)}finally{h.remove()}}
 async function downloadDispatchPDFV81(id){const x=findDispatchV81(id);if(!x)return;const {r,d}=x,rows=d.boxes.map(b=>`<tr><td>Box ${esc(b.boxNo)}</td><td>${money(b.packedRolls)}</td><td><b>${money(b.qty)}</b></td><td>${esc(b.note||'')}</td></tr>`).join('');await pdfFromLetterheadV81(`<div style="border-left:7px solid #078f92;padding-left:14px"><h1 style="margin:0;color:#078f92">FACTORY DISPATCH NOTE</h1><b>${esc(d.dispatchNo)}</b></div><table class="table" style="margin-top:20px"><tr><th>Production Request</th><td>${esc(r.orderNo)}</td><th>PI</th><td>${esc(r.piSerial)}</td></tr><tr><th>Customer</th><td colspan="3">${esc(r.customerName)}</td></tr><tr><th>Item</th><td colspan="3">${esc(r.size)} / ${esc(r.material)} / ${esc(r.layout)} / ${money(r.pcs)} pcs per roll</td></tr><tr><th>Dispatch Date</th><td>${esc(d.date)}</td><th>Driver / Vehicle</th><td>${esc(d.carrier||'-')}</td></tr></table><h3 style="color:#078f92">LOADING COUNT</h3><table class="table"><thead><tr><th>Carton</th><th>Packed Rolls</th><th>Loaded Rolls</th><th>Note</th></tr></thead><tbody>${rows}${d.loose?`<tr><td>Loose</td><td>-</td><td><b>${money(d.loose)}</b></td><td></td></tr>`:''}</tbody></table><div class="dn-status"><b>Total Loaded: ${money(d.qty)} Rolls • ${d.boxes.length} Cartons</b><br>${esc(d.note||'')}</div><div style="margin-top:45px;display:flex;justify-content:space-between"><span>Factory Released By: ${esc(d.by)}</span><span>Driver Signature: __________________</span><span>Stores Received: __________________</span></div>`,`Dispatch_${d.dispatchNo.replaceAll('/','-')}_${r.customerName}.pdf`);audit('DOWNLOAD_DISPATCH_NOTE',d.dispatchNo);saveState()}
@@ -19235,26 +19259,54 @@ window.toggleBpSeparateDeliveryButton = function(){
     }
   };
 
+  // Production run plan is derived only from the flatbed meter reading plus
+  // confirmed JBR widths/lengths and label geometry. It is NOT actual stock.
   function jbrAutoActualV1120(theoreticalRolls){
-    const requested=Math.max(0,Number(jbrRequestedTotalV1120||0));
-    const existing=Math.max(0,Number(jbrExistingAllocatedV1120||0));
-    const remaining=Math.max(0,requested-existing);
-    const maxFull=Math.max(0,Math.floor(Number(theoreticalRolls||0)));
-    const auto=Math.max(0,Math.floor(Math.min(remaining,maxFull)));
     const input=$('jbrActualRollsV1055');
-    if(input){
-      input.readOnly=false;
-      input.removeAttribute('readonly');
-      input.removeAttribute('aria-readonly');
-      input.max=String(maxFull);
-      if(!jbrActualManualV1128)input.value=String(auto);
-      input.title=`Suggested ${money(auto)} from remaining request ${money(remaining)}. You may increase it up to Max Full Rolls ${money(maxFull)}.`;
-    }
     const hint=$('jbrActualAutoHintV1120');
-    if(hint && !jbrActualManualV1128){
-      hint.innerHTML=`Suggested from remaining Requested <b>${money(remaining)}</b>. You may cut more for stock up to this JBR's Max Full Rolls <b>${money(maxFull)}</b>. Packing will record the physical rolls received.`;
+    const labelWidth=Number($('jbrLabelWidthV1055')?.value||0);
+    const labelHeight=Number($('jbrLabelHeightV1055')?.value||0);
+    const gap=Number($('jbrGapV1055')?.value||0);
+    const pitch=labelHeight+Math.max(0,gap);
+    const pcs=Number($('jbrPcsV1055')?.value||0);
+    const entries=typeof jbrRunEntriesV1140!=='undefined'?jbrRunEntriesV1140:[];
+    const feedEl=$('jbrFeedLengthFlatV2'), counterEl=$('jbrPunchCountFlatV2');
+    const feed=Number(feedEl?.value), counter=Number(counterEl?.value);
+    const hasReading=feedEl?.value!==''&&counterEl?.value!=='';
+    const validReading=hasReading&&Number.isFinite(feed)&&feed>0&&Number.isSafeInteger(counter)&&counter>=0;
+    const meters=validReading?feed*counter/1000:0;
+    const validSetup=labelWidth>0&&pitch>0&&pcs>0&&entries.length>0&&entries.every(r=>Number(r.width)>0&&Number(r.length)>0);
+    let remainingFeed=meters, calculatedRolls=0, maxFull=0;
+    if(validSetup){
+      entries.forEach(r=>{
+        const length=Number(r.length), lanes=Math.floor(Number(r.width)/labelWidth);
+        const availableLabels=lanes*Math.floor(length*1000/pitch);
+        maxFull+=Math.floor(availableLabels/pcs);
+        const consumed=Math.max(0,Math.min(remainingFeed,length));
+        calculatedRolls+=Math.floor(lanes*Math.floor(consumed*1000/pitch)/pcs);
+        remainingFeed-=consumed;
+      });
     }
-    return {requested,existing,remaining,maxFull,auto};
+    // Round full rolls down; never invent stock from the meter estimate.
+    const maxFullRolls=Math.floor(maxFull+1e-9);
+    const auto=validReading&&validSetup&&remainingFeed<0.0001
+      ?Math.min(maxFullRolls,calculatedRolls) : 0;
+    if(input){
+      input.value=String(auto);
+      input.readOnly=true;
+      input.setAttribute('readonly','');
+      input.setAttribute('aria-readonly','true');
+      input.max=String(maxFullRolls);
+      input.title='Calculated planning quantity from machine feed and confirmed JBR details. Packing verifies actual rolls.';
+    }
+    jbrActualManualV1128=false;
+    if(hint){
+      if(!validReading)hint.textContent='Enter feed/punch length and machine punch count above to calculate the cut-roll plan.';
+      else if(!validSetup)hint.textContent='Confirm every JBR width/length and the label size, gap and pieces per roll.';
+      else if(remainingFeed>0.0001)hint.textContent='Machine reading exceeds the total recorded JBR supply. Correct inputs before saving.';
+      else hint.innerHTML=`Calculated <b>${money(auto)} planning rolls</b> from <b>${jbrRunFmtV1140(meters)} m</b> of measured feed, ${entries.length} JBR(s), and the confirmed label setup. Supply maximum: <b>${money(maxFullRolls)}</b> rolls. Packing confirms actual production; this is not stock.`;
+    }
+    return {maxFull:maxFullRolls,auto,valid:validReading&&validSetup&&remainingFeed<0.0001};
   }
 
   function jbrCalcV1055(){
@@ -19284,6 +19336,47 @@ window.toggleBpSeparateDeliveryButton = function(){
     return {jbrWidth,jbrLengthM,labelWidth,labelHeight,gap,pcsPerRoll,lanes,pitch,labelsPerLane,theoreticalLabels,theoreticalRolls};
   }
   window.jbrCalcV1055=jbrCalcV1055;
+  // V1.1.40: production-run reading may span several JBRs. No database schema change.
+  let jbrRunEntriesV1140=[];
+  let jbrRunManualV1140=false;
+  const jbrRunFmtV1140=n=>Number(n||0).toLocaleString('en-US',{maximumFractionDigits:3});
+  function jbrRunMetersV1140(){
+    const f=Number($('jbrFeedLengthFlatV2')?.value||0), c=Number($('jbrPunchCountFlatV2')?.value||0);
+    return f>0&&Number.isSafeInteger(c)&&c>0?f*c/1000:0;
+  }
+  function jbrRunRenderV1140(){
+    const target=$('jbrRunInputsV1140');if(!target)return;
+    target.innerHTML=jbrRunEntriesV1140.map((r,i)=>`<div class="jbr-run-line-v1140">
+      <b>JBR ${i+1}</b>
+      <label>Width (mm)<input type="number" min="0.01" step="any" value="${Number(r.width)||206}" oninput="jbrRunEditV1140(${i},'width',this.value)"></label>
+      <label>Length (m)<input type="number" min="0.01" step="any" value="${Number(r.length)||1500}" oninput="jbrRunEditV1140(${i},'length',this.value)"></label>
+      <button type="button" class="btn ghost sm" onclick="jbrRunRemoveV1140(${i})" ${jbrRunEntriesV1140.length===1?'disabled':''}>Remove</button>
+    </div>`).join('');
+    jbrRunSummaryV1140();
+  }
+  function jbrRunSummaryV1140(){
+    const total=jbrRunEntriesV1140.reduce((n,r)=>n+(Number(r.length)||0),0),measured=jbrRunMetersV1140();
+    const valid=jbrRunEntriesV1140.every(r=>Number(r.width)>0&&Number(r.length)>0);
+    const el=$('jbrRunSummaryV1140');
+    if(el)el.innerHTML=`<b>${jbrRunEntriesV1140.length} JBR(s)</b> · available ${jbrRunFmtV1140(total)} m · machine ${jbrRunFmtV1140(measured)} m · difference ${jbrRunFmtV1140(total-measured)} m (not confirmed waste)${!valid?' · Check JBR dimensions':''}`;
+    try{jbrAutoActualV1120(0)}catch(_){}
+    if($('jbrFlatRemainV2'))$('jbrFlatRemainV2').textContent=measured?jbrRunFmtV1140(total-measured)+' m':'—';
+    if($('jbrFlatWarnV2'))$('jbrFlatWarnV2').textContent=measured>total+0.0001?'Warning: measured feed exceeds total confirmed JBR length.':'';
+  }
+  window.jbrRunEditV1140=function(i,key,v){if(!jbrRunEntriesV1140[i])return;jbrRunEntriesV1140[i][key]=Number(v);jbrRunManualV1140=true;jbrRunSummaryV1140()};
+  window.jbrRunAddV1140=function(){if(jbrRunEntriesV1140.length>=30)return toast('Maximum 30 JBRs per run');jbrRunEntriesV1140.push({width:Number($('jbrWidthV1055')?.value)||206,length:1500});jbrRunManualV1140=true;jbrRunRenderV1140()};
+  window.jbrRunRemoveV1140=function(i){if(jbrRunEntriesV1140.length<=1)return;jbrRunEntriesV1140.splice(i,1);jbrRunManualV1140=true;jbrRunRenderV1140()};
+  window.jbrRunSuggestV1140=function(){
+    const meters=jbrRunMetersV1140();const n=Math.max(1,Math.min(30,Math.ceil(meters/1500)));
+    const width=Number($('jbrWidthV1055')?.value)||206;
+    jbrRunEntriesV1140=Array.from({length:n},()=>({width,length:1500}));jbrRunManualV1140=false;jbrRunRenderV1140();
+  };
+  window.jbrRunRefreshV1140=function(){
+    const meters=jbrRunMetersV1140();const n=Math.max(1,Math.min(30,Math.ceil(meters/1500)));
+    if(!jbrRunManualV1140&&n!==jbrRunEntriesV1140.length)jbrRunSuggestV1140();
+    else jbrRunSummaryV1140();
+  };
+
   // Lightweight standalone Flatbed calculation, based on softcreationflatbed.html.
   // Never touches Supabase, summaries, or parent product DOM while typing.
   window.jbrFlatUpdateV2=function(){
@@ -19295,8 +19388,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     const length=Number($('jbrLengthV1055')?.value||0);
     const meters=valid?(feed*count/1000):null;
     $('jbrFlatMetersV2').textContent=meters===null?'—':fmt(meters)+' m';
-    $('jbrFlatRemainV2').textContent=meters===null||!length?'—':fmt(Math.max(0,length-meters))+' m';
-    $('jbrFlatWarnV2').textContent=meters!==null&&length>0&&meters>length+0.0001?'Warning: machine reading exceeds the entered jumbo length. Verify counter or feed length.':'';
+    window.jbrRunRefreshV1140?.();
     return {valid,feed,count,meters,length};
   };
 
@@ -19420,11 +19512,17 @@ window.toggleBpSeparateDeliveryButton = function(){
                     <div class="field"><label>Machine Punch Count</label><input id="jbrPunchCountFlatV2" type="number" min="0" step="1" inputmode="numeric" placeholder="Enter machine counter" oninput="jbrFlatUpdateV2()"></div>
                   </div>
                   <div class="sc-flat-jbr-results-v2">
-                    <div><span>Measured Material Used</span><b id="jbrFlatMetersV2">—</b></div>
-                    <div><span>JBR Material Balance</span><b id="jbrFlatRemainV2">—</b></div>
+                    <div><span>Measured Machine Feed</span><b id="jbrFlatMetersV2">—</b></div>
+                    <div><span>JBR Supply Balance (unclassified)</span><b id="jbrFlatRemainV2">—</b></div>
+                  </div>
+                  <div class="jbr-run-v1140">
+                    <div class="jbr-run-head-v1140"><b>Suggested Jumbo Rolls for This Run</b><span>Default 1,500 m each · confirm actual width and length below</span></div>
+                    <div id="jbrRunInputsV1140"></div>
+                    <div class="jbr-run-row-v1140"><button type="button" class="btn ghost sm" onclick="jbrRunAddV1140()">+ Another JBR</button><button type="button" class="btn ghost sm" onclick="jbrRunSuggestV1140()">Recalculate from machine reading</button></div>
+                    <div id="jbrRunSummaryV1140" class="hint"></div>
                   </div>
                   <div id="jbrFlatWarnV2" class="sc-flat-jbr-warn-v2" aria-live="polite"></div>
-                  <small>Actual Cut Rolls below is the verified finished output. Machine meters alone never create dispatchable stock.</small>
+                  <small>Machine counter is a run-level reading, recorded once. Suggested JBR count is not proof of the exact rolls consumed. Packing confirms physical output; remaining material is not automatically waste.</small>
                 </div>
                 <details class="sc-flat-jbr-advanced-v2"><summary>JBR size and label setup · tap to edit</summary>
                 <div class="grid">
@@ -19459,9 +19557,9 @@ window.toggleBpSeparateDeliveryButton = function(){
                 </div></details>
                 <div class="grid sc-flat-jbr-core-v2">
                   <div class="field">
-                    <label>Actual Cut Rolls <span class="jbr-auto-badge-v1120">SUGGESTED</span></label>
-                    <input id="jbrActualRollsV1055" class="jbr-auto-rolls-v1120" type="number" min="0" step="1" value="0" oninput="jbrMarkActualManualV1128()">
-                    <div id="jbrActualAutoHintV1120" class="hint">Requested rolls are used as a suggested target only. Factory may cut extra rolls for stock up to Max Full Rolls.</div>
+                    <label>Calculated Cut Rolls / Run (planning only) <span class="jbr-auto-badge-v1120">AUTO</span></label>
+                    <input id="jbrActualRollsV1055" class="jbr-auto-rolls-v1120" type="number" min="0" step="1" value="0" readonly aria-readonly="true">
+                    <div id="jbrActualAutoHintV1120" class="hint">Enter the flatbed readings above. This calculated estimate does not create stock; Packing confirms physical rolls.</div>
                   </div>
                   <div class="field">
                     <label>JBR Process Status</label>
@@ -19470,7 +19568,7 @@ window.toggleBpSeparateDeliveryButton = function(){
                       <option value="Partially Die Cut">Partially Die Cut</option>
                       <option value="Fully Die Cut">Fully Die Cut</option>
                     </select>
-                    <div class="hint">Waste is calculated only when the jumbo is Fully Die Cut. Partial / uncut balance remains reusable.</div>
+                    <div class="hint">Choose Full only when all of the corresponding jumbo material has truly been processed. Packing calculates the final variance.</div>
                   </div>
 
                   <div class="field full">
@@ -19641,6 +19739,9 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('jbrNoteV1055').value='';
     $('jbrFeedLengthFlatV2').value=String((size.height||0)+2||'');
     $('jbrPunchCountFlatV2').value='';
+    jbrRunManualV1140=false;
+    jbrRunEntriesV1140=[{width:Number($('jbrWidthV1055')?.value)||206,length:1500}];
+    jbrRunRenderV1140();
     jbrFlatUpdateV2();
 
     // Mobile: one visible dialog at a time; competing scrolling layers can
@@ -19688,8 +19789,13 @@ window.toggleBpSeparateDeliveryButton = function(){
     const feedPresent=String($('jbrFeedLengthFlatV2')?.value||'').trim()!=='';
     const punchPresent=String($('jbrPunchCountFlatV2')?.value||'').trim()!=='';
     if(feedPresent!==punchPresent || (punchPresent && !machine?.valid))return toast('Enter a valid feed length and whole-number punch count');
-    if(machine?.valid&&machine.length>0&&machine.meters>machine.length+0.0001)return toast('Measured material exceeds JBR length. Check machine readings.');
-    const machineNote=machine?.valid?`[Flatbed meter reading: ${machine.count} punches x ${machine.feed} mm = ${machine.meters.toFixed(4)} m; JBR balance ${(machine.length-machine.meters).toFixed(4)} m]`:'';
+    const runLength=jbrRunEntriesV1140.reduce((n,r)=>n+Number(r.length||0),0);
+    if(!jbrRunEntriesV1140.length||jbrRunEntriesV1140.some(r=>!(r.width>0)||!(r.length>0)))return toast('Confirm width and length for every JBR');
+    if(machine?.valid&&machine.meters>runLength+0.0001)return toast('Machine feed exceeds combined JBR length. Check jumbo lengths or counter.');
+    if(!machine?.valid || !machine.count || !machine.meters)return toast('Enter final machine feed length and punch count to calculate the run');
+    const planned=jbrAutoActualV1120(0);
+    if(!planned.valid)return toast('Cannot calculate planned rolls. Check machine reading, JBR widths/lengths and label setup');
+    const machineNote=machine?.valid?`[PRODUCTION RUN meter reading: ${machine.count} punches x ${machine.feed} mm = ${machine.meters.toFixed(4)} m; ${jbrRunEntriesV1140.length} JBR(s); unclassified supply difference ${(runLength-machine.meters).toFixed(4)} m]`:'';
     const note=[userNote,machineNote].filter(Boolean).join('\n');
 
     if(!(calc.jbrWidth>0))return toast('Enter JBR width');
@@ -19698,49 +19804,54 @@ window.toggleBpSeparateDeliveryButton = function(){
     if(!(calc.pcsPerRoll>0))return toast('Enter pieces per finished roll');
     if(!(calc.lanes>0))return toast('JBR width cannot produce even one lane for this label width');
     if(!(calc.labelsPerLane>0))return toast('JBR length / pitch calculation is zero');
-    if(actual>calc.theoreticalRolls)return toast(`Actual Cut Rolls cannot exceed the theoretical maximum of ${calc.theoreticalRolls} for this JBR`);
+    // Run-level quantity validated against combined jumbo capacity below.
 
-    const payload={
-      workspace:JBR_WORKSPACE_V1056,
-      product_key:g.key,
-      product_size:String(g.size||''),
-      material:String(g.material||''),
-      layout:String(g.layout||''),
-      pcs_per_roll:Number(g.pcs||0),
-      unit:String(g.unit||'Rolls'),
-      source_job_ids:jbrJobsV1055(g).map(r=>String(r.id)),
-      jbr_width_mm:calc.jbrWidth,
-      jbr_length_m:calc.jbrLengthM,
-      label_width_mm:calc.labelWidth,
-      label_height_mm:calc.labelHeight,
-      gap_mm:calc.gap,
-      pitch_mm:calc.pitch,
-      lanes:calc.lanes,
-      labels_per_lane:calc.labelsPerLane,
-      theoretical_labels:calc.theoreticalLabels,
-      theoretical_rolls:calc.theoreticalRolls,
-      actual_cut_rolls:actual,
-      process_status:status,
-      note,
-      created_by_username:String(currentUser?.username||''),
-      created_by_display:String(currentUser?.display||currentUser?.username||'User')
-    };
-
-    let saved;
+    const runId='run_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+    const perJbr=jbrRunEntriesV1140.map(r=>{
+      const lanes=Math.floor(Number(r.width)/calc.labelWidth);
+      const labelsPerLane=Math.floor(Number(r.length)*1000/calc.pitch);
+      const theoreticalLabels=lanes*labelsPerLane;
+      const theoreticalRolls=Math.floor(theoreticalLabels/calc.pcsPerRoll);
+      return {...r,lanes,labelsPerLane,theoreticalLabels,theoreticalRolls};
+    });
+    if(perJbr.some(x=>x.lanes<1||x.theoreticalRolls<1))return toast('One or more jumbo rolls cannot produce a finished roll');
+    const runMax=perJbr.reduce((n,x)=>n+x.theoreticalRolls,0);
+    if(actual>runMax)return toast(`Actual Cut Rolls cannot exceed combined max ${runMax}`);
+    let left=actual;
+    const allocations=perJbr.map(x=>{const n=Math.min(left,x.theoreticalRolls);left-=n;return n});
     jbrSaveBusyOct24=true;
+    let savedRows=[];
     try{
-      const rows=await jbrFetchV1055(`/${JBR_TABLE_V1055}`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Prefer':'return=representation'},
-        body:JSON.stringify(payload)
-      });
-      saved=Array.isArray(rows)?rows[0]:rows;
-      if(!saved)throw new Error('Database did not return the saved JBR.');
+      for(let i=0;i<perJbr.length;i++){
+        const x=perJbr[i];
+        const payload={
+          workspace:JBR_WORKSPACE_V1056,
+          product_key:g.key,product_size:String(g.size||''),material:String(g.material||''),
+          layout:String(g.layout||''),pcs_per_roll:Number(g.pcs||0),unit:String(g.unit||'Rolls'),
+          source_job_ids:jbrJobsV1055(g).map(r=>String(r.id)),
+          jbr_width_mm:x.width,jbr_length_m:x.length,
+          label_width_mm:calc.labelWidth,label_height_mm:calc.labelHeight,
+          gap_mm:calc.gap,pitch_mm:calc.pitch,lanes:x.lanes,
+          labels_per_lane:x.labelsPerLane,theoretical_labels:x.theoreticalLabels,
+          theoretical_rolls:x.theoreticalRolls,actual_cut_rolls:allocations[i],
+          process_status:status,
+          note:[userNote,`[Run ${runId} JBR ${i+1}/${perJbr.length}; machine measurement shared at RUN level only]`,i===0?machineNote:''].filter(Boolean).join('\n'),
+          created_by_username:String(currentUser?.username||''),
+          created_by_display:String(currentUser?.display||currentUser?.username||'User')
+        };
+        const rows=await jbrFetchV1055(`/${JBR_TABLE_V1055}`,{
+          method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(payload)
+        });
+        const saved=Array.isArray(rows)?rows[0]:rows;
+        if(!saved)throw new Error('Database returned no saved JBR');
+        savedRows.push(saved);
+      }
     }catch(e){
       console.error(e);
-      return toast(`JBR was NOT saved: ${e.message}`);
+      jbrCloudCacheV1055.delete(g.key);
+      return toast(`JBR run partially/fully failed: ${savedRows.length}/${perJbr.length} saved. Review View JBRs before retrying. ${e.message}`);
     }finally{jbrSaveBusyOct24=false;}
-
+    const saved=savedRows[0];
     jbrCloudCacheV1055.delete(g.key);
     const ui=jbrRowToUiV1055(saved);
     try{
@@ -19755,7 +19866,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     }catch(e){console.error('JBR production balance refresh',e)}
     try{renderProductionProducts()}catch(_){}
     try{openProductionProductDetailsV103(encodeURIComponent(g.key))}catch(_){}
-    toast(`${ui.code} saved to database. Actual cut: ${money(actual)} rolls. Production remaining updated.`);
+    toast(`${savedRows.length} JBRs saved for run. Planned cut: ${money(actual)} rolls. Packing must verify physical output.`);
   };
 
   window.deleteJbrInV1055=async function(encodedKey,id){
@@ -19898,9 +20009,11 @@ window.toggleBpSeparateDeliveryButton = function(){
         try{stats=await jbrStatsV1055(g.key,true)}
         catch(e){return toast(`Cannot open packing: JBR database unavailable. ${e.message}`)}
         if(!(stats.actualCut>0))return toast('Cannot open packing: no Actual Cut Rolls have been recorded in JBR In.');
+        const totalJbrLengthV1140=stats.rows.reduce((n,x)=>n+Math.max(0,Number(x.jbrLengthM||0)),0);
         const r=baseOpenPacking.apply(this,arguments);
         setTimeout(()=>{
           const modal=$('packingModal');
+          if(modal)modal.dataset.jbrTotalLengthV1140=String(totalJbrLengthV1140);
           if(!modal?.classList.contains('show'))return;
           modal.dataset.jbrPlannedRolls=String(stats.actualCut);
           modal.dataset.jbrMaxRolls=String(stats.theoretical);
@@ -20059,12 +20172,19 @@ window.toggleBpSeparateDeliveryButton = function(){
         </div>`;
     }
 
+    const jumboLength=Number(modal.dataset.jbrTotalLengthV1140||0);
+    const jumboMax=Number(modal.dataset.jbrMaxRolls||0);
+    // Metre equivalent is a planning metric: not physical waste until classified.
+    const theoreticalRollDifference=Math.max(0,jumboMax-actualReceived);
+    const meterEquivalent=jumboMax>0?theoreticalRollDifference*(jumboLength/jumboMax):0;
     const receiptSummary=$('packReceiptSummaryV1120');
     if(receiptSummary){
       const varianceText=variance===0?'Matches JBR target':variance<0?`${money(shortage)} roll shortage / process loss`:`${money(overProduction)} roll over target`;
       receiptSummary.innerHTML=`
         <div><span>JBR Planned Target</span><b>${money(planned)}</b><small>auto allocation from Requested</small></div>
         <div><span>JBR Physical Maximum</span><b>${money(max)}</b><small>combined Max Full Rolls</small></div>
+        <div><span>Unproduced Roll Equivalent</span><b>${money(theoreticalRollDifference)} rolls</b><small>max rolls − physically received</small></div>
+        <div><span>Unproduced Length Equivalent</span><b>${jumboLength>0?meterEquivalent.toFixed(2)+' m':'—'}</b><small>estimate only; confirm scrap vs reusable material</small></div>
         <div class="${variance<0?'shortage':variance>0?'over':''}"><span>Production Variance</span><b>${variance>0?'+':''}${money(variance)}</b><small>${varianceText}</small></div>
         <div><span>Count Reconciliation</span><b>${money(total)} / ${money(actualReceived)}</b><small>${total===actualReceived?'fully reconciled':`${money(Math.abs(actualReceived-total))} roll difference`}</small></div>`;
     }
@@ -22093,6 +22213,8 @@ window.toggleBpSeparateDeliveryButton = function(){
    Select one or more packed cartons; roll counts come from Packing and are locked. */
 (function(){
   function dispatchUsedBoxesV1067(r){
+    const shared=spgsPhysicalPackingV1141(r);
+    if(shared)return shared.used;
     const used={};
     (r?.dispatches||[]).forEach(d=>{
       (d?.boxes||[]).forEach(b=>{
@@ -22104,13 +22226,17 @@ window.toggleBpSeparateDeliveryButton = function(){
   }
 
   function dispatchLooseUsedV1067(r){
+    const shared=spgsPhysicalPackingV1141(r);
+    if(shared)return shared.looseUsed;
     return (r?.dispatches||[]).reduce((n,d)=>n+Number(d?.loose||0),0);
   }
 
   function dispatchBatchSummaryV1067(r){
-    const boxes=Array.isArray(r?.packing?.boxes)?r.packing.boxes:[];
+    const shared=spgsPhysicalPackingV1141(r);
+    const physical=shared?.snap||r?.packing;
+    const boxes=Array.isArray(physical?.boxes)?physical.boxes:[];
     const boxRolls=boxes.reduce((n,b)=>n+Number(b?.rolls||0),0);
-    const loose=Number(r?.packing?.loose||0);
+    const loose=Number(physical?.loose||0);
     return {
       boxes,
       boxRolls,
@@ -22198,7 +22324,9 @@ window.toggleBpSeparateDeliveryButton = function(){
       const packed=Math.max(0,Number(b?.rolls||0));
       const already=Math.max(0,Number(used[boxNo]||0));
       const remaining=Math.max(0,packed-already);
-      const disabled=remaining<=0;
+      const disabled=remaining<=0||remaining>available+.001;
+      const shared=spgsPhysicalPackingV1141(r);
+      const allocationWarning=shared&&remaining>available+.001?'Whole box exceeds this source job allocation; reconcile batch allocation before dispatch.':'';
 
       return `
         <label class="dispatch-pack-box-v1067 ${disabled?'done':''}">
@@ -22214,6 +22342,7 @@ window.toggleBpSeparateDeliveryButton = function(){
           <div class="dispatch-pack-box-main-v1067">
             <b>Box ${esc(boxNo)}</b>
             <span>${esc(b?.note||'Packed carton')}</span>
+            ${allocationWarning?`<span class="spgs-allocation-warning-v1141">${esc(allocationWarning)}</span>`:''}
           </div>
           <div class="dispatch-pack-kpi-v1067">
             <span>Packed</span>
@@ -22242,7 +22371,8 @@ window.toggleBpSeparateDeliveryButton = function(){
 
     const selectableCount=batch.boxes.filter((b,i)=>{
       const boxNo=String(b?.boxNo||String(i+1).padStart(2,'0'));
-      return Math.max(0,Number(b?.rolls||0)-Number(used[boxNo]||0))>0;
+      const left=Math.max(0,Number(b?.rolls||0)-Number(used[boxNo]||0));
+      return left>0&&left<=available+.001;
     }).length;
 
     const looseCard=batch.loose>0?`
@@ -22270,7 +22400,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('dispatchBoxPick').innerHTML=`
       <div class="dispatch-pack-batch-head-v1067">
         <div>
-          <b>Packing Batch</b>
+          <b>Packing Batch ${spgsPhysicalPackingV1141(r)?'• Shared physical cartons':''}</b>
           <span>${money(batch.total)} total packed rolls • ${batch.boxes.length} cartons</span>
         </div>
         ${selectableCount>0?`
