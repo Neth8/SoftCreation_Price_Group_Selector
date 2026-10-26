@@ -19061,6 +19061,95 @@ window.toggleBpSeparateDeliveryButton = function(){
       body{font:12px Arial;color:#173439;padding:20px}h1{color:#098f91}.factory-table{width:100%;border-collapse:collapse}.factory-table th,.factory-table td{border:1px solid #dbe6e7;padding:7px;text-align:left}.factory-job-head{margin:12px 0}.factory-job-head b{font-size:18px;display:block}.factory-job-head span{color:#60767b}.factory-cost-total{display:flex;justify-content:flex-end;gap:20px;margin-top:12px;font-size:16px}.btn,.notice{display:none}@page{size:A4 landscape;margin:12mm}
     </style></head><body><h1>SOFTCREATION · Factory Inventory</h1><p>${cost?'MATERIAL COST REPORT':'RAW MATERIAL USAGE REPORT'} · Generated ${fEsc(new Date().toLocaleString())}</p>${factoryJobMarkup(key,cost,false)}
 
+
+<script>
+/* Finance: job-level costing, individual PDFs and 5-job pagination.
+   Read-only use of the existing financeDatasetV1059 cost snapshots and adjustments. */
+(function(){
+  const pageSize=5;
+  let financeEpoch=0;
+  let cache=new Map();
+  const $f=id=>document.getElementById(id);
+  const allow=()=>typeof currentUser!=='undefined' && (currentUser?.role==='admin'||hasPerm('finance_view'));
+  const money2=n=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const safe=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function costLabel(x){return x&&x.cost&&Number(x.cost.costPerRoll)>0?`LKR ${money2(x.totalCost)}`:'Cost unavailable'}
+  window.downloadFinanceJobPdfV2026=async function(id){
+    if(!allow())return toast('Finance access is required');
+    const x=cache.get(String(id));
+    if(!x)return toast('Job cost data not loaded. Refresh Finance.');
+    const r=x.r||{};const costOK=Number(x.cost?.costPerRoll)>0;
+    const table=[
+      ['Production job',r.orderNo||'-'],['Customer',r.customerName||'-'],['Source PI',r.piSerial||'-'],
+      ['Product',[r.size,r.material,r.layout,`${money2(r.pcs||0)} pcs/roll`].filter(Boolean).join(' / ')],
+      ['Job status',r.status||'-'],['Requested',`${money2(r.requestQty)} ${r.unit||'rolls'}`],
+      ['Finished',`${money2(x.actualQty)} ${r.unit||'rolls'}`],
+      ['Cost per roll',costOK?'LKR '+money2(x.cost.costPerRoll):'Unavailable'],
+      ['Estimated production cost',costOK?'LKR '+money2(x.productionCost):'Unavailable'],
+      ['Additional recorded costs','LKR '+money2(x.adj?.total||0)],
+      ['TOTAL ESTIMATED JOB COST',costLabel(x)],
+      ['Cost basis',costOK?'Saved cost snapshot × finished quantity + recorded adjustments':'No valid cost-per-roll snapshot; total not determined']
+    ];
+    const report=document.createElement('div');
+    report.style='position:fixed;left:-10000px;top:0;width:794px;padding:46px;background:#fff;color:#1a2b40;font:15px Arial,sans-serif;box-sizing:border-box;z-index:-1';
+    report.innerHTML=`<div style="border-bottom:4px solid #078f92;padding-bottom:18px"><h1 style="margin:0;color:#078f92">SoftCreation</h1><div style="font-weight:700;font-size:23px;margin-top:8px">PRODUCTION JOB COST REPORT</div><div style="color:#647687;font-size:13px">Internal Finance · Estimated costing · ${safe(new Date().toLocaleString())}</div></div><table style="width:100%;border-collapse:collapse;margin-top:28px">${table.map(([a,b],i)=>`<tr style="background:${i===10?'#e9f7f4':i%2?'#f6f9fa':'#fff'}"><td style="padding:12px;border-bottom:1px solid #dce5e8;width:43%;font-weight:700">${safe(a)}</td><td style="padding:12px;border-bottom:1px solid #dce5e8">${safe(b)}</td></tr>`).join('')}</table><div style="margin-top:35px;color:#526575;font-size:12px;line-height:1.5">Cost estimates are based on the saved unit-cost snapshot and recorded job adjustments. They are not fully reconciled manufacturing actuals. Shared material usage and waste are not double-counted.</div>`;
+    document.body.appendChild(report);
+    try{
+      const okCanvas=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas);
+      const okPdf=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);
+      if(!okCanvas||!okPdf)return toast('PDF libraries are unavailable');
+      const canvas=await window.html2canvas(report,{scale:2,backgroundColor:'#fff'});
+      const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      const width=190,height=canvas.height*width/canvas.width;
+      let remaining=height,y=10;
+      const img=canvas.toDataURL('image/jpeg',0.94);
+      pdf.addImage(img,'JPEG',10,y,width,height);remaining-=277;
+      while(remaining>0){pdf.addPage();y-=277;pdf.addImage(img,'JPEG',10,y,width,height);remaining-=277}
+      pdf.save(`Finance_Job_Cost_${String(r.orderNo||id).replace(/[^A-Za-z0-9_-]/g,'-')}.pdf`);
+    }catch(e){console.error('Finance cost PDF',e);toast('Unable to generate job cost PDF: '+(e.message||e))}
+    finally{report.remove()}
+  };
+  function install(){
+    if(window.__financeCostPdfInstalledV2026)return;
+    if(typeof window.renderFinanceV1059!=='function'||typeof window.financeCostDatasetV2026!=='function')return;
+    window.__financeCostPdfInstalledV2026=true;
+    const prior=window.renderFinanceV1059;
+    window.renderFinanceV1059=async function(force=false){
+      const token=++financeEpoch;
+      const ret=await prior.apply(this,arguments);
+      if(token!==financeEpoch||!allow())return ret;
+      try{
+        const records=await window.financeCostDatasetV2026(force);
+        if(token!==financeEpoch)return ret;
+        cache=new Map(records.map(x=>[String(x.r.id),x]));
+        const cards=[...($f('financeJobsV1059')?.querySelectorAll('.finance-usage-card-v1060')||[])];
+        for(const card of cards){
+          const viewBtn=card.querySelector('button[onclick*="openFinanceJobV1059"]');
+          const id=viewBtn?.getAttribute('onclick')?.match(/openFinanceJobV1059\('([^']+)'\)/)?.[1];
+          if(!id)continue;
+          const x=cache.get(String(id));if(!x)continue;
+          card.querySelector('.finance-job-cost-v2026')?.remove();
+          const summary=document.createElement('div');summary.className='finance-job-cost-v2026';
+          summary.innerHTML=`<div><small>Total estimated job cost</small><strong>${costLabel(x)}</strong></div><div><small>Cost / roll</small><b>${Number(x.cost?.costPerRoll)>0?'LKR '+money2(x.cost.costPerRoll):'Unavailable'}</b></div><div><small>Extra recorded costs</small><b>LKR ${money2(x.adj?.total||0)}</b></div>`;
+          const actions=card.querySelector('.actions');
+          if(actions){actions.before(summary);let btn=actions.querySelector('.finance-cost-pdf-v2026');
+            if(!btn){btn=document.createElement('button');btn.className='btn primary sm finance-cost-pdf-v2026';btn.type='button';btn.textContent='Job Cost PDF';actions.appendChild(btn)}
+            btn.onclick=()=>window.downloadFinanceJobPdfV2026(String(id));
+          }
+        }
+        // Earlier Finance pagination continues to own the 5-per-page UI.
+        if(typeof window.financeGoPageV1066==='function'){
+          const active=$f('financePagerV1066')?.querySelector('.finance-page-btn-v1066.active');
+          window.financeGoPageV1066(Number(active?.textContent||1));
+        }
+      }catch(e){console.error('Finance job cost render',e)}
+      return ret;
+    };
+    try{renderFinanceV1059=window.renderFinanceV1059}catch(_){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+</script>
 </body></html>`);
     w.document.close();w.focus();setTimeout(()=>w.print(),250);
   };
@@ -20944,6 +21033,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     return {r,doc,line,cost,rev,jbr,pack,adj,actualQty,productionCost,totalCost,revenue,gp,gpPct,dispatched,dispatchBalance:Math.max(0,actualQty-dispatched)};
   }
 
+  window.financeCostDatasetV2026 = async function(force=false){return financeDatasetV1059(force)};
   async function financeDatasetV1059(force=false){
     const jobs=(state.productionRequests||[]).slice();
     const keys=[...new Set(jobs.map(finProductKeyV1059))];
@@ -21337,10 +21427,10 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   function tuneFinanceUiV1060(){
     const title=document.querySelector('#finance .panel-title span');
-    if(title)title.textContent='Finance — Job Total Costs & Production Usage';
+    if(title)title.textContent='Finance — Live Job Usage & Costing Support';
 
     const notice=document.querySelector('#finance .panel-body > .notice');
-    if(notice)notice.innerHTML='<b>Estimated job cost:</b> Finished rolls × saved cost per roll + recorded extra job costs. Jobs without a valid cost snapshot show Cost unavailable. Usage, packing and JBR details remain available; this is not an audited actual-cost report.';
+    if(notice)notice.innerHTML='<b>Operational usage report:</b> Finance shows what each production job actually used and produced. Profit / GP is intentionally not calculated here. Use the PDF report as the production-usage basis for your own costing.';
 
     const margin=$('financeMarginV1059');
     if(margin)margin.remove();
@@ -21365,8 +21455,6 @@ window.toggleBpSeparateDeliveryButton = function(){
       return;
     }
 
-    try{await finLoadAdjustmentsV1059(force)}catch(e){console.warn('Finance extra cost load:',e)}
-
     const q=String($('financeSearchV1059')?.value||'').trim().toLowerCase();
     const sf=$('financeStatusV1059')?.value||'';
     rows=rows.filter(x=>
@@ -21374,20 +21462,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       (!q||[x.r.orderNo,x.r.piSerial,x.r.customerName,x.r.size,x.r.material,x.r.layout].join(' ').toLowerCase().includes(q))
     );
 
-    function jobCostV20261026(x){
-      const r=x.r;
-      const {line}=finLineForJobV1059(r);
-      const c=finUnitCostV1059(r,line);
-      const rawQty=Number(x.produced||0);
-      const qty=Number.isFinite(rawQty)&&rawQty>=0?rawQty:0;
-      const known=!!c.snap && Number.isFinite(c.costPerRoll)&&c.costPerRoll>0;
-      const additions=finAdjustmentStatsV1059(r);
-      return {known,unit:c.costPerRoll,qty,base:known?c.costPerRoll*qty:null,
-              additions:additions.total,total:known?c.costPerRoll*qty+additions.total:null};
-    }
     const totals=rows.reduce((a,x)=>{
-      const c=jobCostV20261026(x);
-      if(c.known){a.estimatedCost+=c.total;a.costedJobs++}else{a.uncostedJobs++}
       a.jobs++;
       a.requested+=Number(x.r.requestQty||0);
       a.finished+=Number(x.produced||0);
@@ -21398,7 +21473,6 @@ window.toggleBpSeparateDeliveryButton = function(){
     },{jobs:0,requested:0,finished:0,coreMm:0,jbrWaste:0,dispatched:0});
 
     $('financeKpisV1059').innerHTML=`
-      <div><span>Estimated Job Cost</span><b>LKR ${money(totals.estimatedCost)}</b><small>${money(totals.costedJobs)} costed jobs${totals.uncostedJobs?' • '+money(totals.uncostedJobs)+' awaiting cost':''}</small></div>
       <div><span>Jobs</span><b>${money(totals.jobs)}</b><small>filtered production jobs</small></div>
       <div><span>Requested Rolls</span><b>${money(totals.requested)}</b><small>job demand</small></div>
       <div><span>Finished Rolls</span><b>${money(totals.finished)}</b><small>recorded job output</small></div>
@@ -21408,7 +21482,6 @@ window.toggleBpSeparateDeliveryButton = function(){
     $('financeJobsV1059').innerHTML=rows.length
       ? `<div class="finance-usage-cards-v1060">${rows.map(x=>{
           const r=x.r;
-          const c=jobCostV20261026(x);
           return `<div class="finance-usage-card-v1060">
             <div class="finance-usage-card-head-v1060">
               <div>
@@ -21419,9 +21492,6 @@ window.toggleBpSeparateDeliveryButton = function(){
             </div>
             <div class="finance-usage-product-v1060">${esc(r.size||'-')} • ${esc(r.material||'-')} • ${esc(r.layout||'-')} • ${money(r.pcs)} pcs / ${esc(r.unit||'Rolls')}</div>
             <div class="finance-usage-stats-v1060">
-              <div class="finance-total-cost-v20261026"><span>Total Job Cost (estimate)</span><b>${c.known?'LKR '+money(c.total):'Cost unavailable'}</b></div>
-              <div><span>Cost / Roll</span><b>${c.known?'LKR '+money(c.unit):'—'}</b></div>
-              <div><span>Extra Job Costs</span><b>LKR ${money(c.additions)}</b></div>
               <div><span>Requested</span><b>${money(r.requestQty||0)}</b></div>
               <div><span>Finished</span><b>${money(x.produced)}</b></div>
               <div><span>JBR Actual Cut</span><b>${money(x.jbrActual)}</b></div>
@@ -21439,7 +21509,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       : '<div class="empty">No matching production jobs.</div>';
 
     $('financeStatusNoteV1059').textContent=
-      `Last updated ${new Date().toLocaleTimeString()} • estimated costing + operational usage • auto refresh every 20 seconds while Finance is open`;
+      `Last updated ${new Date().toLocaleTimeString()} • operational usage only • auto refresh every 20 seconds while Finance is open`;
   };
 
   function jbrWasteTextV1060(x){
@@ -21678,23 +21748,10 @@ window.toggleBpSeparateDeliveryButton = function(){
     try{await usageLoadProductV1060(productKeyV1060(r),true)}
     catch(e){return toast(`Usage data unavailable: ${e.message}`)}
     const x=usageForJobV1060(r);
-    try{await finLoadAdjustmentsV1059(false)}catch(_){ }
-    const finLine=finLineForJobV1059(r).line;
-    const finCost=finUnitCostV1059(r,finLine);
-    const finExtras=finAdjustmentStatsV1059(r);
-    const finQty=Math.max(0,Number(x.produced||0));
-    const finKnown=!!finCost.snap&&Number.isFinite(finCost.costPerRoll)&&finCost.costPerRoll>0;
-    const finTotal=finKnown?finCost.costPerRoll*finQty+finExtras.total:null;
-    const finSummary=`<div class="finance-job-cost-summary-v20261026">
-      <strong>Total Job Cost (estimated)</strong>
-      <b>${finKnown?'LKR '+money(finTotal):'Cost unavailable — enter/verify unit cost'}</b>
-      <div>Finished: ${money(finQty)} rolls • Unit cost: ${finKnown?'LKR '+money(finCost.costPerRoll):'unavailable'} • Extra job costs: LKR ${money(finExtras.total)}</div>
-      <small>Snapshot estimate, not an audited actual material cost. Shared JBR costs and wastage are not allocated again.</small>
-    </div>`;
 
     $('financeJobMetaV1059').textContent=`${r.orderNo} • ${r.customerName||'-'} • ${r.size} • ${r.material}`;
     $('financeJobBodyV1059').innerHTML=
-      finSummary+usageDetailHtmlV1060(x,false)+
+      usageDetailHtmlV1060(x,false)+
       `<div class="actions"><button class="btn navy" type="button" onclick="generateJobUsagePdfV1060('${r.id}')">Generate Job Usage PDF</button></div>`;
     $('financeJobModalV1059').classList.add('show');
   };
@@ -28952,6 +29009,95 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
    if(visible())void refresh(true);
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
+</script>
+
+<script>
+/* Finance: job-level costing, individual PDFs and 5-job pagination.
+   Read-only use of the existing financeDatasetV1059 cost snapshots and adjustments. */
+(function(){
+  const pageSize=5;
+  let financeEpoch=0;
+  let cache=new Map();
+  const $f=id=>document.getElementById(id);
+  const allow=()=>typeof currentUser!=='undefined' && (currentUser?.role==='admin'||hasPerm('finance_view'));
+  const money2=n=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const safe=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function costLabel(x){return x&&x.cost&&Number(x.cost.costPerRoll)>0?`LKR ${money2(x.totalCost)}`:'Cost unavailable'}
+  window.downloadFinanceJobPdfV2026=async function(id){
+    if(!allow())return toast('Finance access is required');
+    const x=cache.get(String(id));
+    if(!x)return toast('Job cost data not loaded. Refresh Finance.');
+    const r=x.r||{};const costOK=Number(x.cost?.costPerRoll)>0;
+    const table=[
+      ['Production job',r.orderNo||'-'],['Customer',r.customerName||'-'],['Source PI',r.piSerial||'-'],
+      ['Product',[r.size,r.material,r.layout,`${money2(r.pcs||0)} pcs/roll`].filter(Boolean).join(' / ')],
+      ['Job status',r.status||'-'],['Requested',`${money2(r.requestQty)} ${r.unit||'rolls'}`],
+      ['Finished',`${money2(x.actualQty)} ${r.unit||'rolls'}`],
+      ['Cost per roll',costOK?'LKR '+money2(x.cost.costPerRoll):'Unavailable'],
+      ['Estimated production cost',costOK?'LKR '+money2(x.productionCost):'Unavailable'],
+      ['Additional recorded costs','LKR '+money2(x.adj?.total||0)],
+      ['TOTAL ESTIMATED JOB COST',costLabel(x)],
+      ['Cost basis',costOK?'Saved cost snapshot × finished quantity + recorded adjustments':'No valid cost-per-roll snapshot; total not determined']
+    ];
+    const report=document.createElement('div');
+    report.style='position:fixed;left:-10000px;top:0;width:794px;padding:46px;background:#fff;color:#1a2b40;font:15px Arial,sans-serif;box-sizing:border-box;z-index:-1';
+    report.innerHTML=`<div style="border-bottom:4px solid #078f92;padding-bottom:18px"><h1 style="margin:0;color:#078f92">SoftCreation</h1><div style="font-weight:700;font-size:23px;margin-top:8px">PRODUCTION JOB COST REPORT</div><div style="color:#647687;font-size:13px">Internal Finance · Estimated costing · ${safe(new Date().toLocaleString())}</div></div><table style="width:100%;border-collapse:collapse;margin-top:28px">${table.map(([a,b],i)=>`<tr style="background:${i===10?'#e9f7f4':i%2?'#f6f9fa':'#fff'}"><td style="padding:12px;border-bottom:1px solid #dce5e8;width:43%;font-weight:700">${safe(a)}</td><td style="padding:12px;border-bottom:1px solid #dce5e8">${safe(b)}</td></tr>`).join('')}</table><div style="margin-top:35px;color:#526575;font-size:12px;line-height:1.5">Cost estimates are based on the saved unit-cost snapshot and recorded job adjustments. They are not fully reconciled manufacturing actuals. Shared material usage and waste are not double-counted.</div>`;
+    document.body.appendChild(report);
+    try{
+      const okCanvas=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas);
+      const okPdf=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);
+      if(!okCanvas||!okPdf)return toast('PDF libraries are unavailable');
+      const canvas=await window.html2canvas(report,{scale:2,backgroundColor:'#fff'});
+      const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      const width=190,height=canvas.height*width/canvas.width;
+      let remaining=height,y=10;
+      const img=canvas.toDataURL('image/jpeg',0.94);
+      pdf.addImage(img,'JPEG',10,y,width,height);remaining-=277;
+      while(remaining>0){pdf.addPage();y-=277;pdf.addImage(img,'JPEG',10,y,width,height);remaining-=277}
+      pdf.save(`Finance_Job_Cost_${String(r.orderNo||id).replace(/[^A-Za-z0-9_-]/g,'-')}.pdf`);
+    }catch(e){console.error('Finance cost PDF',e);toast('Unable to generate job cost PDF: '+(e.message||e))}
+    finally{report.remove()}
+  };
+  function install(){
+    if(window.__financeCostPdfInstalledV2026)return;
+    if(typeof window.renderFinanceV1059!=='function'||typeof window.financeCostDatasetV2026!=='function')return;
+    window.__financeCostPdfInstalledV2026=true;
+    const prior=window.renderFinanceV1059;
+    window.renderFinanceV1059=async function(force=false){
+      const token=++financeEpoch;
+      const ret=await prior.apply(this,arguments);
+      if(token!==financeEpoch||!allow())return ret;
+      try{
+        const records=await window.financeCostDatasetV2026(force);
+        if(token!==financeEpoch)return ret;
+        cache=new Map(records.map(x=>[String(x.r.id),x]));
+        const cards=[...($f('financeJobsV1059')?.querySelectorAll('.finance-usage-card-v1060')||[])];
+        for(const card of cards){
+          const viewBtn=card.querySelector('button[onclick*="openFinanceJobV1059"]');
+          const id=viewBtn?.getAttribute('onclick')?.match(/openFinanceJobV1059\('([^']+)'\)/)?.[1];
+          if(!id)continue;
+          const x=cache.get(String(id));if(!x)continue;
+          card.querySelector('.finance-job-cost-v2026')?.remove();
+          const summary=document.createElement('div');summary.className='finance-job-cost-v2026';
+          summary.innerHTML=`<div><small>Total estimated job cost</small><strong>${costLabel(x)}</strong></div><div><small>Cost / roll</small><b>${Number(x.cost?.costPerRoll)>0?'LKR '+money2(x.cost.costPerRoll):'Unavailable'}</b></div><div><small>Extra recorded costs</small><b>LKR ${money2(x.adj?.total||0)}</b></div>`;
+          const actions=card.querySelector('.actions');
+          if(actions){actions.before(summary);let btn=actions.querySelector('.finance-cost-pdf-v2026');
+            if(!btn){btn=document.createElement('button');btn.className='btn primary sm finance-cost-pdf-v2026';btn.type='button';btn.textContent='Job Cost PDF';actions.appendChild(btn)}
+            btn.onclick=()=>window.downloadFinanceJobPdfV2026(String(id));
+          }
+        }
+        // Earlier Finance pagination continues to own the 5-per-page UI.
+        if(typeof window.financeGoPageV1066==='function'){
+          const active=$f('financePagerV1066')?.querySelector('.finance-page-btn-v1066.active');
+          window.financeGoPageV1066(Number(active?.textContent||1));
+        }
+      }catch(e){console.error('Finance job cost render',e)}
+      return ret;
+    };
+    try{renderFinanceV1059=window.renderFinanceV1059}catch(_){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
 </script>
 </body></html>
