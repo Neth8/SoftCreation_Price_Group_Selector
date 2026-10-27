@@ -1158,6 +1158,7 @@ async function persistCurrentDocument(){
   if(!usable.length){toast('Add at least one selected item with quantity');return null}
   try{
     if(d.category!=='device')ensureMasterFromLines(d.lines);
+    if(!d.ownerUser)d.ownerUser=d.createdByUser||currentUser?.username||'';
     d.accountingSnapshot=d.accountingSnapshot||JSON.parse(JSON.stringify(state.settings.pricing||DEFAULT_PRICING));
     if(tempFiles.po)d.attachments.po=await putFile(tempFiles.po,'PO');
     if(tempFiles.quote)d.attachments.quote=await putFile(tempFiles.quote,'Quotation');
@@ -1177,6 +1178,11 @@ async function persistCurrentDocument(){
 async function saveCurrentDoc(){
   const d=await persistCurrentDocument();
   if(!d)return false;
+  try{await window.spgsConfirmDocumentSavedV1131(d.id)}catch(e){
+    console.error('Document cloud confirmation failed',e);
+    toast('Cloud save not confirmed: '+(e.message||e)+' — document kept locally; do not clear this form.');
+    return false;
+  }
   const listView=d.type==='Q'?'quotations':'pis';
   resetEditor(false);
   renderDocLists();
@@ -1187,6 +1193,11 @@ async function saveCurrentDoc(){
 async function saveAndPDF(){
   const d=await persistCurrentDocument();
   if(!d)return;
+  try{await window.spgsConfirmDocumentSavedV1131(d.id)}catch(e){
+    console.error('Document cloud confirmation failed',e);
+    toast('Cloud save not confirmed: '+(e.message||e)+' — document kept locally.');
+    return;
+  }
   await downloadDocPDF(d);
   const listView=d.type==='Q'?'quotations':'pis';
   resetEditor(false);
@@ -6196,18 +6207,43 @@ window.spgsLoadProductionSeen=
       });
       changed.forEach(r=>{spgsEntityHashes[spgsEntityKey(r.entity_type,r.id)]=spgsEntitySignature(r.payload,r.sort_order)});
     }
-    // Delete only records that THIS browser previously knew about and has now
-    // intentionally removed. A stale browser cannot delete rows it never saw.
-    const deleted=Object.keys(spgsEntityHashes).filter(key=>{
-      const type=key.split('::')[0];
-      return (SPGS_ENTITY_ARRAYS.includes(type)||SPGS_ENTITY_SINGLETONS.includes(type))&&!currentKeys.has(key);
-    });
-    for(const key of deleted){
-      const cut=key.indexOf('::'),type=key.slice(0,cut),id=key.slice(cut+2);
-      await spgsFetch(`/spgs_entities?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&entity_type=eq.${encodeURIComponent(type)}&id=eq.${encodeURIComponent(id)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
-      delete spgsEntityHashes[key];
-    }
+    // IMPORTANT: Never infer cloud deletions from the current in-memory array.
+    // UI pagination and per-user visibility temporarily replace state.docs /
+    // state.customers with subsets. A concurrent sync could otherwise DELETE
+    // legitimate records from spgs_entities. Cloud deletion requires a separate
+    // explicit, permission-checked operation (not performed by this autosync).
+
   }
+  // Confirm critical business records in Supabase before telling a user a
+  // quotation was saved. Does not delete, replace other records or alter owner.
+  window.spgsConfirmDocumentSavedV1131=async function(id){
+    if(!spgsReady||!spgsEntityStoreReady)throw new Error('Cloud entity storage is offline. The draft remains in this browser.');
+    const d=(state.docs||[]).find(x=>String(x.id)===String(id));
+    if(!d)throw new Error('Document not found in the current session');
+    const now=new Date().toISOString();
+    const username=currentUser?.username||'system';
+    const entities=[{entity_type:'docs',payload:d}];
+    const customer=(state.customers||[]).find(x=>String(x.id)===String(d.customerId));
+    if(customer)entities.unshift({entity_type:'customers',payload:customer});
+    const rows=entities.map((r,i)=>({
+      workspace:SPGS_WORKSPACE,entity_type:r.entity_type,id:String(r.payload.id),
+      payload:spgsEntityCleanPayload(r.payload),sort_order:0,
+      updated_at:now,updated_by:username
+    }));
+    await spgsFetch('/spgs_entities?on_conflict=workspace,entity_type,id',{
+      method:'POST',headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify(rows)
+    });
+    const found=await spgsFetch(`/spgs_entities?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&entity_type=eq.docs&id=eq.${encodeURIComponent(String(id))}&select=id,payload&limit=1`);
+    if(!Array.isArray(found)||String(found[0]?.id)!==String(id) ||
+       String(found[0]?.payload?.serial||'')!==String(d.serial||'')){
+      throw new Error('Cloud verification failed; document is preserved locally');
+    }
+    rows.forEach(r=>{
+      spgsEntityHashes[spgsEntityKey(r.entity_type,r.id)]=spgsEntitySignature(r.payload,r.sort_order);
+    });
+    return true;
+  };
   function spgsApplyEntityRealtime(change){
     const oldRow=change.old||{},newRow=change.new||{};
     const row=change.eventType==='DELETE'?oldRow:newRow;
@@ -27849,6 +27885,7 @@ if(select){
         erpCustomerId:String(c.id||''),
         erpCustomerCode:String(c.code||c.customer_id||''),
         erpLinkedAt:new Date().toISOString(),
+        ownerUser:currentUser?.username||'',
         active:true
       };
       state.customers=state.customers||[];
@@ -27863,6 +27900,12 @@ if(select){
       local.erpCustomerId=String(c.id||local.erpCustomerId||'');
       local.erpCustomerCode=String(c.code||c.customer_id||local.erpCustomerCode||'');
       local.erpLinkedAt=new Date().toISOString();
+      // Claim only unowned records when explicitly selected by this user.
+      // Never take ownership away from another user.
+      if(!local.ownerUser)local.ownerUser=currentUser?.username||'';
+      if(currentUser?.username && local.ownerUser!==currentUser.username){
+        local.sharedWith=[...new Set([...(local.sharedWith||[]),currentUser.username])];
+      }
     }
 
     /*
