@@ -27565,6 +27565,8 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
   let seqV1119=0;
   let resultsV1119=[];
   let activeV1119=-1;
+  let selectedCustomerV1119=false;
+  let selectingV1119=false;
 
   function el(id){return document.getElementById(id)}
   function e(v){return typeof esc==='function'?esc(String(v??'')):String(v??'')}
@@ -27708,13 +27710,17 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
   }
 
   window.scCustomerSearchTypeV1119=function(value){
+    selectedCustomerV1119=false;
     clearTimeout(timerV1119);
-    timerV1119=setTimeout(()=>searchV1119(value),220);
+    ++seqV1119; // invalidate earlier ERP responses immediately
+    timerV1119=setTimeout(()=>searchV1119(value),320);
   };
 
   window.scCustomerSearchFocusV1119=function(){
-    const input=el('customerSearchV1119');
-    searchV1119(input?.value||'');
+    // Do not run a network search merely by focusing an already selected name.
+    if(selectedCustomerV1119)return;
+    const value=el('customerSearchV1119')?.value||'';
+    renderSuggestionsV1119(localMatchesV1119(value),[]);
   };
 
   function highlightV1119(){
@@ -27777,6 +27783,10 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
   window.scSelectCustomerV1119=async function(index){
     const row=resultsV1119[index];
     if(!row)return;
+    clearTimeout(timerV1119);
+    ++seqV1119; // stop stale searches from rewriting the suggestions
+    selectingV1119=true;
+    selectedCustomerV1119=true;
 
     const input=el('customerSearchV1119');
     const select=el('customerSelect');
@@ -27796,10 +27806,12 @@ if(select){
         source.innerHTML=`<span class="system">SYSTEM CUSTOMER</span>${e(row.phone||'')}`;
       }
       el('customerSuggestionsV1119')?.classList.remove('show');
+      selectingV1119=false;
       return;
     }
 
     const c=row.raw||{};
+    if(input)input.value=row.name||''; // selection is immediate; address loads separately
     const address=await firstErpAddressV1119(c.id);
 
     let local=findExistingErpCustomerV1119(c);
@@ -27866,6 +27878,7 @@ if(select){
     try{saveState()}catch(_){}
 
     el('customerSuggestionsV1119')?.classList.remove('show');
+    selectingV1119=false;
     try{renderCurrent()}catch(_){}
   };
 
@@ -27873,13 +27886,17 @@ if(select){
     const select=el('customerSelect');
     const input=el('customerSearchV1119');
     const source=el('customerSourceV1119');
-    if(!select||!input)return;
+    if(!select||!input||selectingV1119)return;
 
     const c=(state.customers||[]).find(x=>x.id===select.value);
 
     if(!c){
-      if(!state.current?.customerId)input.value='';
-      if(source)source.innerHTML='';
+      // A refresh may temporarily rebuild the hidden selector. Do not erase
+      // the visible selected name during this transitional state.
+      if(!selectedCustomerV1119 && !input.matches(':focus')){
+        if(!state.current?.customerId)input.value='';
+        if(source)source.innerHTML='';
+      }
       return;
     }
 
@@ -27897,7 +27914,7 @@ if(select){
     const base=window.refreshCustomerPick;
     window.refreshCustomerPick=function(){
       const r=base.apply(this,arguments);
-      setTimeout(syncSearchFromNativeV1119,0);
+      if(!selectedCustomerV1119)syncSearchFromNativeV1119();
       return r;
     };
     try{refreshCustomerPick=window.refreshCustomerPick}catch(_){}
@@ -27916,6 +27933,7 @@ if(select){
   if(typeof window.newDocument==='function'){
     const base=window.newDocument;
     window.newDocument=function(){
+      selectedCustomerV1119=false;
       const r=base.apply(this,arguments);
       setTimeout(syncSearchFromNativeV1119,0);
       return r;
