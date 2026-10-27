@@ -7483,3 +7483,31 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 /* Manual Invoice VAT selection — 2026-10-27 */
 .mi-vat-check{display:flex;align-items:center;gap:9px;padding:11px 13px;margin:12px 0 6px;border:1px solid #b5dedc;border-radius:10px;background:#effafa;font-size:12px;font-weight:750;color:#176c70;cursor:pointer}
 .mi-vat-check input{width:17px;height:17px;accent-color:#078f92;flex:none}
+
+/* Manual invoice VAT summary: opaque to cover legacy template text and compact enough for footer. */
+.mi-ex-summary.mi-ex-summary-paged{background:#fff;z-index:5}
+.mi-summary-vat-on .mi-ex-sumrow{height:20pt}
+.mi-summary-vat-on .mi-ex-words{height:27pt}
+.mi-summary-vat-on .mi-ex-mode{height:20pt;white-space:normal}
+.mi-customer-documents{margin:12px 0;border:1px solid #d4e4e6;background:#f7fbfc;border-radius:10px;padding:10px}
+.mi-customer-documents h4{margin:0 0 9px;font-size:12px;color:#087f83}
+.mi-customer-documents h4 small{font-weight:400;color:#697d88}
+.mi-source-document{background:#fff;border:1px solid #d9e7e9;border-radius:8px;margin:6px 0}
+.mi-source-document summary{cursor:pointer;padding:9px 11px;font-size:11px}
+.mi-source-document summary small{color:#71818a;margin-left:8px}
+.mi-source-lines{padding:5px 11px 10px}
+.mi-source-line{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #e7eef0;font-size:11px}
+
+/* Manual Invoice: independent side-by-side customer document lists. */
+.mi-source-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:12px;margin-top:10px}
+.mi-source-columns>.mi-source-group{min-width:0;background:#fff;border:1px solid #d8e7e9;border-radius:11px;overflow:hidden}
+.mi-source-columns>.mi-source-group>h4{margin:0;padding:11px 12px;background:#e9f6f6;border-bottom:1px solid #d8e7e9;font-size:12px;color:#087f83}
+.mi-source-columns>.mi-source-group>.mi-source-document,.mi-source-columns>.mi-source-group>.mi-muted{margin:8px 9px}
+.mi-source-columns>.mi-source-group>.mi-muted{display:block;padding:12px 4px;font-size:11px}
+.mi-source-columns>.mi-source-group{max-height:390px;overflow-y:auto;overscroll-behavior:contain}
+.mi-source-columns>.mi-source-group>h4{position:sticky;top:0;z-index:1}
+.mi-source-columns .mi-source-document summary{overflow-wrap:anywhere}
+.mi-source-columns .mi-source-line{align-items:flex-start;flex-wrap:wrap}
+.mi-source-columns .mi-source-line>span{min-width:0;overflow-wrap:anywhere;flex:1 1 130px}
+.mi-source-columns .mi-source-line>button{flex:0 0 auto}
+@media(max-width:1050px){.mi-source-columns{grid-template-columns:repeat(3,minmax(245px,1fr));overflow-x:auto;align-items:stretch;padding-bottom:5px}}

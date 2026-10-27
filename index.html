@@ -26659,7 +26659,7 @@ async function miFetch(path,options={}){
   let data=null;
   try{data=raw?JSON.parse(raw):null}catch(_){data=raw}
   if(!res.ok){
-    throw new Error(data?.message||data?.details||data?.hint||raw||`HTTP ${res.status}`);
+    throw new Error([data?.message,data?.details,data?.hint].filter(x=>typeof x==='string'&&x.trim()&&x.trim()!=='.').join(' — ') || (typeof raw==='string'&&raw.trim()&&raw.trim()!=='.'?raw.trim():`Supabase request failed (HTTP ${res.status})`));
   }
   return data;
 }
@@ -27025,6 +27025,7 @@ function miEditorHTML(){
           </div>
           <div id="miCustomerSelected" class="mi-selected-customer"></div>
         </div>
+        <div id="miCustomerDocuments" class="mi-customer-documents"><div class="mi-muted">Select an ERP customer to view related quotations, pro formas and sales orders.</div></div>
         <input id="miErpCustomerId" type="hidden"><input id="miErpCustomerCode" type="hidden">
         <div class="mi-grid2 mi-gap-top">
           <div class="field"><label>Customer Name *</label><input id="miCustomerName" readonly></div>
@@ -27111,6 +27112,7 @@ function miAfterEditorRender(){
   miDraftPayments=inv?(inv.payments||[]).map(x=>({...x})):miDraftPayments;
   miRenderPayments();
   miRenderSelectedCustomer();
+  miRenderCustomerDocs();
   if(inv?.erpCustomerId)miLoadAddresses(inv.erpCustomerId,inv.customerAddress);
   miRefreshEditor();
 }
@@ -27239,13 +27241,16 @@ window.miSaveInvoice=async function(silent=false){
   };
   try{
     const r=await miRpc('spgs_manual_invoice_save',{p_payload:payload});
-    miEditingId=r?.id||miEditingId;
+    if(!r?.id && !miEditingId)throw new Error('Save returned no invoice ID. Check the Supabase save function and permissions.');
+    const confirmedId=r?.id||miEditingId;
     await miLoad();
-    const saved=miInvoice(miEditingId);
+    const saved=miInvoice(confirmedId);
+    if(!saved)throw new Error('Invoice not found after saving. Cloud save could not be confirmed; keep this form open.');
+    miEditingId=confirmedId;
     miDraftPayments=(saved?.payments||[]).map(x=>({...x}));
     if(!silent)toast(`${r?.invoice_no||inv.invoiceNo} saved`);
     miRender();
-  }catch(e){console.error(e);toast(e.message)}
+  }catch(e){console.error('Manual invoice save failed:',e);const message=String(e?.message||'').trim();toast(message&&message!=='.'?`Invoice NOT saved: ${message}`:'Invoice NOT saved. Supabase returned an unidentified error; check browser Console and Network response.')}
 };
 window.miMarkERPUpdatedById=async function(id){
   const inv=miInvoice(id);
@@ -27312,6 +27317,63 @@ window.miDeleteInvoice=async function(){
   }catch(e){console.error(e);toast(e.message)}
 };
 
+/* Customer-linked source documents. Keep the underlying record untouched. */
+function miCustomerDocMatches(doc,id,name){
+  const norm=v=>String(v||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const docId=String(doc.customerId||doc.erpCustomerId||doc.customer?.id||doc.customer?.erpId||'');
+  const docName=norm(doc.customer?.name||doc.customerName||doc.customer_name||'');
+  return !!((id&&docId&&(docId===id||docId==='erp_customer_'+id||'erp_customer_'+docId===id))||(name&&docName&&docName===norm(name)));
+}
+function miSourceLines(doc){
+  const source=Array.isArray(doc.lines)?doc.lines:[];
+  return source.filter(l=>l&&typeof l==='object'&&l.use!==false&&l.selected!==false);
+}
+function miGetCustomerDocs(){
+  const id=String(mi$('miErpCustomerId')?.value||'').trim(),name=String(mi$('miCustomerName')?.value||'').trim();
+  if(!id&&!name)return [];
+  const quotes=(state.docs||[]).filter(d=>['Q','PI'].includes(d.type)&&(typeof visibleToCurrent!=='function'||visibleToCurrent(d))&&miCustomerDocMatches(d,id,name)).map(d=>({kind:d.type==='PI'?'Pro Forma Invoice':'Quotation',group:d.type==='PI'?'pi':'quote',no:d.serial||'',date:d.date||'',lines:miSourceLines(d),id:d.id,doc:d}));
+  const orders=(state.salesOrders||[]).filter(d=>(typeof soVisible91!=='function'||soVisible91(d))&&miCustomerDocMatches(d,id,name)).map(d=>({kind:'Sales Order',group:'so',no:d.soNo||d.serial||'',date:d.date||d.createdAt||'',lines:miSourceLines(d),id:d.id,doc:d}));
+  return [...quotes,...orders].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,150);
+}
+function miSourceItem(line){
+  // Quotation/PI and SO entries save the item description in `desc` and the
+  // identifying size/material/pack attributes in separate fields.
+  const first=(...vals)=>vals.find(v=>typeof v==='string'&&v.trim())?.trim()||'';
+  const base=first(line.desc,line.description,line.itemName,line.productName,line.product_name,line.item_description,line.item?.description,line.item?.name,line.name,line.title,line.product,line.label);
+  const size=first(line.size,line.sizeLabel,line.size_label);
+  const material=first(line.material,line.materialName);
+  const layout=first(line.layout);
+  const pcs=line.pcs||line.pcsPerRoll||line.pcs_per_roll||'';
+  const pack=first(line.unit,line.packName,line.packing);
+  const details=[size,material,layout,pcs?String(pcs)+' pcs':''].filter(Boolean);
+  // Avoid losing distinguishing attributes when the base is a generic label.
+  const name=base?[base,...details.filter(v=>!base.toLowerCase().includes(v.toLowerCase()))].join(' • '):details.join(' • ');
+  const num=(...values)=>{for(const x of values){if(x!==undefined&&x!==null&&x!==''){const n=Number(x);if(Number.isFinite(n))return n;}}return 0;};
+  return {code:first(line.code,line.sku,line.itemCode,line.item_code,line.productCode,line.product_code,line.item?.code),desc:name||'Unnamed source item',qty:Math.max(0,num(line.qty,line.quantity,line.requestedQty,1))||1,unitPrice:Math.max(0,num(line.price,line.unitPrice,line.unit_price,line.sellingPrice,line.rate)),unit:pack};
+}
+window.miRenderCustomerDocs=function(){
+  const host=mi$('miCustomerDocuments');if(!host)return;
+  const docs=miGetCustomerDocs();
+  if(!mi$('miErpCustomerId')?.value&&!mi$('miCustomerName')?.value){host.innerHTML='<div class="mi-muted">Select an ERP customer to view related documents.</div>';return;}
+  const categories=[{key:'quote',title:'Quotations'},{key:'pi',title:'Pro Forma Invoices'},{key:'so',title:'Sales Orders'}];
+  const sections=categories.map(cat=>{
+    const subset=docs.map((d,index)=>({d,index})).filter(x=>x.d.group===cat.key);
+    return `<section class="mi-source-group"><h4>${cat.title} <small>(${subset.length})</small></h4>${subset.length?subset.map(({d,index})=>`<details class="mi-source-document"><summary><b>${miEsc(d.no||'-')}</b> <small>${miEsc(String(d.date).slice(0,10))} · ${d.lines.length} line(s)</small></summary><div class="mi-source-lines">${d.lines.map((l,j)=>{const item=miSourceItem(l);return `<div class="mi-source-line"><span><b>${miEsc(item.desc)}</b>${item.code?' <small>('+miEsc(item.code)+')</small>':''}<br>Qty ${miEsc(item.qty)} · Rs. ${miMoney(item.unitPrice)}</span><button type="button" class="btn ghost sm" onclick="miCopySourceLine(${index},${j})">Add to invoice</button></div>`;}).join('')||'<span class="mi-muted">No saved lines.</span>'}</div></details>`).join(''):'<div class="mi-muted">No matching documents in this category.</div>'}</section>`;
+  });
+  host.innerHTML='<h4>Customer Documents <small>('+docs.length+' available) — expand a document to copy items</small></h4><div class="mi-source-columns">'+sections.join('')+'</div>';
+};
+window.miCopySourceLine=function(docIndex,lineIndex){
+  if(miLocked)return toast('ERP Updated invoices are locked');
+  const entry=miGetCustomerDocs()[docIndex],line=entry?.lines?.[lineIndex];
+  if(!line)return toast('Source line unavailable. Refresh customer documents.');
+  const item=miSourceItem(line);
+  if(item.desc==='Unnamed source item')return toast('Source item has no identifiable name.');
+  const rows=[...document.querySelectorAll('#miItems .mi-item-row')];
+  if(rows.length===1&&!rows[0].querySelector('.mi-it-desc')?.value.trim()&&!rows[0].querySelector('.mi-it-code')?.value.trim())rows[0].remove();
+  miAddItem(item,true);
+  toast('Item copied. Verify description, quantity and price before saving.');
+};
+
 /* ---------------- ERP customer autocomplete ---------------- */
 window.miCustomerType=function(value){
   const q=String(value||'').trim();
@@ -27324,6 +27386,7 @@ window.miCustomerType=function(value){
   mi$('miCustomerPhone').value='';
   mi$('miCustomerAddress').value='';
   miRenderSelectedCustomer();
+  miRenderCustomerDocs();
   if(q.length<2){
     miCustomerRows=[];
     miHideCustomerSuggestions();
@@ -27367,6 +27430,7 @@ window.miSelectCustomer=async function(i){
   mi$('miCustomerSearch').value=c.name||'';
   miHideCustomerSuggestions();
   miRenderSelectedCustomer();
+  miRenderCustomerDocs();
   await miLoadAddresses(c.id,'');
   miRefreshEditor();
 };
@@ -27460,7 +27524,7 @@ function miRenderInvoice(inv,hostId){
   const tableHeadH=25;
 
   /* Keep the final summary safely above the fixed signature/footer art. */
-  const summaryTopBase=560;
+  const summaryTopBase=inv.vatEnabled?525:545;
   const footerLimit=705;
   const finalRows=Math.max(1,Math.floor((summaryTopBase-tableTop-tableHeadH-18)/rowH));
   const continuationRows=Math.max(1,Math.floor((footerLimit-tableTop-tableHeadH-14)/rowH));
@@ -27574,7 +27638,7 @@ function miRenderInvoice(inv,hostId){
       `:''}
 
       ${isLast?`
-        <div class="mi-ex-summary mi-ex-summary-paged" style="top:${summaryTop}pt">
+        <div class="mi-ex-summary mi-ex-summary-paged ${inv.vatEnabled?'mi-summary-vat-on':''}" style="top:${summaryTop}pt">
           <div class="mi-ex-sumrow"><div>Value of Supply (Excl. VAT)</div><div class="v">${miMoney(subtotal)}</div></div>
           ${inv.vatEnabled?`<div class="mi-ex-sumrow"><div>VAT 18%</div><div class="v">${miMoney(vat)}</div></div>`:''}
           <div class="mi-ex-sumrow"><div>Total Value of Supply</div><div class="v">${miMoney(total)}</div></div>
