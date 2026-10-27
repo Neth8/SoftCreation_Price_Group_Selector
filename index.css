@@ -7479,3 +7479,7 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 
 /* Finance job costing summary */
 .finance-job-cost-v2026{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;padding:13px;margin:12px 0;border:1px solid #a9d7d8;border-radius:12px;background:#f1fbf9}.finance-job-cost-v2026>div{display:flex;flex-direction:column;gap:5px}.finance-job-cost-v2026 small{font-size:11px;color:#58717c;font-weight:700}.finance-job-cost-v2026 strong{font-size:20px;color:#087e71}.finance-job-cost-v2026 b{font-size:14px;color:#213b4b}@media(max-width:650px){.finance-job-cost-v2026{grid-template-columns:1fr 1fr}.finance-job-cost-v2026>div:first-child{grid-column:1/-1}}
+
+/* Manual Invoice VAT selection — 2026-10-27 */
+.mi-vat-check{display:flex;align-items:center;gap:9px;padding:11px 13px;margin:12px 0 6px;border:1px solid #b5dedc;border-radius:10px;background:#effafa;font-size:12px;font-weight:750;color:#176c70;cursor:pointer}
+.mi-vat-check input{width:17px;height:17px;accent-color:#078f92;flex:none}

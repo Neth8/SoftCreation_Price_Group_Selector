@@ -26795,7 +26795,8 @@ function miInvoiceObject(row){
     erpStatus:row.erp_status||'pending',
     createdAt:row.created_at,
     updatedAt:row.updated_at,
-    items:miDb.lines.filter(x=>x.invoice_id===row.id).map(x=>({
+    vatEnabled:miDb.lines.some(x=>x.invoice_id===row.id&&x.item_code===MI_VAT_CODE),
+    items:miDb.lines.filter(x=>x.invoice_id===row.id&&x.item_code!==MI_VAT_CODE).map(x=>({
       id:x.id,code:x.item_code||'',desc:x.description||'',qty:miNum(x.qty),unitPrice:miNum(x.unit_price)
     })),
     payments:miDb.payments.filter(x=>x.invoice_id===row.id).map(x=>({
@@ -26803,9 +26804,12 @@ function miInvoiceObject(row){
     }))
   };
 }
+const MI_VAT_CODE='__SC_MANUAL_VAT_18__';
+function miSubtotal(inv){return (inv.items||[]).reduce((sum,i)=>sum+miNum(i.qty)*miNum(i.unitPrice),0)}
+function miVatAmount(inv){return inv.vatEnabled?Math.round((miSubtotal(inv)*0.18+Number.EPSILON)*100)/100:0}
 function miInvoices(){return miDb.invoices.map(miInvoiceObject)}
 function miInvoice(id){const r=miDb.invoices.find(x=>x.id===id);return r?miInvoiceObject(r):null}
-function miTotal(inv){return (inv.items||[]).reduce((s,i)=>s+miNum(i.qty)*miNum(i.unitPrice),0)}
+function miTotal(inv){return Math.round((miSubtotal(inv)+miVatAmount(inv)+Number.EPSILON)*100)/100}
 function miPaid(inv){return (inv.payments||[]).reduce((s,p)=>s+miNum(p.amount),0)}
 function miBalance(inv){return Math.max(0,miTotal(inv)-miPaid(inv))}
 function miPayStatus(inv){const t=miTotal(inv),p=miPaid(inv);return p<=0?'Unpaid':p+0.005>=t?'Paid':'Partially Paid'}
@@ -26889,7 +26893,7 @@ function miTableHTML(list){
     const updated=inv.erpStatus==='updated';
     const actions=updated
       ? `<button class="btn ghost sm" onclick="miViewInvoice('${inv.id}')">View</button><button class="btn ghost sm" onclick="miPrintInvoice('${inv.id}')">Download / PDF</button>`
-      : `<button class="btn ghost sm" onclick="miViewInvoice('${inv.id}')">View</button>${miCan('manual_invoice_finalize')?`<button class="btn green sm" onclick="miMarkERPUpdatedById('${inv.id}')">ERP Updated</button>`:''}`;
+      : `<button class="btn ghost sm" onclick="miViewInvoice('${inv.id}')">View</button>${miCan('manual_invoice_create')?`<button class="btn amber sm" onclick="miRequestEdit('${inv.id}')">Edit</button>`:''}${miCan('manual_invoice_finalize')?`<button class="btn green sm" onclick="miMarkERPUpdatedById('${inv.id}')">ERP Updated</button>`:''}`;
     return `<tr>
       <td><b>${miEsc(inv.invoiceNo)}</b>${inv.erpRef?`<small>ERP: ${miEsc(inv.erpRef)}</small>`:''}</td>
       <td>${miEsc(inv.invoiceDate||'')}</td>
@@ -26923,6 +26927,7 @@ window.miViewInvoice=function(id){
   miRender();
 };
 
+window.miRequestEdit=function(id){return miOpenInvoice(id)};
 window.miOpenInvoice=function(id){
   const inv=miInvoice(id);
   if(!inv)return;
@@ -26930,6 +26935,11 @@ window.miOpenInvoice=function(id){
     return miViewInvoice(id);
   }
   if(!miCan('manual_invoice_create'))return requirePerm('manual_invoice_create','edit manual invoices');
+  const admins=(state.users||[]).filter(u=>u&&u.role==='admin'&&u.active!==false&&typeof u.password==='string'&&u.password.length);
+  if(!admins.length)return toast('No active admin account configured for edit authorization');
+  const pwd=prompt('Administrator password required to EDIT manual invoice '+(inv.invoiceNo||'')+':');
+  if(pwd===null)return;
+  if(!admins.some(u=>u.password===pwd))return toast('Incorrect administrator password');
   miEditingId=id;
   miViewingId='';
   miDraftPayments=(inv.payments||[]).map(x=>({...x}));
@@ -26959,7 +26969,7 @@ function miViewerHTML(){
           <p>${miEsc(inv.customerName)} • ${miEsc(inv.invoiceDate||'')}</p>
         </div>
         <div class="mi-actions">
-          ${!updated&&miCan('manual_invoice_create')?`<button class="btn amber" onclick="miOpenInvoice('${inv.id}')">Edit Invoice</button>`:''}
+          ${!updated&&miCan('manual_invoice_create')?`<button class="btn amber" onclick="miRequestEdit('${inv.id}')">Edit Invoice</button>`:''}
           <button class="btn ghost" onclick="miPrintInvoice('${inv.id}')">Download / PDF</button>
           ${!updated&&miCan('manual_invoice_finalize')?`<button class="btn green" onclick="miMarkERPUpdatedById('${inv.id}')">ERP Updated</button>`:''}
           <button class="btn ghost" onclick="miGo('${updated?'updated':'history'}')">Back</button>
@@ -27030,6 +27040,9 @@ function miEditorHTML(){
         <div class="mi-card-head"><h3>Items</h3>${canEdit?'<button class="btn primary sm" onclick="miAddItem()">+ Add Item</button>':''}</div>
         <div class="mi-item-head"><span>Item Code</span><span>Description</span><span>Qty</span><span>Unit Price</span><span>Amount</span><span></span></div>
         <div id="miItems"></div>
+        <label class="mi-vat-check"><input type="checkbox" id="miVatEnabled" onchange="miRefreshEditor()" ${locked?'disabled':''}> Apply 18% VAT to item subtotal</label>
+        <div class="mi-total-row">Subtotal: <b id="miEditorSubtotal">Rs. 0.00</b></div>
+        <div class="mi-total-row">VAT (18%): <b id="miEditorVat">Rs. 0.00</b></div>
         <div class="mi-total-row">Invoice Total: <b id="miEditorTotal">Rs. 0.00</b></div>
       </div>
 
@@ -27075,6 +27088,7 @@ function miAfterEditorRender(){
   mi$('miInvoiceDate').value=inv?.invoiceDate||miToday();
   mi$('miSupplyDate').value=inv?.supplyDate||miToday();
   mi$('miAdditional').value=inv?.additionalInfo||'';
+  mi$('miVatEnabled').checked=!!inv?.vatEnabled;
   mi$('miPaymentMode').value=inv?.paymentMode||'Cash / Card / Bank Transfer';
   mi$('miErpCustomerId').value=inv?.erpCustomerId||miSelectedErpCustomer?.id||'';
   mi$('miErpCustomerCode').value=inv?.erpCustomerCode||miSelectedErpCustomer?.code||'';
@@ -27115,6 +27129,7 @@ function miDraft(){
     invoiceDate:mi$('miInvoiceDate')?.value||'',
     supplyDate:mi$('miSupplyDate')?.value||'',
     additionalInfo:String(mi$('miAdditional')?.value||'').trim(),
+    vatEnabled:!!mi$('miVatEnabled')?.checked,
     paymentMode:String(mi$('miPaymentMode')?.value||'').trim(),
     erpCustomerId:String(mi$('miErpCustomerId')?.value||'').trim(),
     erpCustomerCode:String(mi$('miErpCustomerCode')?.value||'').trim(),
@@ -27158,6 +27173,8 @@ window.miRefreshEditor=function(){
     const a=r.querySelector('.mi-it-amount');if(a)a.value=miMoney(amount);
   });
   const inv=miDraft();
+  if(mi$('miEditorSubtotal'))mi$('miEditorSubtotal').textContent='Rs. '+miMoney(miSubtotal(inv));
+  if(mi$('miEditorVat'))mi$('miEditorVat').textContent='Rs. '+miMoney(miVatAmount(inv));
   if(mi$('miEditorTotal'))mi$('miEditorTotal').textContent='Rs. '+miMoney(miTotal(inv));
   if(mi$('miPaidDisplay'))mi$('miPaidDisplay').value='Rs. '+miMoney(miPaid(inv));
   if(mi$('miBalanceDisplay'))mi$('miBalanceDisplay').value='Rs. '+miMoney(miBalance(inv));
@@ -27216,7 +27233,8 @@ window.miSaveInvoice=async function(silent=false){
     supplier_bill_ref:inv.supplierBill,courier_ref:inv.courierRef,erp_ref:inv.erpRef,
     internal_note:inv.internalNote,
     user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},
-    lines:inv.items.map((x,i)=>({line_no:i+1,item_code:x.code,description:x.desc,qty:x.qty,unit_price:x.unitPrice})),
+    lines:[...inv.items.map((x,i)=>({line_no:i+1,item_code:x.code,description:x.desc,qty:x.qty,unit_price:x.unitPrice})),
+      ...(inv.vatEnabled?[{line_no:inv.items.length+1,item_code:MI_VAT_CODE,description:'VAT 18% (calculated)',qty:1,unit_price:miVatAmount(inv)}]:[])],
     payments:inv.payments.map(x=>({payment_date:x.date,amount:x.amount,method:x.method,reference_note:x.note||''}))
   };
   try{
@@ -27418,7 +27436,7 @@ function miAmountWords(n){n=miNum(n);let ru=Math.floor(n+1e-9),cents=Math.round(
 function miRenderInvoice(inv,hostId){
   const host=mi$(hostId);if(!host)return;
 
-  const total=miTotal(inv),paid=miPaid(inv),bal=miBalance(inv);
+  const total=miTotal(inv),subtotal=miSubtotal(inv),vat=miVatAmount(inv),paid=miPaid(inv),bal=miBalance(inv);
   const rawAddress=String(inv.customerAddress||'').trim();
   const addressLines=rawAddress
     ? rawAddress.split(/\n/).reduce((n,line)=>n+Math.max(1,Math.ceil(String(line||'').length/34)),0)
@@ -27557,6 +27575,8 @@ function miRenderInvoice(inv,hostId){
 
       ${isLast?`
         <div class="mi-ex-summary mi-ex-summary-paged" style="top:${summaryTop}pt">
+          <div class="mi-ex-sumrow"><div>Value of Supply (Excl. VAT)</div><div class="v">${miMoney(subtotal)}</div></div>
+          ${inv.vatEnabled?`<div class="mi-ex-sumrow"><div>VAT 18%</div><div class="v">${miMoney(vat)}</div></div>`:''}
           <div class="mi-ex-sumrow"><div>Total Value of Supply</div><div class="v">${miMoney(total)}</div></div>
           <div class="mi-ex-sumrow"><div>Advance Paid</div><div class="v">${miMoney(paid)}</div></div>
           <div class="mi-ex-sumrow"><div>Balance Payment</div><div class="v">${miMoney(bal)}</div></div>
