@@ -27784,10 +27784,14 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
 
     if(row.source==='system'){
       if(input)input.value=row.name||'';
-      if(select){
-        select.value=row.id;
-        select.dispatchEvent(new Event('change',{bubbles:true}));
-      }
+
+if(select){
+  refreshCustomerPick();
+  select.value=String(row.id);
+  select.dispatchEvent(new Event('change',{bubbles:true}));
+  fillCustomer(String(row.id));
+}
+
       if(source){
         source.innerHTML=`<span class="system">SYSTEM CUSTOMER</span>${e(row.phone||'')}`;
       }
@@ -27846,12 +27850,11 @@ if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
           (state.customers||[]).map(x=>`<option value="${e(x.id)}">${e(x.name)}</option>`).join('');
       }
     }
-
-    if(select){
-      select.value=local.id;
-      select.dispatchEvent(new Event('change',{bubbles:true}));
-    }
-
+if(select){
+  select.value=String(local.id);
+  select.dispatchEvent(new Event('change',{bubbles:true}));
+  fillCustomer(String(local.id));
+}
     if(input)input.value=local.name||'';
 
     if(source){
