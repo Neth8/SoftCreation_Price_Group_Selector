@@ -20143,6 +20143,13 @@ window.toggleBpSeparateDeliveryButton = function(){
             Math.max(...validPitches)-Math.min(...validPitches)<0.00001 ? validPitches[0] : 0;
           modal.dataset.packingWastePitchMmV2026=String(commonPitch||0);
           modal.dataset.packingWastePcsV2026=String(Number(g.pcs||0));
+          // Physical source: total JBR input area / maximum whole finished rolls.
+          // Different JBR widths are supported. Do not use finished roll width here.
+          const validAreaRows=(stats.rows||[]).filter(x=>Number(x.jbrWidth)>0&&Number(x.jbrLengthM)>0&&Number(x.theoreticalRolls)>0);
+          const allAreaValid=validAreaRows.length===(stats.rows||[]).length && validAreaRows.length>0;
+          const jbrAreaSqm=allAreaValid?validAreaRows.reduce((sum,x)=>sum+Number(x.jbrWidth)*Number(x.jbrLengthM)/1000,0):0;
+          modal.dataset.jbrWasteInputSqmV2026=String(jbrAreaSqm);
+          modal.dataset.jbrWasteMaxRollsV2026=String(allAreaValid?stats.theoretical:0);
           if(typeof window.updatePackingLiveV1057==='function')window.updatePackingLiveV1057();
           const notice=modal.querySelector('.notice');
           if(notice){
@@ -20287,9 +20294,13 @@ window.toggleBpSeparateDeliveryButton = function(){
     const core=window.packingCoreCalcV1057(total,g);
     const pitchMm=Number(modal.dataset.packingWastePitchMmV2026||0);
     const pcsPerRoll=Number(modal.dataset.packingWastePcsV2026||g?.pcs||0);
-    const rollLengthM=pitchMm>0&&pcsPerRoll>0?pitchMm*pcsPerRoll/1000:null;
-    const wasteSqm=rollLengthM!==null&&core.rollWidthMm>0?
-      unpacked*core.rollWidthMm*rollLengthM/1000:null;
+    // Calculate from JBR material input, NOT the finished label-roll width.
+    // This measures unused / lost *material equivalent* against physical capacity.
+    const jbrInputSqm=Number(modal.dataset.jbrWasteInputSqmV2026||0);
+    const jbrPhysicalMax=Number(modal.dataset.jbrWasteMaxRollsV2026||0);
+    const sqMPerRoll=jbrInputSqm>0&&jbrPhysicalMax>0?jbrInputSqm/jbrPhysicalMax:null;
+    const remainingRollEquivalent=Math.max(0,jbrPhysicalMax-total);
+    const wasteSqm=sqMPerRoll!==null?remainingRollEquivalent*sqMPerRoll:null;
     const wasteSqmText=wasteSqm===null?'Not available':wasteSqm.toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3})+' m²';
 
     const grand=$('packGrand');
@@ -20319,7 +20330,7 @@ window.toggleBpSeparateDeliveryButton = function(){
         <div><span>Unproduced Length Equivalent</span><b>${jumboLength>0?meterEquivalent.toFixed(2)+' m':'—'}</b><small>estimate only; confirm scrap vs reusable material</small></div>
         <div class="${variance<0?'shortage':variance>0?'over':''}"><span>Production Variance</span><b>${variance>0?'+':''}${money(variance)}</b><small>${varianceText}</small></div>
         <div><span>Count Reconciliation</span><b>${money(total)} / ${money(actualReceived)}</b><small>${total===actualReceived?'fully reconciled':`${money(Math.abs(actualReceived-total))} roll difference`}</small></div>
-        <div class="packing-waste-indicator-v2026 pack-waste-sqm-live-v2026"><span>Packing Wastage — Estimated Area</span><b>${wasteSqmText}</b><small>${money(unpacked)} rolls difference · Actual Received − Packed Total</small><small>${wasteSqm===null?'Requires matching JBR pitch, pieces/roll and finished roll width':`${core.rollWidthMm} mm width × ${rollLengthM.toFixed(3)} m/roll`} · Count variance until scrap is confirmed</small></div>`;
+        <div class="packing-waste-indicator-v2026 pack-waste-sqm-live-v2026"><span>Potential Material Wastage — JBR Based</span><b>${wasteSqmText}</b><small>${money(remainingRollEquivalent)} roll equivalent · JBR maximum ${money(jbrPhysicalMax)} − packed ${money(total)}</small><small>${sqMPerRoll===null?'Needs valid JBR width, length, and maximum rolls':`${sqMPerRoll.toFixed(4)} m² per roll · JBR input ${jbrInputSqm.toFixed(3)} m²`} · Includes unproduced or reusable material; verify before classifying as scrap</small></div>`;
     }
 
     if($('packCoreSummaryV1057')){
@@ -21362,18 +21373,16 @@ window.toggleBpSeparateDeliveryButton = function(){
 
   /* The packing batch note stores the variance without changing the existing Supabase table schema. */
   function packingWasteV2026(p,r,jbrRows){
-    if(!p)return {rolls:0,sqm:null,rollLengthM:null,source:'No packing batch'};
-    const actual=Number(p.actual_received_rolls);
+    if(!p)return {rolls:0,sqm:null,sqmPerRoll:null,source:'No packing batch'};
     const packed=Number(p.packed_total);
-    const valid=Number.isFinite(actual)&&Number.isFinite(packed)&&actual>=0&&packed>=0;
-    const rolls=valid?Math.max(0,actual-packed):0;
-    const pitches=(jbrRows||[]).map(j=>Number(j.pitch_mm)||((Number(j.label_height_mm)||0)+(Number(j.gap_mm)||0))).filter(v=>v>0);
-    const pitch=pitches.length&&Math.max(...pitches)-Math.min(...pitches)<0.00001?pitches[0]:0;
-    const pcs=Number(p.pcs_per_roll||r?.pcs||0);
-    const width=Number(p.roll_width_mm||rollWidthV1060(r)||0);
-    const rollLengthM=pitch>0&&pcs>0?pcs*pitch/1000:null;
-    return {rolls,rollLengthM,sqm:rollLengthM!=null&&width>0?rolls*rollLengthM*width/1000:null,
-      source:pitches.length>1&&!pitch?'Mixed JBR pitch; cannot estimate reliably':!pitch?'JBR pitch unavailable':'Estimated using finished-roll width × pcs/roll × JBR pitch'};
+    const rows=Array.isArray(jbrRows)?jbrRows:[];
+    const valid=rows.length>0&&rows.every(j=>Number(j.jbr_width_mm)>0&&Number(j.jbr_length_m)>0&&Number(j.theoretical_rolls)>0);
+    const maxRolls=valid?rows.reduce((sum,j)=>sum+Number(j.theoretical_rolls),0):0;
+    const inputSqm=valid?rows.reduce((sum,j)=>sum+Number(j.jbr_width_mm)*Number(j.jbr_length_m)/1000,0):0;
+    const sqmPerRoll=maxRolls>0?inputSqm/maxRolls:null;
+    const rolls=Number.isFinite(packed)&&packed>=0?Math.max(0,maxRolls-packed):0;
+    return {rolls,maxRolls,inputSqm,sqmPerRoll,sqm:sqmPerRoll!==null&&Number.isFinite(packed)&&packed>=0?rolls*sqmPerRoll:null,
+      source:!valid?'JBR width / calculated length / max-roll record incomplete':'JBR input m² ÷ maximum rolls; potential variance, not confirmed scrap'};
   }
 
   function usageForJobV1060(r){
@@ -21495,7 +21504,7 @@ window.toggleBpSeparateDeliveryButton = function(){
               <div><span>Finished</span><b>${money(x.produced)}</b></div>
               <div><span>JBR Actual Cut</span><b>${money(x.jbrActual)}</b></div>
               <div><span>JBR Productive Length</span><b>${money((x.jbrSet.rows||[]).reduce((n,j)=>n+jbrMeasuredV1061(j,r).productiveLengthM,0))} m</b></div>
-              <div class="packing-waste-finance-v2026"><span>Packing Waste / Difference</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"m² unavailable":money(x.packingWaste.sqm)+" m² (estimated)"}</small></div>
+              <div class="packing-waste-finance-v2026"><span>Potential JBR Material Variance</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"m² unavailable":money(x.packingWaste.sqm)+" m² (JBR-based potential)"}</small></div>
               <div><span>Core Used</span><b>${money(x.coreMm)} mm</b></div>
               <div><span>Dispatched</span><b>${money(x.dispatched)}</b></div>
             </div>
@@ -21616,13 +21625,13 @@ window.toggleBpSeparateDeliveryButton = function(){
           <div><span>Requested</span><b>${money(r.requestQty||0)} ${esc(r.unit||'')}</b></div>
           <div><span>Finished / Recorded</span><b>${money(x.produced)}</b></div>
           <div><span>Job Packed Allocation</span><b>${money(x.packedAllocated)}</b></div>
-          <div class="packing-waste-finance-v2026"><span>Packing Waste / Difference</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"Area estimate unavailable — verify JBR pitch":money(x.packingWaste.sqm)+" m² estimated"}</small></div>
+          <div class="packing-waste-finance-v2026"><span>Potential JBR Material Variance</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"Area estimate unavailable — verify JBR pitch":money(x.packingWaste.sqm)+" m² JBR-based potential"}</small></div>
           <div><span>Dispatched</span><b>${money(x.dispatched)}</b></div>
           <div><span>Dispatch Balance</span><b>${money(x.dispatchBalance)}</b></div>
           <div><span>Priority / Shift</span><b>${esc(r.priority||'-')} / ${esc(r.shift||'-')}</b></div>
         </div>
 
-        <div class="notice">Packing count difference = Actual Received − Packed Total. The estimated m² uses finished roll width × calculated roll length. It is a count variance until physical scrap is confirmed, not an additional JBR loss; do not double-count.</div>
+        <div class="notice">JBR-based potential material variance = (JBR maximum full rolls − packed rolls) × (combined JBR input m² ÷ combined maximum rolls). This includes unproduced/reusable material and is not confirmed scrap. Do not double-count JBR cutting waste.</div>
         <div class="section">JBR USAGE</div>
         <div class="usage-scope-note-v1060">${esc(x.jbrSet.scope)}. New JBR records are linked to the source production jobs; older JBR records may only be identifiable at consolidated product-batch level.</div>
         ${jbrRows.length?`
@@ -21732,7 +21741,7 @@ window.toggleBpSeparateDeliveryButton = function(){
           <div><span>Latest Batch Loose</span><b>${money(latestPack?.loose_rolls||0)}</b></div>
           <div><span>Latest Batch Packed Total</span><b>${money(latestPack?.packed_total||0)}</b></div>
           <div><span>Actual Received</span><b>${money(latestPack?.actual_received_rolls||0)}</b></div>
-          <div class="packing-waste-finance-v2026"><span>Unpacked Difference / Potential Waste</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"Area not available":money(x.packingWaste.sqm)+" m² estimated"}</small></div>
+          <div class="packing-waste-finance-v2026"><span>Potential JBR Material Variance</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"Area not available":money(x.packingWaste.sqm)+" m² JBR-based potential"}</small></div>
           <div><span>QC Result</span><b>${esc(latestPack?.qc_result||'-')}</b></div>
         </div>
         ${batchBoxes.length?`<div class="tablewrap"><table class="table usage-table-v1060"><thead><tr><th>Batch Box</th><th>Rolls</th><th>Note</th></tr></thead><tbody>${batchBoxes.map((b,i)=>`<tr><td>${esc(String(b.box_no??b.boxNo??i+1))}</td><td>${money(Number(b.roll_count??b.rolls??0))}</td><td>${esc(String(b.note||''))}</td></tr>`).join('')}</tbody></table></div>`:''}
