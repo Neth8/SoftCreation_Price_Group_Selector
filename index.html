@@ -26806,10 +26806,11 @@ function miInvoiceObject(row){
 }
 const MI_VAT_CODE='__SC_MANUAL_VAT_18__';
 function miSubtotal(inv){return (inv.items||[]).reduce((sum,i)=>sum+miNum(i.qty)*miNum(i.unitPrice),0)}
-function miVatAmount(inv){return inv.vatEnabled?Math.round((miSubtotal(inv)*0.18+Number.EPSILON)*100)/100:0}
+function miVatAmount(inv){return inv.vatEnabled?Math.round((miSubtotal(inv)*18/118+Number.EPSILON)*100)/100:0}
+function miNetAmount(inv){return Math.round((miSubtotal(inv)-miVatAmount(inv)+Number.EPSILON)*100)/100}
 function miInvoices(){return miDb.invoices.map(miInvoiceObject)}
 function miInvoice(id){const r=miDb.invoices.find(x=>x.id===id);return r?miInvoiceObject(r):null}
-function miTotal(inv){return Math.round((miSubtotal(inv)+miVatAmount(inv)+Number.EPSILON)*100)/100}
+function miTotal(inv){return Math.round((miSubtotal(inv)+Number.EPSILON)*100)/100}
 function miPaid(inv){return (inv.payments||[]).reduce((s,p)=>s+miNum(p.amount),0)}
 function miBalance(inv){return Math.max(0,miTotal(inv)-miPaid(inv))}
 function miPayStatus(inv){const t=miTotal(inv),p=miPaid(inv);return p<=0?'Unpaid':p+0.005>=t?'Paid':'Partially Paid'}
@@ -27016,16 +27017,16 @@ function miEditorHTML(){
       </div>
 
       <div class="mi-card">
-        <h3>ERP Customer</h3>
+        <h3>Customer — ERP + System</h3>
         <div class="mi-erp-customer-wrap">
           <div class="field">
-            <label>Search ERP Customer *</label>
+            <label>Search ERP / System Customer *</label>
             <input id="miCustomerSearch" autocomplete="off" placeholder="Type customer name, email or phone..." oninput="miCustomerType(this.value)" onfocus="miCustomerFocus()" ${locked?'disabled':''}>
             <div id="miCustomerSuggestions" class="mi-customer-suggestions"></div>
           </div>
           <div id="miCustomerSelected" class="mi-selected-customer"></div>
         </div>
-        <div id="miCustomerDocuments" class="mi-customer-documents"><div class="mi-muted">Select an ERP customer to view related quotations, pro formas and sales orders.</div></div>
+        <div id="miCustomerDocuments" class="mi-customer-documents"><div class="mi-muted">Select a customer to view related quotations, pro formas and sales orders.</div></div>
         <input id="miErpCustomerId" type="hidden"><input id="miErpCustomerCode" type="hidden">
         <div class="mi-grid2 mi-gap-top">
           <div class="field"><label>Customer Name *</label><input id="miCustomerName" readonly></div>
@@ -27041,8 +27042,8 @@ function miEditorHTML(){
         <div class="mi-card-head"><h3>Items</h3>${canEdit?'<button class="btn primary sm" onclick="miAddItem()">+ Add Item</button>':''}</div>
         <div class="mi-item-head"><span>Item Code</span><span>Description</span><span>Qty</span><span>Unit Price</span><span>Amount</span><span></span></div>
         <div id="miItems"></div>
-        <label class="mi-vat-check"><input type="checkbox" id="miVatEnabled" onchange="miRefreshEditor()" ${locked?'disabled':''}> Apply 18% VAT to item subtotal</label>
-        <div class="mi-total-row">Subtotal: <b id="miEditorSubtotal">Rs. 0.00</b></div>
+        <label class="mi-vat-check"><input type="checkbox" id="miVatEnabled" onchange="miRefreshEditor()" ${locked?'disabled':''}> Show included VAT (18/118 of VAT-inclusive item prices)</label>
+        <div class="mi-total-row">Value excluding VAT: <b id="miEditorSubtotal">Rs. 0.00</b></div>
         <div class="mi-total-row">VAT (18%): <b id="miEditorVat">Rs. 0.00</b></div>
         <div class="mi-total-row">Invoice Total: <b id="miEditorTotal">Rs. 0.00</b></div>
       </div>
@@ -27113,7 +27114,7 @@ function miAfterEditorRender(){
   miRenderPayments();
   miRenderSelectedCustomer();
   miRenderCustomerDocs();
-  if(inv?.erpCustomerId)miLoadAddresses(inv.erpCustomerId,inv.customerAddress);
+  if(inv?.erpCustomerId){const local=(state.customers||[]).find(c=>String(c.id)===String(inv.erpCustomerId));if(local){const pick=mi$('miCustomerAddressPick');if(pick)pick.innerHTML='<option value="0">System customer billing address</option>';}else miLoadAddresses(inv.erpCustomerId,inv.customerAddress);}
   miRefreshEditor();
 }
 window.miAddItem=function(item={code:'',desc:'',qty:1,unitPrice:0},refresh=true){
@@ -27159,8 +27160,8 @@ function miDraft(){
 function miValidate(inv){
   if(!inv.invoiceNo)return 'Invoice number is required.';
   if(!inv.invoiceDate||!inv.supplyDate)return 'Invoice date and supply date are required.';
-  if(!inv.erpCustomerId)return 'Select the customer from ERP search.';
-  if(!inv.customerName||!inv.customerAddress)return 'ERP customer name and invoice address are required.';
+  if(!inv.erpCustomerId)return 'Select a customer from ERP or System search.';
+  if(!inv.customerName||!inv.customerAddress)return 'Customer name and invoice address are required.';
   if(!inv.items.length)return 'Add at least one item.';
   for(const i of inv.items)if(!i.desc||i.qty<=0||i.unitPrice<0)return 'Each item needs description, quantity and a valid unit price.';
   const duplicate=miInvoices().find(x=>x.invoiceNo.toLowerCase()===inv.invoiceNo.toLowerCase()&&x.id!==miEditingId);
@@ -27175,7 +27176,7 @@ window.miRefreshEditor=function(){
     const a=r.querySelector('.mi-it-amount');if(a)a.value=miMoney(amount);
   });
   const inv=miDraft();
-  if(mi$('miEditorSubtotal'))mi$('miEditorSubtotal').textContent='Rs. '+miMoney(miSubtotal(inv));
+  if(mi$('miEditorSubtotal'))mi$('miEditorSubtotal').textContent='Rs. '+miMoney(miNetAmount(inv));
   if(mi$('miEditorVat'))mi$('miEditorVat').textContent='Rs. '+miMoney(miVatAmount(inv));
   if(mi$('miEditorTotal'))mi$('miEditorTotal').textContent='Rs. '+miMoney(miTotal(inv));
   if(mi$('miPaidDisplay'))mi$('miPaidDisplay').value='Rs. '+miMoney(miPaid(inv));
@@ -27236,7 +27237,7 @@ window.miSaveInvoice=async function(silent=false){
     internal_note:inv.internalNote,
     user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},
     lines:[...inv.items.map((x,i)=>({line_no:i+1,item_code:x.code,description:x.desc,qty:x.qty,unit_price:x.unitPrice})),
-      ...(inv.vatEnabled?[{line_no:inv.items.length+1,item_code:MI_VAT_CODE,description:'VAT 18% (calculated)',qty:1,unit_price:miVatAmount(inv)}]:[])],
+      ...(inv.vatEnabled?[{line_no:inv.items.length+1,item_code:MI_VAT_CODE,description:'VAT 18% included (breakdown only)',qty:1,unit_price:0}]:[])],
     payments:inv.payments.map(x=>({payment_date:x.date,amount:x.amount,method:x.method,reference_note:x.note||''}))
   };
   try{
@@ -27354,7 +27355,7 @@ function miSourceItem(line){
 window.miRenderCustomerDocs=function(){
   const host=mi$('miCustomerDocuments');if(!host)return;
   const docs=miGetCustomerDocs();
-  if(!mi$('miErpCustomerId')?.value&&!mi$('miCustomerName')?.value){host.innerHTML='<div class="mi-muted">Select an ERP customer to view related documents.</div>';return;}
+  if(!mi$('miErpCustomerId')?.value&&!mi$('miCustomerName')?.value){host.innerHTML='<div class="mi-muted">Select a customer to view related documents.</div>';return;}
   const categories=[{key:'quote',title:'Quotations'},{key:'pi',title:'Pro Forma Invoices'},{key:'so',title:'Sales Orders'}];
   const sections=categories.map(cat=>{
     const subset=docs.map((d,index)=>({d,index})).filter(x=>x.d.group===cat.key);
@@ -27392,26 +27393,42 @@ window.miCustomerType=function(value){
     miHideCustomerSuggestions();
     return;
   }
+  miCustomerSeq++;
+  miShowCustomerResults(miSystemCustomerRows(q));
   miCustomerTimer=setTimeout(()=>miLoadCustomers(q),300);
 };
+function miSystemCustomerRows(q){
+  const term=String(q||'').trim().toLowerCase();
+  return (state.customers||[]).filter(c=>{
+    const fields=[c.name,c.phone,c.email,c.id,c.code].map(v=>String(v||'').toLowerCase());
+    return fields.some(v=>v.includes(term));
+  }).slice(0,20).map(c=>({
+    id:String(c.id||''),code:String(c.code||''),name:String(c.name||''),
+    phone:String(c.phone||''),email:String(c.email||''),
+    tin:String(c.tin||c.vat||''),address:String(c.address||''),
+    delivery:String(c.delivery||''),source:'system'
+  }));
+}
+function miShowCustomerResults(rows,error=''){
+  const box=mi$('miCustomerSuggestions');if(!box)return;
+  miCustomerRows=rows;
+  box.innerHTML=rows.length?rows.map((c,i)=>`<button type="button" class="mi-customer-option" onclick="miSelectCustomer(${i})"><b>${miEsc(c.name||'-')}</b><span>${miEsc(c.phone||'No phone')} ${c.email?'• '+miEsc(c.email):''}</span><small>${c.source==='system'?'SYSTEM':'ERP'} • ID: ${miEsc(c.id||'-')}</small></button>`).join(''):(error?`<div class="mi-customer-message error">${miEsc(error)}</div>`:'<div class="mi-customer-message">No matching customer found.</div>');
+  box.classList.add('show');
+}
 async function miLoadCustomers(q){
   const seq=++miCustomerSeq;
-  const box=mi$('miCustomerSuggestions');
-  box.innerHTML='<div class="mi-customer-message">Searching ERP customers...</div>';
-  box.classList.add('show');
+  const local=miSystemCustomerRows(q);
+  miShowCustomerResults(local);
   try{
     const r=await miEdge({action:'search',q,limit:12});
     if(seq!==miCustomerSeq)return;
-    miCustomerRows=Array.isArray(r?.customers)?r.customers:[];
-    box.innerHTML=miCustomerRows.length?miCustomerRows.map((c,i)=>`
-      <button type="button" class="mi-customer-option" onclick="miSelectCustomer(${i})">
-        <b>${miEsc(c.name||'-')}</b>
-        <span>${miEsc(c.phone||'No phone')} ${c.email?'• '+miEsc(c.email):''}</span>
-        <small>ERP ID: ${miEsc(c.id||'-')}${c.code?' • '+miEsc(c.code):''}</small>
-      </button>`).join(''):'<div class="mi-customer-message">No matching ERP customer found.</div>';
+    const remote=(Array.isArray(r?.customers)?r.customers:[]).map(c=>({...c,source:'erp'}));
+    const ids=new Set(local.map(c=>String(c.id)));
+    miShowCustomerResults([...local,...remote.filter(c=>!ids.has(String(c.id)))]);
   }catch(e){
-    console.error(e);
-    box.innerHTML=`<div class="mi-customer-message error">${miEsc(e.message)}</div>`;
+    if(seq!==miCustomerSeq)return;
+    console.error('ERP customer lookup:',e);
+    miShowCustomerResults(local,local.length?'':('ERP search unavailable: '+(e.message||'unknown error')));
   }
 }
 window.miCustomerFocus=function(){
@@ -27420,6 +27437,7 @@ window.miCustomerFocus=function(){
 function miHideCustomerSuggestions(){mi$('miCustomerSuggestions')?.classList.remove('show')}
 window.miSelectCustomer=async function(i){
   const c=miCustomerRows[i];if(!c)return;
+  miCustomerSeq++;clearTimeout(miCustomerTimer);
   miSelectedErpCustomer=c;
   mi$('miErpCustomerId').value=String(c.id||'');
   mi$('miErpCustomerCode').value=String(c.code||c.customer_id||'');
@@ -27431,13 +27449,18 @@ window.miSelectCustomer=async function(i){
   miHideCustomerSuggestions();
   miRenderSelectedCustomer();
   miRenderCustomerDocs();
-  await miLoadAddresses(c.id,'');
+  if(c.source==='system'){
+    const address=String(c.address||c.delivery||'').trim();
+    const pick=mi$('miCustomerAddressPick');
+    if(pick){pick.innerHTML='<option value="0">System customer billing address</option>';pick.dataset.rows='';}
+    mi$('miCustomerAddress').value=address;
+  }else{await miLoadAddresses(c.id,'');}
   miRefreshEditor();
 };
 function miRenderSelectedCustomer(){
   const box=mi$('miCustomerSelected');if(!box)return;
   const c=miSelectedErpCustomer;
-  box.innerHTML=c?.id?`<div><span>ERP CUSTOMER SELECTED</span><b>${miEsc(c.name||'')}</b><small>ID ${miEsc(c.id)}${c.code?' • '+miEsc(c.code):''}</small></div><strong>LIVE ERP</strong>`:'<div class="mi-muted">Select the customer from ERP suggestions.</div>';
+  box.innerHTML=c?.id?`<div><span>${c.source==='system'?'SYSTEM CUSTOMER SELECTED':'ERP CUSTOMER SELECTED'}</span><b>${miEsc(c.name||'')}</b><small>ID ${miEsc(c.id)}${c.code?' • '+miEsc(c.code):''}</small></div><strong>${c.source==='system'?'SYSTEM':'LIVE ERP'}</strong>`:'<div class="mi-muted">Select the customer from ERP suggestions.</div>';
 }
 async function miLoadAddresses(customerId,preferred){
   const select=mi$('miCustomerAddressPick');if(!select)return;
@@ -27500,7 +27523,7 @@ function miAmountWords(n){n=miNum(n);let ru=Math.floor(n+1e-9),cents=Math.round(
 function miRenderInvoice(inv,hostId){
   const host=mi$(hostId);if(!host)return;
 
-  const total=miTotal(inv),subtotal=miSubtotal(inv),vat=miVatAmount(inv),paid=miPaid(inv),bal=miBalance(inv);
+  const total=miTotal(inv),subtotal=miNetAmount(inv),vat=miVatAmount(inv),paid=miPaid(inv),bal=miBalance(inv);
   const rawAddress=String(inv.customerAddress||'').trim();
   const addressLines=rawAddress
     ? rawAddress.split(/\n/).reduce((n,line)=>n+Math.max(1,Math.ceil(String(line||'').length/34)),0)
