@@ -7511,3 +7511,19 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .mi-source-columns .mi-source-line>span{min-width:0;overflow-wrap:anywhere;flex:1 1 130px}
 .mi-source-columns .mi-source-line>button{flex:0 0 auto}
 @media(max-width:1050px){.mi-source-columns{grid-template-columns:repeat(3,minmax(245px,1fr));overflow-x:auto;align-items:stretch;padding-bottom:5px}}
+
+/* Production Control: manager approval queue, 2026-10-28 */
+.pc-approval-dashboard{margin-bottom:14px}
+.pc-approval-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(265px,1fr));gap:10px;margin-top:12px}
+.pc-approval-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #d6e4e7;border-radius:12px;background:#fbfdfd;min-width:0}
+.pc-approval-entry.selected{border-color:#079b9c;background:#eefbfa}
+.pc-approval-entry>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pc-approval-entry b{font-size:13px;overflow-wrap:anywhere}
+.pc-approval-entry small,.pc-approval-entry span{font-size:11px;color:#647986}
+.pc-approval-entry .btn{flex-shrink:0}
+.pc-approval-empty{padding:15px;color:#607580;background:#f4f8f8;border-radius:10px;grid-column:1/-1}
+.pc-approval-actions{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:13px 15px;background:#f0faf6;border:1px solid #bce3ca;border-radius:12px;margin:12px 0}
+.pc-approval-actions>div{display:flex;gap:8px;flex-wrap:wrap}
+.pc-approval-actions strong{color:#126a45;font-size:13px}
+#pcPendingCount{font-size:11px;opacity:.85}
+@media(max-width:650px){.pc-approval-list{grid-template-columns:1fr}.pc-approval-entry{align-items:flex-start;flex-direction:column}.pc-approval-actions>div{width:100%}}

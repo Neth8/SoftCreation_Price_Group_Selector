@@ -26269,7 +26269,7 @@ function pcInstallUI(){
   if(nav){const b=document.createElement('button');b.className='navbtn';b.dataset.view='productioncontrol';b.textContent='Production Control';b.onclick=()=>showView('productioncontrol');nav.insertBefore(b,before||null)}
   const section=document.createElement('section');section.id='productioncontrol';section.className='view';section.innerHTML=`
     <div class="panel pc-shell"><div class="panel-title pc-title"><div><span>Production Control</span><small>SC HO planning → Manager approval → existing Products execution</small></div><button class="btn sm pc-refresh" onclick="pcRefresh(true)">Refresh Live Data</button></div>
-    <div class="panel-body"><div class="pc-tabs"><button data-pc-view="planner" onclick="pcGo('planner')">Production Request</button><button data-pc-view="register" onclick="pcGo('register')">Request Register</button><button data-pc-view="demand" onclick="pcGo('demand')">Demand / Sales Orders</button></div><div id="pcKpis" class="pc-kpis"></div><div id="pcBody"></div></div></div>`;
+    <div class="panel-body"><div class="pc-tabs"><button data-pc-view="planner" onclick="pcGo('planner')">Production Request</button><button data-pc-view="approvals" onclick="pcGo('approvals')">Manager Approvals <span id="pcPendingCount"></span></button><button data-pc-view="register" onclick="pcGo('register')">Request Register</button><button data-pc-view="demand" onclick="pcGo('demand')">Demand / Sales Orders</button></div><div id="pcKpis" class="pc-kpis"></div><div id="pcBody"></div></div></div>`;
   const firstModal=document.querySelector('.modal');if(firstModal)firstModal.insertAdjacentElement('beforebegin',section);else document.querySelector('.app')?.appendChild(section);
   document.body.insertAdjacentHTML('beforeend',`<div id="pcReturnModal" class="modal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><b>Return Production Request</b><button class="closex" onclick="closeModal('pcReturnModal')">×</button></div><div class="modal-body"><div class="field"><label>Return Reason</label><textarea id="pcReturnReason" placeholder="Explain what HO Stores must correct"></textarea></div><div class="actions"><button class="btn amber" onclick="pcConfirmReturn()">Return to HO Stores</button></div></div></div></div>`);
 }
@@ -26301,7 +26301,11 @@ function pcRender(){
   const plannerBtn=document.querySelector('[data-pc-view="planner"]');
   if(plannerBtn)plannerBtn.style.display=isManager?'none':'';
 
-  if(isManager&&pcView==='planner')pcView='register';
+  if(isManager&&pcView==='planner')pcView='approvals';
+  const approveTab=document.querySelector('[data-pc-view="approvals"]');
+  if(approveTab)approveTab.style.display=pcHas('production_control_approve')?'':'none';
+  const pendingCount=document.getElementById('pcPendingCount');
+  if(pendingCount)pendingCount.textContent='('+pcCloud.requests.filter(r=>r.status==='Pending Approval').length+')';
 
   document.querySelectorAll('[data-pc-view]').forEach(
     b=>b.classList.toggle('active',b.dataset.pcView===pcView)
@@ -26320,6 +26324,8 @@ function pcRender(){
 
   const body=pcView==='planner'
     ? pcPlannerHTML()
+    : pcView==='approvals'
+      ? pcApprovalsHTML()
     : pcView==='register'
       ? pcRegisterHTML()
       : pcDemandHTML();
@@ -26371,6 +26377,16 @@ window.pcSubmitRequest=async function(){
   if(role==='manager')return toast('Managers cannot create Production Control requests.');
   if(!pcHas('production_control_create'))return requirePerm('production_control_create','submit Production Control requests');if(!pcBasket.length)return toast('Add at least one item.');const due=document.getElementById('pcDue')?.value;if(!due)return toast('Choose Required at HO date.');const payload={workspace:PC_WORKSPACE,required_date:due,material_mode:document.getElementById('pcMaterial')?.value||'Factory to arrange material',reason:String(document.getElementById('pcRequestReason')?.value||'').trim(),user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},lines:pcBasket.map(x=>({item_key:x.itemKey,source_item_id:x.sourceItemId,description:x.desc,size_label:x.size,material:x.material,layout:x.layout,pcs_per_roll:x.pcs,unit:x.unit,requested_qty:x.requestedQty,so_demand_qty:x.soDemand,stock_cover_qty:x.cover,safety_stock_qty:x.safety,available_stock_qty:x.stock,pipeline_qty:x.pipeline,recommended_qty:x.recommended,override_reason:x.overrideReason,cover_weeks:x.coverWeeks,allocations:x.allocations}))};try{const r=await pcRpc('spgs_pc_create_request',{p_payload:payload});pcBasket=[];pcView='register';pcSelectedRequest=r?.id||'';await pcRefresh(false);toast(`${r?.request_no||'Production request'} submitted`)}catch(e){console.error(e);toast(e.message)}}
 
+function pcApprovalsHTML(){
+  if(!pcHas('production_control_approve'))return '<div class="pc-card">You do not have approval permission.</div>';
+  const rows=[...(pcCloud.requests||[])].filter(r=>r.status==='Pending Approval').sort((a,b)=>Date.parse(a.created_at||0)-Date.parse(b.created_at||0));
+  const approved=(pcCloud.requests||[]).filter(r=>r.status==='Approved').length;
+  const selected=rows.find(r=>r.id===pcSelectedRequest)||rows[0]||null;
+  if(selected)pcSelectedRequest=selected.id;
+  return `<div class="pc-card pc-approval-dashboard"><div class="pc-card-head"><div><h3>Manager approval queue</h3><p class="pc-muted">${rows.length} waiting for decision · ${approved} approved requests</p></div><button class="btn ghost sm" onclick="pcRefresh(true)">Refresh approvals</button></div>
+   <div class="pc-approval-list">${rows.map(r=>{const lines=pcRequestLines(r.id);const qty=lines.reduce((n,l)=>n+pcNum(l.requested_qty),0);return `<div class="pc-approval-entry ${r.id===selected?.id?'selected':''}"><div><b>${pcEsc(r.request_no||r.id)}</b><small>${pcEsc(r.created_by_display||r.created_by||'Sales')} · Required ${pcEsc(r.required_date||'-')}</small><span>${lines.length} item(s) · ${pcMoney(qty)} rolls</span></div><button class="btn primary sm" onclick="pcOpenApproval('${r.id}')">Review request</button></div>`}).join('')||'<div class="pc-approval-empty">No requests waiting for manager approval.</div>'}</div></div>${selected?pcRequestDetailHTML(selected):''}`;
+}
+window.pcOpenApproval=function(id){pcSelectedRequest=id;pcView='approvals';pcRender();document.querySelector('#pcBody .pc-detail')?.scrollIntoView({behavior:'smooth',block:'start'});};
 function pcRegisterHTML(){
   const role=String(currentUser?.role||'').toLowerCase();
   const rows=[...(pcCloud.requests||[])].sort((a,b)=>{
@@ -26387,9 +26403,9 @@ function pcRegisterHTML(){
 window.pcOpenRequest=function(id){pcSelectedRequest=id;pcRender()}
 function pcRequestDetailHTML(r){
   const lines=pcRequestLines(r.id),msgs=pcRequestMsgs(r.id),audit=pcRequestAudit(r.id),canApprove=pcHas('production_control_approve')&&r.status==='Pending Approval';
-  return `<div class="pc-card pc-detail"><div class="pc-card-head"><div><h3>${pcEsc(r.request_no)} · Evidence & Approval</h3><p>Required ${pcEsc(r.required_date||'-')} • ${pcEsc(r.material_mode||'')}</p></div><span class="pc-status ${String(r.status).toLowerCase().replace(/\s+/g,'-')}">${pcEsc(r.status)}</span></div>${r.return_reason?`<div class="notice"><b>Returned:</b> ${pcEsc(r.return_reason)}</div>`:''}
+  return `<div class="pc-card pc-detail"><div class="pc-card-head"><div><h3>${pcEsc(r.request_no)} · Evidence & Approval</h3><p>Required ${pcEsc(r.required_date||'-')} • ${pcEsc(r.material_mode||'')}</p></div><span class="pc-status ${String(r.status).toLowerCase().replace(/\s+/g,'-')}">${pcEsc(r.status)}</span></div>${canApprove?`<div class="pc-approval-actions"><strong>Manager decision required</strong><div><button class="btn green" onclick="pcApproveRequest('${r.id}')">Approve & Release to Production</button><button class="btn amber" onclick="pcOpenReturn('${r.id}')">Return with Reason</button></div></div>`:''}${r.return_reason?`<div class="notice"><b>Returned:</b> ${pcEsc(r.return_reason)}</div>`:''}
   ${lines.map(l=>`<div class="pc-line-detail"><div class="pc-card-head"><div><b>${pcEsc(pcLineLabel({desc:l.description,size:l.size_label,material:l.material,layout:l.layout,pcs:l.pcs_per_roll}))}</b><small>${pcEsc(l.item_key)}</small></div><strong>${pcMoney(l.requested_qty)} ${pcEsc(l.unit)}</strong></div><div class="pc-split"><div><h4>Linked Sales Orders · ${pcMoney(l.so_demand_qty)}</h4>${pcRequestAlloc(l.id).map(a=>`<div class="pc-message"><b>${pcEsc(a.source_so_no)}</b><span>${pcEsc(a.customer_name)} • ${pcEsc(a.required_date||'-')}</span><strong>${pcMoney(a.allocated_qty)}</strong></div>`).join('')||'<p class="pc-muted">Stock-only replenishment.</p>'}</div><div><h4>Why this quantity?</h4><p>${pcMoney(l.so_demand_qty)} SO + ${pcMoney(l.stock_cover_qty)} cover + ${pcMoney(l.safety_stock_qty)} safety − ${pcMoney(l.available_stock_qty)} stock − ${pcMoney(l.pipeline_qty)} pipeline = <b>${pcMoney(l.recommended_qty)} recommended</b></p><p>Override: ${pcEsc(l.override_reason||'None')}</p></div></div></div>`).join('')}
-  <div class="actions">${canApprove?`<button class="btn green" onclick="pcApproveRequest('${r.id}')">Approve & Release to Products</button><button class="btn amber" onclick="pcOpenReturn('${r.id}')">Return with Reason</button>`:''}</div></div>
+  </div>
   <div class="pc-split"><div class="pc-card"><h3>Stores ↔ Production Communication</h3>${msgs.map(m=>`<div class="pc-chat"><b>${pcEsc(m.created_by_display||m.created_by)}</b><small>${new Date(m.created_at).toLocaleString()}</small><p>${pcEsc(m.message)}</p></div>`).join('')||'<p class="pc-muted">No messages yet.</p>'}${pcHas('production_control_chat')?`<div class="field"><label>Message</label><textarea id="pcMessageText" placeholder="Material, priority, progress or clarification"></textarea></div><button class="btn primary sm" onclick="pcSendMessage('${r.id}')">Send Update</button>`:''}</div>
   <div class="pc-card"><h3>Audit Trail</h3>${audit.map(a=>`<div class="pc-audit"><b>${pcEsc(a.action)}</b><span>${pcEsc(a.detail||'')}</span><small>${pcEsc(a.display_name||a.username)} • ${new Date(a.created_at).toLocaleString()}</small></div>`).join('')||'<p class="pc-muted">No audit entries.</p>'}</div></div>`;
 }
@@ -26410,9 +26426,15 @@ window.pcApproveRequest=async function(id){
       p_display_name:currentUser?.display||currentUser?.username||''
     });
     await pcRefresh(false);
+    const requestAfter=pcCloud.requests.find(r=>r.id===id);
+    const releases=(pcCloud.releases||[]).filter(r=>r.request_id===id);
+    if(requestAfter?.status!=='Approved')throw new Error('Approval was submitted but the approved status could not be verified. Refresh and check request register before retrying.');
+    if(!releases.length){toast('Approved in database, but no production release was found. Check spgs_pc_transition / release processing.');return;}
+    const unprocessed=releases.filter(r=>!r.consumed_at);
+    if(unprocessed.length){toast('Approved; '+unprocessed.length+' production release(s) still pending sync. Use Refresh Live Data.');return;}
     try{renderProductionBoard?.()}catch(_){}
     try{renderProductionProducts?.()}catch(_){}
-    toast('Approved and released to Productions Summary / Products.');
+    toast('Approved and production release(s) processed. Check Production / Products.');
   }catch(e){
     console.error(e);
     toast(e.message);
