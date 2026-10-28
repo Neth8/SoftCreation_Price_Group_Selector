@@ -18032,6 +18032,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       productionVarianceRolls:productionVarianceRollsV1120,
       productionShortageRolls:Math.max(0,-productionVarianceRollsV1120),
       productionOverRolls:Math.max(0,productionVarianceRollsV1120),
+      packingWasteRolls:Math.max(0,actualReceivedRollsV1120-total),
       productKey:g.key,
       sourceJobIds:jobs.map(r=>r.id),
       packedBy:currentUser.display,
@@ -20136,6 +20137,13 @@ window.toggleBpSeparateDeliveryButton = function(){
           modal.dataset.jbrPlannedRolls=String(stats.actualCut);
           modal.dataset.jbrMaxRolls=String(stats.theoretical);
           modal.dataset.jbrProductKey=g.key;
+          // Use the same JBR pitch basis as Finance; never silently assume a pitch.
+          const validPitches=(stats.rows||[]).map(x=>Number(x.pitch||0)).filter(v=>v>0);
+          const commonPitch=validPitches.length===(stats.rows||[]).length && validPitches.length &&
+            Math.max(...validPitches)-Math.min(...validPitches)<0.00001 ? validPitches[0] : 0;
+          modal.dataset.packingWastePitchMmV2026=String(commonPitch||0);
+          modal.dataset.packingWastePcsV2026=String(Number(g.pcs||0));
+          if(typeof window.updatePackingLiveV1057==='function')window.updatePackingLiveV1057();
           const notice=modal.querySelector('.notice');
           if(notice){
             notice.insertAdjacentHTML('beforeend',`<br><b>JBR planned target:</b> ${money(stats.actualCut)} ${esc(g.unit||'Rolls')} • <b>physical maximum:</b> ${money(stats.theoretical)}. Enter the rolls actually received below; carton + loose count must match that received quantity.`);
@@ -20165,7 +20173,7 @@ window.toggleBpSeparateDeliveryButton = function(){
           const physicalMax=Math.max(0,Math.floor(Number(stats.theoretical||0)));
           if(!(actualReceived>0))return toast('Enter the Actual Rolls Received from production before saving packing.');
           if(actualReceived>physicalMax)return toast(`Actual Rolls Received cannot exceed the combined JBR Max Full Rolls. Maximum ${money(physicalMax)}, entered ${money(actualReceived)}.`);
-          if(total!==actualReceived)return toast(`Packed count must match Actual Rolls Received. Received ${money(actualReceived)}, boxes + loose ${money(total)}.`);
+          if(total>actualReceived)return toast(`Packed count cannot exceed Actual Rolls Received. Received ${money(actualReceived)}, boxes + loose ${money(total)}.`);
         }
         return baseSavePacking.apply(this,arguments);
       };
@@ -20277,6 +20285,12 @@ window.toggleBpSeparateDeliveryButton = function(){
     const overProduction=Math.max(0,variance);
     const g=packCurrentGroupV1057();
     const core=window.packingCoreCalcV1057(total,g);
+    const pitchMm=Number(modal.dataset.packingWastePitchMmV2026||0);
+    const pcsPerRoll=Number(modal.dataset.packingWastePcsV2026||g?.pcs||0);
+    const rollLengthM=pitchMm>0&&pcsPerRoll>0?pitchMm*pcsPerRoll/1000:null;
+    const wasteSqm=rollLengthM!==null&&core.rollWidthMm>0?
+      unpacked*core.rollWidthMm*rollLengthM/1000:null;
+    const wasteSqmText=wasteSqm===null?'Not available':wasteSqm.toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3})+' m²';
 
     const grand=$('packGrand');
     if(grand){
@@ -20285,7 +20299,7 @@ window.toggleBpSeparateDeliveryButton = function(){
         <div class="pack-live-grid-v1057">
           <div><span>Boxes</span><b>${boxes.length}</b><small>${money(boxRolls)} rolls</small></div>
           <div><span>Loose</span><b>${money(loose)}</b><small>rolls</small></div>
-          <div><span>Packed Total</span><b>${money(total)}</b><small>${unpacked>0?`${money(unpacked)} received rolls still unpacked`:overPacked>0?`OVER RECEIVED BY ${money(overPacked)}`:'matches received'}</small></div>
+          <div><span>Packed Total</span><b>${money(total)}</b><small>${unpacked>0?`${money(unpacked)} roll(s) not packed — count variance / potential waste`:overPacked>0?`OVER RECEIVED BY ${money(overPacked)}`:'matches received'}</small></div>
           <div><span>Actual Received</span><b>${money(actualReceived)}</b><small>physically counted at Packing</small></div>
         </div>`;
     }
@@ -20304,7 +20318,8 @@ window.toggleBpSeparateDeliveryButton = function(){
         <div><span>Unproduced Roll Equivalent</span><b>${money(theoreticalRollDifference)} rolls</b><small>max rolls − physically received</small></div>
         <div><span>Unproduced Length Equivalent</span><b>${jumboLength>0?meterEquivalent.toFixed(2)+' m':'—'}</b><small>estimate only; confirm scrap vs reusable material</small></div>
         <div class="${variance<0?'shortage':variance>0?'over':''}"><span>Production Variance</span><b>${variance>0?'+':''}${money(variance)}</b><small>${varianceText}</small></div>
-        <div><span>Count Reconciliation</span><b>${money(total)} / ${money(actualReceived)}</b><small>${total===actualReceived?'fully reconciled':`${money(Math.abs(actualReceived-total))} roll difference`}</small></div>`;
+        <div><span>Count Reconciliation</span><b>${money(total)} / ${money(actualReceived)}</b><small>${total===actualReceived?'fully reconciled':`${money(Math.abs(actualReceived-total))} roll difference`}</small></div>
+        <div class="packing-waste-indicator-v2026 pack-waste-sqm-live-v2026"><span>Packing Wastage — Estimated Area</span><b>${wasteSqmText}</b><small>${money(unpacked)} rolls difference · Actual Received − Packed Total</small><small>${wasteSqm===null?'Requires matching JBR pitch, pieces/roll and finished roll width':`${core.rollWidthMm} mm width × ${rollLengthM.toFixed(3)} m/roll`} · Count variance until scrap is confirmed</small></div>`;
     }
 
     if($('packCoreSummaryV1057')){
@@ -20320,7 +20335,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       let danger=false;
       if(overPhysical>0){danger=true;msg=`<b>Invalid received quantity:</b> Actual Received is ${money(overPhysical)} rolls above the combined JBR physical maximum.`;}
       else if(overPacked>0){danger=true;msg=`<b>Packing mismatch:</b> boxes + loose are ${money(overPacked)} rolls above Actual Received.`;}
-      else if(unpacked>0){msg=`<b>Unreconciled received rolls:</b> ${money(unpacked)} rolls were received but are not yet entered in boxes / loose.`;}
+      else if(unpacked>0){msg=`<b>Packing waste / shortfall:</b> ${money(unpacked)} received roll(s) are not in Packed Total. This difference will be recorded for Finance as packing count variance (confirm physical scrap).`;}
       else if(variance<0){msg=`<b>Production shortage / waste:</b> received ${money(shortage)} rolls below the JBR planned target. This variance will be recorded when packing is saved.`;}
       else if(variance>0){msg=`<b>Production over target:</b> received ${money(overProduction)} rolls above the JBR planned target. This variance will be recorded when packing is saved.`;}
       else{msg='<b>Production count matched:</b> Actual Received matches the JBR planned target and the packing count is reconciled.';}
@@ -20438,7 +20453,7 @@ window.toggleBpSeparateDeliveryButton = function(){
     const actualReceived=Math.max(0,Math.floor(Number($('packActualReceivedV1120')?.value||0)));
     if(!(actualReceived>0)){toast('Enter the Actual Rolls Received from production.');return false;}
     if(actualReceived>jbrTheoretical){toast(`Actual Rolls Received cannot exceed combined JBR Max Full Rolls. Maximum ${money(jbrTheoretical)}, entered ${money(actualReceived)}.`);return false;}
-    if(Number(total)!==actualReceived){toast(`Packed total must match Actual Rolls Received. Received ${money(actualReceived)}, packed ${money(total)}.`);return false;}
+    if(Number(total)>actualReceived){toast(`Packed total cannot exceed Actual Rolls Received. Received ${money(actualReceived)}, packed ${money(total)}.`);return false;}
     const productionVariance=actualReceived-jbrActual;
 
     const payload={
@@ -20474,7 +20489,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       core_sticks_required:Number(core?.coreSticksRequired||0),
       core_balance_mm:Number(core?.coreBalanceMm||0),
       qc_result:String(qc||'Passed'),
-      note:String(note||''),
+      note:String(note||'') + '\n[PACK_WASTE_V1 actual=' + actualReceived + ';packed=' + Number(total||0) + ';waste=' + Math.max(0,actualReceived-Number(total||0)) + ']',
       packed_by_username:String(currentUser?.username||''),
       packed_by_display:String(currentUser?.display||currentUser?.username||'User')
     };
@@ -21345,10 +21360,27 @@ window.toggleBpSeparateDeliveryButton = function(){
     return Number(nums[0]||0);
   }
 
+  /* The packing batch note stores the variance without changing the existing Supabase table schema. */
+  function packingWasteV2026(p,r,jbrRows){
+    if(!p)return {rolls:0,sqm:null,rollLengthM:null,source:'No packing batch'};
+    const actual=Number(p.actual_received_rolls);
+    const packed=Number(p.packed_total);
+    const valid=Number.isFinite(actual)&&Number.isFinite(packed)&&actual>=0&&packed>=0;
+    const rolls=valid?Math.max(0,actual-packed):0;
+    const pitches=(jbrRows||[]).map(j=>Number(j.pitch_mm)||((Number(j.label_height_mm)||0)+(Number(j.gap_mm)||0))).filter(v=>v>0);
+    const pitch=pitches.length&&Math.max(...pitches)-Math.min(...pitches)<0.00001?pitches[0]:0;
+    const pcs=Number(p.pcs_per_roll||r?.pcs||0);
+    const width=Number(p.roll_width_mm||rollWidthV1060(r)||0);
+    const rollLengthM=pitch>0&&pcs>0?pcs*pitch/1000:null;
+    return {rolls,rollLengthM,sqm:rollLengthM!=null&&width>0?rolls*rollLengthM*width/1000:null,
+      source:pitches.length>1&&!pitch?'Mixed JBR pitch; cannot estimate reliably':!pitch?'JBR pitch unavailable':'Estimated using finished-roll width × pcs/roll × JBR pitch'};
+  }
+
   function usageForJobV1060(r){
     const jbrSet=usageJbrRowsV1060(r);
     const packRows=usagePackingRowsV1060(r);
     const latestPack=packRows[0]||null;
+    const packingWaste=packingWasteV2026(latestPack,r,jbrSet.rows);
     const produced=Math.max(0,Number(r.finishedQty||r.packing?.total||0));
     const packedAllocated=Math.max(0,Number(r.packing?.total||produced||0));
     const width=rollWidthV1060(r);
@@ -21381,7 +21413,7 @@ window.toggleBpSeparateDeliveryButton = function(){
       r,jbrSet,packRows,latestPack,produced,packedAllocated,width,coreMm,coreStickLength,
       coreEquivalent,coreSticks,coreBalance,dispatched,
       dispatchBalance:Math.max(0,dispatchProducedQtyV1060(r)-dispatched),
-      jbrActual,jbrTheoretical,jbrWaste,reusable,jbrLengths
+      jbrActual,jbrTheoretical,jbrWaste,reusable,jbrLengths,packingWaste
     };
   }
 
@@ -21463,6 +21495,7 @@ window.toggleBpSeparateDeliveryButton = function(){
               <div><span>Finished</span><b>${money(x.produced)}</b></div>
               <div><span>JBR Actual Cut</span><b>${money(x.jbrActual)}</b></div>
               <div><span>JBR Productive Length</span><b>${money((x.jbrSet.rows||[]).reduce((n,j)=>n+jbrMeasuredV1061(j,r).productiveLengthM,0))} m</b></div>
+              <div class="packing-waste-finance-v2026"><span>Packing Waste / Difference</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"m² unavailable":money(x.packingWaste.sqm)+" m² (estimated)"}</small></div>
               <div><span>Core Used</span><b>${money(x.coreMm)} mm</b></div>
               <div><span>Dispatched</span><b>${money(x.dispatched)}</b></div>
             </div>
@@ -21583,11 +21616,13 @@ window.toggleBpSeparateDeliveryButton = function(){
           <div><span>Requested</span><b>${money(r.requestQty||0)} ${esc(r.unit||'')}</b></div>
           <div><span>Finished / Recorded</span><b>${money(x.produced)}</b></div>
           <div><span>Job Packed Allocation</span><b>${money(x.packedAllocated)}</b></div>
+          <div class="packing-waste-finance-v2026"><span>Packing Waste / Difference</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"Area estimate unavailable — verify JBR pitch":money(x.packingWaste.sqm)+" m² estimated"}</small></div>
           <div><span>Dispatched</span><b>${money(x.dispatched)}</b></div>
           <div><span>Dispatch Balance</span><b>${money(x.dispatchBalance)}</b></div>
           <div><span>Priority / Shift</span><b>${esc(r.priority||'-')} / ${esc(r.shift||'-')}</b></div>
         </div>
 
+        <div class="notice">Packing count difference = Actual Received − Packed Total. The estimated m² uses finished roll width × calculated roll length. It is a count variance until physical scrap is confirmed, not an additional JBR loss; do not double-count.</div>
         <div class="section">JBR USAGE</div>
         <div class="usage-scope-note-v1060">${esc(x.jbrSet.scope)}. New JBR records are linked to the source production jobs; older JBR records may only be identifiable at consolidated product-batch level.</div>
         ${jbrRows.length?`
@@ -21696,6 +21731,8 @@ window.toggleBpSeparateDeliveryButton = function(){
           <div><span>Latest Batch Boxes</span><b>${money(latestPack?.box_count||0)}</b></div>
           <div><span>Latest Batch Loose</span><b>${money(latestPack?.loose_rolls||0)}</b></div>
           <div><span>Latest Batch Packed Total</span><b>${money(latestPack?.packed_total||0)}</b></div>
+          <div><span>Actual Received</span><b>${money(latestPack?.actual_received_rolls||0)}</b></div>
+          <div class="packing-waste-finance-v2026"><span>Unpacked Difference / Potential Waste</span><b>${money(x.packingWaste.rolls)} rolls</b><small>${x.packingWaste.sqm==null?"Area not available":money(x.packingWaste.sqm)+" m² estimated"}</small></div>
           <div><span>QC Result</span><b>${esc(latestPack?.qc_result||'-')}</b></div>
         </div>
         ${batchBoxes.length?`<div class="tablewrap"><table class="table usage-table-v1060"><thead><tr><th>Batch Box</th><th>Rolls</th><th>Note</th></tr></thead><tbody>${batchBoxes.map((b,i)=>`<tr><td>${esc(String(b.box_no??b.boxNo??i+1))}</td><td>${money(Number(b.roll_count??b.rolls??0))}</td><td>${esc(String(b.note||''))}</td></tr>`).join('')}</tbody></table></div>`:''}

@@ -7543,3 +7543,12 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 
 /* JBR job-level shared feed and automatic per-roll processed length */
 .sc-jbr-jobfeed-v2026{padding:12px;border:1px solid #9bd5d3;border-radius:12px;background:#f0fbfa;margin:10px 0;display:flex;flex-wrap:wrap;align-items:end;gap:12px}.sc-jbr-jobfeed-v2026 label{font-size:12px;font-weight:800;flex:1 1 230px}.sc-jbr-jobfeed-v2026 input{display:block;width:100%;padding:9px;margin-top:5px;border:1px solid #aecbcb;border-radius:8px}.sc-jbr-jobfeed-v2026 span{color:#557078;font-size:11px;flex:2 1 220px}.sc-jbr-readonly-v2026{display:flex;flex-direction:column;gap:7px;padding:6px 0}.sc-jbr-readonly-v2026 span{font-size:11px;font-weight:700}.sc-jbr-readonly-v2026 b{font-size:14px;color:#087f83}
+
+/* Packing waste reconciliation and finance estimate */
+.packing-waste-indicator-v2026,.packing-waste-finance-v2026{border:1px solid #e1bd72!important;background:linear-gradient(120deg,#fff8e9,#fffcf4)!important;border-radius:10px;padding:10px;color:#704800}.packing-waste-indicator-v2026 span,.packing-waste-finance-v2026 span{display:block;font-size:11px;font-weight:800}.packing-waste-indicator-v2026 b,.packing-waste-finance-v2026 b{display:block;font-size:18px;margin-top:4px}.packing-waste-indicator-v2026 small,.packing-waste-finance-v2026 small{display:block;font-size:10px;margin-top:3px;line-height:1.4}
+
+/* Packing Count live estimated waste area */
+.pack-waste-sqm-live-v2026{border:2px solid #e5b768!important;background:#fff9eb!important;border-radius:12px;padding:12px!important;grid-column:1/-1}
+.pack-waste-sqm-live-v2026 span{font-weight:800;color:#80551c}
+.pack-waste-sqm-live-v2026 b{display:block;font-size:22px!important;color:#8d5215!important;margin:4px 0}
+.pack-waste-sqm-live-v2026 small{display:block;line-height:1.5;color:#856a3d}
