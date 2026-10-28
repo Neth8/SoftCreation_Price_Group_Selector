@@ -3488,7 +3488,7 @@ function productionProductUpdatedAtV103(r){
 function productionProductGroupsV103(){
   const groups=new Map();
   (state.productionRequests||[]).forEach(r=>{
-    if(!r?.id)return;
+    if(!r?.id || pcIsArchivedProductionJobV1130(r))return;
     const key=productionProductKeyV103(r);
     if(!key.replace(/\|/g,''))return;
     let g=groups.get(key);
@@ -26300,11 +26300,40 @@ function pcDemandGroups(){
     const ordered=pcNum(l.qty),dispatched=Math.min(ordered,pcDispatchedForSOLine(so,i)),cancelled=pcNum(l.cancelledQty),grossOpen=Math.max(0,ordered-dispatched-cancelled),allocated=Math.min(grossOpen,pcAllocatedToOpenRequests(so.id,i)),available=Math.max(0,grossOpen-allocated);
     if(grossOpen>0)g.orders.push({sourceSoId:so.id,sourceSoNo:so.soNo||so.id,lineIndex:i,customer:so.customerName||'',requiredDate:so.needDate||'',ordered,dispatched,cancelled,grossOpen,allocated,available});
   }));
-  return [...m.values()].map(g=>{const p=pcPolicy(g.key),movement=pcDeliveredMovementWeeks(g.key),avg=movement.reduce((a,b)=>a+b,0)/4,coverWeeks=Math.max(.25,pcNum(p.cover_weeks)||2),demand=g.orders.reduce((n,o)=>n+o.available,0),cover=Math.ceil(avg*coverWeeks),safety=Math.max(0,pcNum(p.safety_stock_qty)),stock=Math.max(0,pcNum(p.available_stock_qty)),pipeline=Math.max(0,pcPipelineForItem(g.key)),recommended=Math.max(0,Math.ceil(demand+cover+safety-stock-pipeline));return {...g,movement,avg,coverWeeks,demand,cover,safety,stock,pipeline,recommended}}).sort((a,b)=>b.recommended-a.recommended||a.size.localeCompare(b.size,undefined,{numeric:true}))
+  return [...m.values()].map(g=>{const p=pcPolicy(g.key),movement=pcDeliveredMovementWeeks(g.key),avg=movement.reduce((a,b)=>a+b,0)/4,coverWeeks=Math.max(.25,pcNum(p.cover_weeks)||2),demand=g.orders.reduce((n,o)=>n+o.available,0),cover=Math.ceil(avg*coverWeeks),safety=Math.max(0,pcNum(p.safety_stock_qty)),stock=Math.max(0,pcNum(p.available_stock_qty)),pipeline=Math.max(0,pcPipelineForItem(g.key)),recommended=Math.max(0,Math.ceil(demand+cover+safety-stock-pipeline));return {...g,movement,avg,coverWeeks,demand,cover,safety,stock,pipeline,recommended}}).filter(g=>g.orders.length>0).sort((a,b)=>b.recommended-a.recommended||a.size.localeCompare(b.size,undefined,{numeric:true}))
 }
 function pcGroup(k){return pcDemandGroups().find(x=>x.key===k)||null}
 async function pcLoadCloud(){const q='?select=*&order=created_at.desc';const [requests,lines,allocations,messages,audit,policies,releases]=await Promise.all([
 pcFetch('/spgs_prod_control_requests?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*&order=created_at.desc'),pcFetch('/spgs_prod_control_request_lines'+q),pcFetch('/spgs_prod_control_so_allocations'+q),pcFetch('/spgs_prod_control_messages'+q),pcFetch('/spgs_prod_control_audit'+q),pcFetch('/spgs_prod_control_item_policy?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*'),pcFetch('/spgs_prod_control_releases?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*&order=created_at.asc')]);pcCloud={requests:requests||[],lines:lines||[],allocations:allocations||[],messages:messages||[],audit:audit||[],policies:policies||[],releases:releases||[]}}
+/* A production-control order cycle is historical only when ALL its allocated
+   sales-order lines are fully dispatched.  Archive is derived from dispatched
+   quantities, not the product specification, so a fresh SO starts a new cycle. */
+function pcRequestFullyDispatchedV1130(request){
+  if(!request || request.status==='Pending Approval' || request.status==='Returned')return false;
+  const lines=(pcCloud.lines||[]).filter(l=>String(l.request_id)===String(request.id));
+  if(!lines.length)return false;
+  const allocations=(pcCloud.allocations||[]).filter(a=>lines.some(l=>String(l.id)===String(a.request_line_id)));
+  if(!allocations.length)return false; // Stock-only production is not a completed SO
+  return allocations.every(a=>{
+    const so=(state.salesOrders||[]).find(x=>String(x.id)===String(a.source_so_id));
+    if(!so)return false;
+    const index=Number(a.source_line_index);
+    const line=so.lines?.[index];
+    if(!line)return false;
+    const ordered=pcNum(line.qty),cancelled=pcNum(line.cancelledQty);
+    const required=Math.max(0,ordered-cancelled);
+    return pcDispatchedForSOLine(so,index)+0.00001>=required;
+  });
+}
+function pcHistoryRequestIdsV1130(){
+  return new Set((pcCloud.requests||[]).filter(pcRequestFullyDispatchedV1130).map(r=>String(r.id)));
+}
+function pcIsArchivedProductionJobV1130(job){
+  if(!job)return false;
+  if(['Dispatched','Received','GRN Closed'].includes(String(job.status||'')))return true;
+  const id=job.productionControlRequestId;
+  return !!id && pcHistoryRequestIdsV1130().has(String(id));
+}
 function pcRequestLines(id){return pcCloud.lines.filter(x=>x.request_id===id).sort((a,b)=>a.line_no-b.line_no)}
 function pcRequestAlloc(id){return pcCloud.allocations.filter(x=>x.request_line_id===id)}
 function pcRequestMsgs(id){return pcCloud.messages.filter(x=>x.request_id===id).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at))}
@@ -26319,7 +26348,7 @@ function pcInstallUI(){
   if(nav){const b=document.createElement('button');b.className='navbtn';b.dataset.view='productioncontrol';b.textContent='Production Control';b.onclick=()=>showView('productioncontrol');nav.insertBefore(b,before||null)}
   const section=document.createElement('section');section.id='productioncontrol';section.className='view';section.innerHTML=`
     <div class="panel pc-shell"><div class="panel-title pc-title"><div><span>Production Control</span><small>SC HO planning → Manager approval → existing Products execution</small></div><button class="btn sm pc-refresh" onclick="pcRefresh(true)">Refresh Live Data</button></div>
-    <div class="panel-body"><div class="pc-tabs"><button data-pc-view="planner" onclick="pcGo('planner')">Production Request</button><button data-pc-view="approvals" onclick="pcGo('approvals')">Manager Approvals <span id="pcPendingCount"></span></button><button data-pc-view="register" onclick="pcGo('register')">Request Register</button><button data-pc-view="demand" onclick="pcGo('demand')">Demand / Sales Orders</button></div><div id="pcKpis" class="pc-kpis"></div><div id="pcBody"></div></div></div>`;
+    <div class="panel-body"><div class="pc-tabs"><button data-pc-view="planner" onclick="pcGo('planner')">Production Request</button><button data-pc-view="approvals" onclick="pcGo('approvals')">Manager Approvals <span id="pcPendingCount"></span></button><button data-pc-view="register" onclick="pcGo('register')">Request Register</button><button data-pc-view="history" onclick="pcGo('history')">History <span id="pcHistoryCount"></span></button><button data-pc-view="demand" onclick="pcGo('demand')">Demand / Sales Orders</button></div><div id="pcKpis" class="pc-kpis"></div><div id="pcBody"></div></div></div>`;
   const firstModal=document.querySelector('.modal');if(firstModal)firstModal.insertAdjacentElement('beforebegin',section);else document.querySelector('.app')?.appendChild(section);
   document.body.insertAdjacentHTML('beforeend',`<div id="pcReturnModal" class="modal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><b>Return Production Request</b><button class="closex" onclick="closeModal('pcReturnModal')">×</button></div><div class="modal-body"><div class="field"><label>Return Reason</label><textarea id="pcReturnReason" placeholder="Explain what HO Stores must correct"></textarea></div><div class="actions"><button class="btn amber" onclick="pcConfirmReturn()">Return to HO Stores</button></div></div></div></div>`);
 }
@@ -26356,6 +26385,8 @@ function pcRender(){
   if(approveTab)approveTab.style.display=pcHas('production_control_approve')?'':'none';
   const pendingCount=document.getElementById('pcPendingCount');
   if(pendingCount)pendingCount.textContent='('+pcCloud.requests.filter(r=>r.status==='Pending Approval').length+')';
+  const historyCount=document.getElementById('pcHistoryCount');
+  if(historyCount)historyCount.textContent='('+pcHistoryRequestIdsV1130().size+')';
 
   document.querySelectorAll('[data-pc-view]').forEach(
     b=>b.classList.toggle('active',b.dataset.pcView===pcView)
@@ -26378,7 +26409,9 @@ function pcRender(){
       ? pcApprovalsHTML()
     : pcView==='register'
       ? pcRegisterHTML()
-      : pcDemandHTML();
+      : pcView==='history'
+        ? pcHistoryHTMLV1130()
+        : pcDemandHTML();
 
   b.innerHTML=roleBanner+body;
 }
@@ -26439,7 +26472,8 @@ function pcApprovalsHTML(){
 window.pcOpenApproval=function(id){pcSelectedRequest=id;pcView='approvals';pcRender();document.querySelector('#pcBody .pc-detail')?.scrollIntoView({behavior:'smooth',block:'start'});};
 function pcRegisterHTML(){
   const role=String(currentUser?.role||'').toLowerCase();
-  const rows=[...(pcCloud.requests||[])].sort((a,b)=>{
+  const archived=pcHistoryRequestIdsV1130();
+  const rows=[...(pcCloud.requests||[])].filter(r=>!archived.has(String(r.id))).sort((a,b)=>{
     if(role==='manager'){
       const ap=a.status==='Pending Approval'?0:1;
       const bp=b.status==='Pending Approval'?0:1;
@@ -26450,6 +26484,17 @@ function pcRegisterHTML(){
   const selected=rows.find(x=>x.id===pcSelectedRequest)||rows[0];if(selected&&!pcSelectedRequest)pcSelectedRequest=selected.id;
   return `<div class="pc-card"><div class="pc-card-head"><h3>Production request register</h3><span class="pc-pill">${rows.length} request(s)</span></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Request</th><th>Required</th><th>Items / Rolls</th><th>Status</th><th>Created By</th><th></th></tr></thead><tbody>${rows.map(r=>{const ls=pcRequestLines(r.id);return `<tr><td><b>${pcEsc(r.request_no)}</b><small>${new Date(r.created_at).toLocaleString()}</small></td><td>${pcEsc(r.required_date||'-')}</td><td>${ls.length} item(s) • ${pcMoney(ls.reduce((n,l)=>n+pcNum(l.requested_qty),0))}</td><td><span class="pc-status ${String(r.status).toLowerCase().replace(/\s+/g,'-')}">${pcEsc(r.status)}</span></td><td>${pcEsc(r.created_by_display||r.created_by)}</td><td><button class="btn ghost sm" onclick="pcOpenRequest('${r.id}')">Review →</button></td></tr>`}).join('')||'<tr><td colspan="6">No Production Control requests yet.</td></tr>'}</tbody></table></div></div>${selected?pcRequestDetailHTML(selected):''}`;
 }
+function pcHistoryHTMLV1130(){
+  const archived=pcHistoryRequestIdsV1130();
+  const rows=(pcCloud.requests||[]).filter(r=>archived.has(String(r.id)))
+    .sort((a,b)=>Date.parse(b.created_at||0)-Date.parse(a.created_at||0));
+  const selected=rows.find(r=>r.id===pcSelectedRequest)||rows[0]||null;
+  return `<div class="pc-card"><div class="pc-card-head"><div><h3>History — All Sales Orders Dispatched</h3><p>Completed order cycles remain searchable. A new sales order creates a separate active cycle.</p></div><span class="pc-pill">${rows.length} archived request(s)</span></div>
+  <div class="pc-scroll"><table class="pc-table"><thead><tr><th>Request</th><th>Required</th><th>Items / Rolls</th><th>Dispatch</th><th>Created By</th><th></th></tr></thead><tbody>
+  ${rows.map(r=>{const ls=pcRequestLines(r.id);return `<tr><td><b>${pcEsc(r.request_no)}</b><small>${new Date(r.created_at).toLocaleString()}</small></td><td>${pcEsc(r.required_date||'-')}</td><td>${ls.length} item(s) • ${pcMoney(ls.reduce((n,l)=>n+pcNum(l.requested_qty),0))}</td><td><span class="pc-status approved">ALL DISPATCHED</span></td><td>${pcEsc(r.created_by_display||r.created_by||'-')}</td><td><button class="btn ghost sm" onclick="pcOpenHistoryV1130('${r.id}')">View →</button></td></tr>`}).join('')||'<tr><td colspan="6">No fully dispatched production requests yet.</td></tr>'}
+  </tbody></table></div></div>${selected?pcRequestDetailHTML(selected):''}`;
+}
+window.pcOpenHistoryV1130=function(id){pcSelectedRequest=id;pcView='history';pcRender();};
 window.pcOpenRequest=function(id){pcSelectedRequest=id;pcRender()}
 function pcRequestDetailHTML(r){
   const lines=pcRequestLines(r.id),msgs=pcRequestMsgs(r.id),audit=pcRequestAudit(r.id),canApprove=pcHas('production_control_approve')&&r.status==='Pending Approval';
