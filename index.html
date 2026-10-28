@@ -26659,7 +26659,10 @@ async function miFetch(path,options={}){
   let data=null;
   try{data=raw?JSON.parse(raw):null}catch(_){data=raw}
   if(!res.ok){
-    throw new Error([data?.message,data?.details,data?.hint].filter(x=>typeof x==='string'&&x.trim()&&x.trim()!=='.').join(' — ') || (typeof raw==='string'&&raw.trim()&&raw.trim()!=='.'?raw.trim():`Supabase request failed (HTTP ${res.status})`));
+    const details=[data?.code,data?.message,data?.details,data?.hint].filter(x=>typeof x==='string'&&x.trim()&&x.trim()!=='.').join(' — ');
+    const rawText=typeof data==='string'?data.trim():'';
+    const body=details || (rawText && rawText!=='.'?rawText:'');
+    throw new Error(body?`HTTP ${res.status}: ${body.slice(0,700)}`:`Supabase request failed (HTTP ${res.status}). Check permissions, database function and Network response.`);
   }
   return data;
 }
@@ -27242,14 +27245,16 @@ window.miSaveInvoice=async function(silent=false){
   };
   try{
     const r=await miRpc('spgs_manual_invoice_save',{p_payload:payload});
-    if(!r?.id && !miEditingId)throw new Error('Save returned no invoice ID. Check the Supabase save function and permissions.');
-    const confirmedId=r?.id||miEditingId;
-    await miLoad();
+    const result=Array.isArray(r)?r[0]:r;
+    if(result?.error || result?.ok===false || result?.success===false)throw new Error(String(result?.message||result?.error||'Database rejected the invoice.'));
+    const confirmedId=(typeof result==='string' && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(result.trim())?result.trim():'') || result?.id || result?.invoice_id || result?.saved_id || miEditingId;
+    if(!confirmedId)throw new Error('Database did not return an invoice ID. Verify the spgs_manual_invoice_save function.');
+    try{await miLoad()}catch(loadError){throw new Error('Save RPC returned an invoice ID ('+confirmedId+'), but reloading failed: '+String(loadError?.message||loadError)+'. Check database before saving again to avoid duplicates.')}
     const saved=miInvoice(confirmedId);
-    if(!saved)throw new Error('Invoice not found after saving. Cloud save could not be confirmed; keep this form open.');
+    if(!saved)throw new Error('Save RPC returned invoice ID '+confirmedId+', but it is not visible after reload. Check permissions before trying again.');
     miEditingId=confirmedId;
     miDraftPayments=(saved?.payments||[]).map(x=>({...x}));
-    if(!silent)toast(`${r?.invoice_no||inv.invoiceNo} saved`);
+    if(!silent)toast(`${result?.invoice_no||inv.invoiceNo} saved`);
     miRender();
   }catch(e){console.error('Manual invoice save failed:',e);const message=String(e?.message||'').trim();toast(message&&message!=='.'?`Invoice NOT saved: ${message}`:'Invoice NOT saved. Supabase returned an unidentified error; check browser Console and Network response.')}
 };
@@ -27597,10 +27602,10 @@ function miRenderInvoice(inv,hostId){
         <td>${miEsc(it.code||'')}</td>
         <td class="desc">${miEsc(it.desc||'')}</td>
         <td class="c">${miNum(it.qty).toLocaleString('en-US',{maximumFractionDigits:3})}</td>
-        <td class="r">${miMoney(it.unitPrice)}</td>
-        <td class="r">${miMoney(miNum(it.qty)*miNum(it.unitPrice))}</td>
+        <td class="r">${miMoney(inv.vatEnabled?miNum(it.unitPrice)/1.18:it.unitPrice)}</td>
+        <td class="r">${miMoney(miNum(it.qty)*(inv.vatEnabled?miNum(it.unitPrice)/1.18:miNum(it.unitPrice)))}</td>
       </tr>`;
-    }).join('');
+    }).join('') || '<tr><td colspan="6" class="mi-empty-line">No invoice items added</td></tr>';
 
     const currentTableBottom=tableTop+tableHeadH+(pageItems.length*rowH);
     const summaryTop=Math.max(summaryTopBase,currentTableBottom+18);
