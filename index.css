@@ -7540,3 +7540,6 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .sc-jbr-entry-results-v2026 span{display:block;color:#617782;font-size:10px;}
 .sc-jbr-entry-results-v2026 b{display:block;font-size:14px;margin-top:3px;}
 @media(max-width:600px){.sc-jbr-entry-fields-v2026,.sc-jbr-entry-results-v2026{grid-template-columns:1fr;}}
+
+/* JBR job-level shared feed and automatic per-roll processed length */
+.sc-jbr-jobfeed-v2026{padding:12px;border:1px solid #9bd5d3;border-radius:12px;background:#f0fbfa;margin:10px 0;display:flex;flex-wrap:wrap;align-items:end;gap:12px}.sc-jbr-jobfeed-v2026 label{font-size:12px;font-weight:800;flex:1 1 230px}.sc-jbr-jobfeed-v2026 input{display:block;width:100%;padding:9px;margin-top:5px;border:1px solid #aecbcb;border-radius:8px}.sc-jbr-jobfeed-v2026 span{color:#557078;font-size:11px;flex:2 1 220px}.sc-jbr-readonly-v2026{display:flex;flex-direction:column;gap:7px;padding:6px 0}.sc-jbr-readonly-v2026 span{font-size:11px;font-weight:700}.sc-jbr-readonly-v2026 b{font-size:14px;color:#087f83}
