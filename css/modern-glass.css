@@ -1,0 +1,1507 @@
+/**
+ * SoftCreation v1.1.30 - Modern Glassmorphism & Android Design System
+ * Universal Side Floating Glass Navbar (Desktop & Android)
+ * Advanced Scrollable Modals (Purchase Order & System-Wide Dialogs)
+ * Full Android / Mobile Responsive UI Support
+ */
+
+/* =====================================================================
+   ROOT VARIABLES & THEMES
+===================================================================== */
+:root {
+  --sc-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --sc-teal: #078f92;
+  --sc-teal-light: #0aa3a6;
+  --sc-teal-dark: #056a6c;
+  --sc-teal-glow: rgba(7, 143, 146, 0.28);
+  
+  /* Light Mode (Soft Frosted Glass) */
+  --sc-bg-app: #f0f4f6;
+  --sc-bg-mesh: radial-gradient(at 0% 0%, rgba(7, 143, 146, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(13, 71, 95, 0.08) 0px, transparent 50%),
+                #f2f6f8;
+  --sc-glass-bg: rgba(255, 255, 255, 0.82);
+  --sc-glass-bg-elevated: rgba(255, 255, 255, 0.94);
+  --sc-glass-bg-card: rgba(255, 255, 255, 0.86);
+  --sc-glass-border: rgba(255, 255, 255, 0.85);
+  --sc-glass-border-subtle: rgba(200, 218, 224, 0.5);
+  --sc-glass-shadow: 0 12px 32px -4px rgba(18, 48, 64, 0.08), 0 4px 12px -2px rgba(18, 48, 64, 0.04);
+  --sc-glass-shadow-floating: 0 20px 48px -6px rgba(18, 48, 64, 0.16), 0 8px 20px -2px rgba(18, 48, 64, 0.08);
+  --sc-glass-inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  
+  --sc-text-main: #13222a;
+  --sc-text-muted: #536976;
+  --sc-text-subtle: #7e94a0;
+  --sc-divider: rgba(180, 202, 210, 0.4);
+  
+  --sc-input-bg: rgba(255, 255, 255, 0.9);
+  --sc-input-border: rgba(185, 206, 214, 0.8);
+  --sc-input-text: #13222a;
+  
+  --sc-table-header-bg: rgba(235, 244, 246, 0.85);
+  --sc-table-row-hover: rgba(7, 143, 146, 0.06);
+  --sc-table-row-alt: rgba(247, 250, 252, 0.6);
+  
+  --sc-modal-backdrop: rgba(10, 25, 35, 0.52);
+  --sc-dock-bg: rgba(255, 255, 255, 0.88);
+  --sc-dock-border: rgba(255, 255, 255, 0.95);
+  
+  --sc-badge-green-bg: rgba(16, 185, 129, 0.14);
+  --sc-badge-green-text: #065f46;
+  --sc-badge-amber-bg: rgba(245, 158, 11, 0.16);
+  --sc-badge-amber-text: #92400e;
+  --sc-badge-red-bg: rgba(239, 68, 68, 0.14);
+  --sc-badge-red-text: #991b1b;
+  --sc-badge-blue-bg: rgba(14, 165, 233, 0.14);
+  --sc-badge-blue-text: #0369a1;
+}
+
+[data-theme="dark"] {
+  --sc-bg-app: #0d1520;
+  --sc-bg-mesh: radial-gradient(at 5% 5%, rgba(7, 143, 146, 0.14) 0px, transparent 45%),
+                radial-gradient(at 95% 95%, rgba(23, 45, 75, 0.18) 0px, transparent 50%),
+                #0a111a;
+  --sc-glass-bg: rgba(17, 27, 40, 0.85);
+  --sc-glass-bg-elevated: rgba(22, 34, 50, 0.94);
+  --sc-glass-bg-card: rgba(18, 29, 43, 0.85);
+  --sc-glass-border: rgba(255, 255, 255, 0.12);
+  --sc-glass-border-subtle: rgba(255, 255, 255, 0.08);
+  --sc-glass-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.5), 0 6px 16px -2px rgba(0, 0, 0, 0.35);
+  --sc-glass-shadow-floating: 0 20px 48px -6px rgba(0, 0, 0, 0.65), 0 8px 24px -2px rgba(0, 0, 0, 0.45);
+  --sc-glass-inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  
+  --sc-text-main: #edf3f8;
+  --sc-text-muted: #95a7ba;
+  --sc-text-subtle: #6a7c91;
+  --sc-divider: rgba(255, 255, 255, 0.08);
+  
+  --sc-input-bg: rgba(13, 22, 33, 0.88);
+  --sc-input-border: rgba(255, 255, 255, 0.15);
+  --sc-input-text: #f1f5f9;
+  
+  --sc-table-header-bg: rgba(20, 32, 48, 0.94);
+  --sc-table-row-hover: rgba(56, 167, 165, 0.12);
+  --sc-table-row-alt: rgba(14, 23, 34, 0.6);
+  
+  --sc-modal-backdrop: rgba(4, 8, 14, 0.72);
+  --sc-dock-bg: rgba(18, 28, 42, 0.90);
+  --sc-dock-border: rgba(255, 255, 255, 0.14);
+  
+  --sc-badge-green-bg: rgba(16, 185, 129, 0.22);
+  --sc-badge-green-text: #34d399;
+  --sc-badge-amber-bg: rgba(245, 158, 11, 0.24);
+  --sc-badge-amber-text: #fbbf24;
+  --sc-badge-red-bg: rgba(239, 68, 68, 0.22);
+  --sc-badge-red-text: #f87171;
+  --sc-badge-blue-bg: rgba(14, 165, 233, 0.22);
+  --sc-badge-blue-text: #38bdf8;
+}
+
+/* =====================================================================
+   BODY & ENVIRONMENT
+===================================================================== */
+html, body {
+  background: var(--sc-bg-mesh) !important;
+  color: var(--sc-text-main) !important;
+  font-family: var(--sc-font);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.mobile-nav-open {
+  overflow: hidden !important;
+}
+
+.app {
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 0 16px 40px 16px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* =====================================================================
+   FLOATING GLASS TOPBAR
+===================================================================== */
+.topbar.app-shell-header {
+  position: sticky !important;
+  top: 12px !important;
+  z-index: 1000 !important;
+  margin: 12px auto 16px auto !important;
+  padding: 10px 18px !important;
+  border-radius: 20px !important;
+  background: var(--sc-glass-bg) !important;
+  backdrop-filter: blur(18px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  box-shadow: var(--sc-glass-shadow-floating), var(--sc-glass-inner-glow) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+}
+
+.topbar-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 14px;
+}
+
+.brand.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  flex-shrink: 0;
+}
+
+.brand.app-brand:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.brandmark {
+  background: linear-gradient(135deg, #078f92 0%, #0aa3a6 100%) !important;
+  padding: 6px 14px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(7, 143, 146, 0.35) !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.brandmark span.s {
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 17px;
+  letter-spacing: -0.5px;
+}
+
+.brandmark span.c {
+  color: #c7f9cc;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.5px;
+}
+
+.brandtext {
+  display: flex;
+  flex-direction: column;
+}
+
+.brandtext b {
+  color: var(--sc-text-main) !important;
+  font-size: 14px;
+  letter-spacing: -0.2px;
+}
+
+.brandtext span {
+  color: var(--sc-text-muted) !important;
+  font-size: 11px;
+}
+
+.shell-version {
+  background: rgba(7, 143, 146, 0.15) !important;
+  color: var(--sc-teal) !important;
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(7, 143, 146, 0.25) !important;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .shell-version {
+  background: rgba(7, 143, 146, 0.28) !important;
+  color: #5eead4 !important;
+  border-color: rgba(94, 234, 212, 0.3) !important;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Shell Icon & Action Buttons */
+.printer-hub-btn-v1124,
+.app-refresh-btn-v1079,
+.user-profile-btn,
+.shell-icon-btn {
+  background: var(--sc-glass-bg-card) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid var(--sc-glass-border-subtle) !important;
+  border-radius: 12px !important;
+  color: var(--sc-text-main) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  padding: 7px 12px !important;
+  cursor: pointer;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+
+.printer-hub-btn-v1124:hover,
+.app-refresh-btn-v1079:hover,
+.user-profile-btn:hover,
+.shell-icon-btn:hover {
+  transform: translateY(-2px) !important;
+  border-color: var(--sc-teal) !important;
+  box-shadow: 0 6px 16px rgba(7, 143, 146, 0.2) !important;
+}
+
+/* Hamburger Menu Toggle (Universal on Desktop & Mobile) */
+.mobile-nav-toggle {
+  display: inline-flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+  background: var(--sc-glass-bg-card) !important;
+  border: 1px solid var(--sc-glass-border-subtle) !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  flex-shrink: 0 !important;
+}
+
+.mobile-nav-toggle:hover {
+  border-color: var(--sc-teal) !important;
+  box-shadow: 0 4px 12px rgba(7, 143, 146, 0.25) !important;
+  transform: scale(1.05) !important;
+}
+
+.mobile-nav-toggle span {
+  display: block !important;
+  width: 18px !important;
+  height: 2px !important;
+  border-radius: 4px !important;
+  background: var(--sc-text-main) !important;
+  transition: all 0.25s ease !important;
+}
+
+body.mobile-nav-open .mobile-nav-toggle span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+  background: var(--sc-teal) !important;
+}
+
+body.mobile-nav-open .mobile-nav-toggle span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+body.mobile-nav-open .mobile-nav-toggle span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+  background: var(--sc-teal) !important;
+}
+
+/* Modern Theme Switcher */
+.theme-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 58px;
+  height: 32px;
+  border-radius: 999px !important;
+  padding: 3px 6px !important;
+  background: rgba(0, 0, 0, 0.07) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12) !important;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .theme-toggle {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(7, 143, 146, 0.28), inset 0 2px 4px rgba(0, 0, 0, 0.12) !important;
+}
+
+.theme-toggle-sun {
+  color: #f59e0b;
+  font-size: 13px;
+}
+
+.theme-toggle-moon {
+  color: #38bdf8;
+  font-size: 13px;
+}
+
+/* User Profile Dropdown */
+.user-profile-wrap {
+  position: relative;
+}
+
+.user-profile-menu {
+  background: var(--sc-glass-bg-elevated) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--sc-glass-shadow-floating), var(--sc-glass-inner-glow) !important;
+  overflow: hidden;
+  padding: 8px !important;
+  z-index: 1100;
+}
+
+.profile-menu-item {
+  color: var(--sc-text-main) !important;
+  border-radius: 10px !important;
+  transition: all 0.15s ease !important;
+  padding: 9px 12px !important;
+}
+
+.profile-menu-item:hover {
+  background: rgba(7, 143, 146, 0.12) !important;
+  color: var(--sc-teal) !important;
+  transform: translateX(3px);
+}
+
+[data-theme="dark"] .profile-menu-item:hover {
+  background: rgba(56, 167, 165, 0.2) !important;
+  color: #5eead4 !important;
+}
+
+/* =====================================================================
+   SIDE FLOATING GLASS NAVBAR (LIKE ANDROID - UNIVERSAL ACROSS ALL DEVICES)
+   Delivers the requested modern Android floating glass drawer on Desktop & Mobile.
+===================================================================== */
+.nav-backdrop {
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: var(--sc-modal-backdrop) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s ease !important;
+  z-index: 1190 !important;
+}
+
+body.mobile-nav-open .nav-backdrop {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+.nav-shell {
+  position: fixed !important;
+  left: 14px !important;
+  top: 14px !important;
+  bottom: 14px !important;
+  width: 320px !important;
+  max-width: calc(100vw - 28px) !important;
+  height: calc(100vh - 28px) !important;
+  height: calc(100dvh - 28px) !important;
+  max-height: calc(100dvh - 28px) !important;
+  padding: 0 !important;
+  background: var(--sc-glass-bg-elevated) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 30px 70px -10px rgba(0, 0, 0, 0.45), var(--sc-glass-inner-glow) !important;
+  transform: translate3d(calc(-100% - 28px), 0, 0) !important;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  z-index: 1200 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+}
+
+body.mobile-nav-open .nav-shell {
+  transform: translate3d(0, 0, 0) !important;
+}
+
+.mobile-nav-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 16px 20px !important;
+  border-bottom: 1px solid var(--sc-divider) !important;
+  background: var(--sc-table-header-bg) !important;
+  backdrop-filter: blur(12px) !important;
+  flex-shrink: 0 !important;
+}
+
+.mobile-nav-head b {
+  font-size: 15px !important;
+  color: var(--sc-text-main) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.2px;
+}
+
+.mobile-nav-head span {
+  font-size: 11px !important;
+  color: var(--sc-text-muted) !important;
+  display: block;
+  margin-top: 2px;
+}
+
+.mobile-nav-head button {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--sc-glass-border-subtle);
+  background: var(--sc-glass-bg-card);
+  color: var(--sc-text-main);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.mobile-nav-head button:hover {
+  background: var(--sc-teal);
+  color: #ffffff;
+}
+
+.nav {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+  padding: 14px 12px 24px 12px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  flex: 1 1 auto !important;
+  background: transparent !important;
+  scrollbar-width: thin !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.navbtn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  min-height: 42px !important;
+  padding: 10px 16px !important;
+  border-radius: 14px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--sc-text-main) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+}
+
+.navbtn:hover {
+  background: rgba(7, 143, 146, 0.12) !important;
+  color: var(--sc-teal) !important;
+  transform: translateX(4px) !important;
+}
+
+[data-theme="dark"] .navbtn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.navbtn.active {
+  background: linear-gradient(135deg, #078f92 0%, #0aa3a6 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 4px 16px rgba(7, 143, 146, 0.35) !important;
+  transform: translateX(2px) !important;
+}
+
+[data-theme="dark"] .navbtn.active {
+  background: linear-gradient(135deg, #0aa3a6 0%, #14b8a6 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(10, 163, 166, 0.45) !important;
+}
+
+/* =====================================================================
+   ACTIVE VIEW & VIEWPORT LAYOUT
+===================================================================== */
+.view {
+  display: none !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.view.active {
+  display: block !important;
+  width: 100% !important;
+  animation: viewFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =====================================================================
+   CARDS, PANELS & FLOATING SURFACES
+===================================================================== */
+.card,
+.cards .card,
+.dash-card,
+.device-card,
+.admin-kpi,
+.customer-cloud-doc-card,
+.jbr-batch-card,
+.po-receive-mini,
+.prod-card,
+.factory-card,
+.pack-card {
+  background: var(--sc-glass-bg-card) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--sc-glass-shadow), var(--sc-glass-inner-glow) !important;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease !important;
+  position: relative;
+  overflow: hidden;
+  color: var(--sc-text-main) !important;
+}
+
+.card:hover,
+.cards .card:hover,
+.dash-card:hover,
+.device-card:hover,
+.admin-kpi:hover,
+.customer-cloud-doc-card:hover,
+.prod-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: var(--sc-glass-shadow-floating), 0 0 0 1px var(--sc-teal-glow) !important;
+  border-color: rgba(7, 143, 146, 0.4) !important;
+}
+
+.card .k {
+  color: var(--sc-text-muted) !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 11px;
+}
+
+.card .v {
+  color: var(--sc-text-main) !important;
+  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+}
+
+.card .sub {
+  color: var(--sc-text-subtle) !important;
+  font-size: 11px;
+}
+
+.panel {
+  background: var(--sc-glass-bg-card) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--sc-glass-shadow), var(--sc-glass-inner-glow) !important;
+  margin-top: 16px;
+  overflow: hidden;
+  color: var(--sc-text-main) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.panel-title {
+  background: var(--sc-table-header-bg) !important;
+  backdrop-filter: blur(8px) !important;
+  color: var(--sc-text-main) !important;
+  border-bottom: 1px solid var(--sc-divider) !important;
+  font-weight: 700;
+  padding: 14px 20px !important;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+
+.panel-body {
+  padding: 20px !important;
+  color: var(--sc-text-main) !important;
+}
+
+/* Sticky Document Viewer Action Bar */
+.viewer-top {
+  position: sticky !important;
+  top: 72px !important;
+  z-index: 890 !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
+  margin-bottom: 8px;
+  transition: all 0.25s ease;
+}
+
+/* =====================================================================
+   SYSTEM-WIDE TABLES (TOUCH-FRIENDLY & SCROLLABLE)
+===================================================================== */
+.doctable,
+.factory-table,
+.jbr-table-v1050,
+.jbr-table-v1055,
+.pack-history-table-v1058,
+.finance-table-v1059,
+.usage-table-v1060,
+.jbr-usage-detail-table-v1061,
+.pc-table,
+.mi-table,
+.mi-ex-table,
+.po-editor-lines,
+.line-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  width: 100%;
+  color: var(--sc-text-main) !important;
+}
+
+.doctable th,
+.factory-table th,
+.jbr-table-v1050 th,
+.jbr-table-v1055 th,
+.pack-history-table-v1058 th,
+.finance-table-v1059 th,
+.usage-table-v1060 th,
+.jbr-usage-detail-table-v1061 th,
+.pc-table th,
+.mi-table th,
+.mi-ex-table th,
+.po-editor-lines th,
+.line-table th {
+  background: var(--sc-table-header-bg) !important;
+  backdrop-filter: blur(8px) !important;
+  color: var(--sc-text-muted) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-bottom: 1px solid var(--sc-divider) !important;
+  border-color: var(--sc-divider) !important;
+  padding: 10px 14px !important;
+}
+
+.doctable td,
+.factory-table td,
+.jbr-table-v1050 td,
+.jbr-table-v1055 td,
+.pack-history-table-v1058 td,
+.finance-table-v1059 td,
+.usage-table-v1060 td,
+.jbr-usage-detail-table-v1061 td,
+.pc-table td,
+.mi-table td,
+.mi-ex-table td,
+.po-editor-lines td,
+.line-table td {
+  color: var(--sc-text-main) !important;
+  border-bottom: 1px solid var(--sc-divider) !important;
+  border-color: var(--sc-divider) !important;
+  padding: 10px 14px !important;
+  font-size: 12px !important;
+  transition: background-color 0.15s ease;
+}
+
+.doctable tr:hover td,
+.factory-table tr:hover td,
+.jbr-table-v1050 tr:hover td,
+.finance-table-v1059 tr:hover td,
+.line-table tr:hover td {
+  background: var(--sc-table-row-hover) !important;
+}
+
+/* =====================================================================
+   FORM INPUTS, SELECTS, TEXTAREAS & SEARCH BOXES
+===================================================================== */
+input[type="text"],
+input[type="search"],
+input[type="date"],
+input[type="number"],
+input[type="password"],
+input[type="email"],
+input[type="file"],
+select,
+textarea {
+  background: var(--sc-input-bg) !important;
+  color: var(--sc-input-text) !important;
+  border: 1px solid var(--sc-input-border) !important;
+  border-radius: 12px !important;
+  padding: 9px 12px !important;
+  font-size: 13px !important;
+  transition: all 0.2s ease !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  box-sizing: border-box;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--sc-teal) !important;
+  box-shadow: 0 0 0 3px var(--sc-teal-glow), inset 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  outline: none !important;
+}
+
+/* ERP Autocomplete Dropdowns */
+.erp-suggestions,
+.sc-customer-suggestions-v1119 {
+  background: var(--sc-glass-bg-elevated) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--sc-glass-shadow-floating) !important;
+  color: var(--sc-text-main) !important;
+  overflow: hidden;
+  z-index: 1250;
+}
+
+.erp-suggestion-item,
+.sc-customer-suggestion-item {
+  color: var(--sc-text-main) !important;
+  transition: background 0.15s ease;
+  padding: 8px 12px;
+}
+
+.erp-suggestion-item:hover,
+.sc-customer-suggestion-item:hover {
+  background: rgba(7, 143, 146, 0.12) !important;
+  color: var(--sc-teal) !important;
+}
+
+/* Price Calculator Box */
+.price-calc {
+  background: var(--sc-glass-bg-card) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(7, 143, 146, 0.3) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--sc-glass-shadow) !important;
+  color: var(--sc-text-main) !important;
+}
+
+.price-calc-head {
+  color: var(--sc-text-main) !important;
+}
+
+/* Buttons */
+.btn {
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2px !important;
+  padding: 8px 16px !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  cursor: pointer;
+  min-height: 38px;
+  box-sizing: border-box;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #078f92 0%, #0aa3a6 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 4px 14px rgba(7, 143, 146, 0.35) !important;
+}
+
+.btn.primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(7, 143, 146, 0.45) !important;
+}
+
+.btn.ghost {
+  background: var(--sc-glass-bg-card) !important;
+  border: 1px solid var(--sc-glass-border-subtle) !important;
+  color: var(--sc-text-main) !important;
+}
+
+.btn.ghost:hover {
+  background: rgba(7, 143, 146, 0.1) !important;
+  color: var(--sc-teal) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn.green {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+}
+
+.btn.amber {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35) !important;
+}
+
+.btn.red,
+.btn.danger {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35) !important;
+}
+
+/* =====================================================================
+   MODALS & DIALOGS (FULLY SCROLLABLE & INTUITIVE POPUPS)
+   Fixes purchase order popup and all modal scrolling issues.
+===================================================================== */
+.modal {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: var(--sc-modal-backdrop) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  display: none;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  z-index: 1300 !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  box-sizing: border-box !important;
+}
+
+.modal.show {
+  display: flex !important;
+}
+
+.modal-card,
+.modal-content,
+.modal-box {
+  background: var(--sc-glass-bg-elevated) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.45), var(--sc-glass-inner-glow) !important;
+  animation: modalFloatIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  color: var(--sc-text-main) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 92vh !important;
+  max-height: 92dvh !important;
+  overflow: hidden !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+@keyframes modalFloatIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-head {
+  background: var(--sc-table-header-bg) !important;
+  border-bottom: 1px solid var(--sc-divider) !important;
+  padding: 14px 20px !important;
+  color: var(--sc-text-main) !important;
+  flex: 0 0 auto !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.modal-head b {
+  font-size: 16px !important;
+  font-weight: 800 !important;
+}
+
+.closex {
+  border: 1px solid var(--sc-glass-border-subtle) !important;
+  background: var(--sc-glass-bg-card) !important;
+  color: var(--sc-text-main) !important;
+  border-radius: 10px !important;
+  width: 34px !important;
+  height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 900 !important;
+  font-size: 16px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.closex:hover {
+  background: var(--sc-teal) !important;
+  color: #ffffff !important;
+}
+
+.modal-body {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  max-height: calc(92vh - 65px) !important;
+  max-height: calc(92dvh - 65px) !important;
+  padding: 18px 22px 28px 22px !important;
+  box-sizing: border-box !important;
+}
+
+/* Specific Purchase Order Modal Scroll Engine */
+#purchaseOrderModal {
+  overflow-y: auto !important;
+}
+
+#purchaseOrderModal .modal-card {
+  width: min(1180px, 96vw) !important;
+  max-height: 92vh !important;
+  max-height: 92dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+#purchaseOrderModal .modal-head {
+  flex: 0 0 auto !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+}
+
+#purchaseOrderModal .modal-body {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  max-height: calc(92vh - 65px) !important;
+  max-height: calc(92dvh - 65px) !important;
+  padding: 18px 22px 32px 22px !important;
+}
+
+#purchaseOrderModal .po-line-scroll {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  max-width: 100% !important;
+  border: 1px solid var(--sc-divider) !important;
+  border-radius: 12px !important;
+  margin-bottom: 12px !important;
+  background: var(--sc-glass-bg-card) !important;
+}
+
+#purchaseOrderModal .po-editor-lines {
+  min-width: 900px !important;
+  width: 100% !important;
+}
+
+#poReceiptModal .modal-card {
+  max-height: 92vh !important;
+  max-height: 92dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#poReceiptModal .modal-body {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  max-height: calc(92vh - 65px) !important;
+  max-height: calc(92dvh - 65px) !important;
+}
+
+/* =====================================================================
+   FLOATING ACTION SCENARIOS (DOCKS & QUICK TOOLS)
+===================================================================== */
+.sc-floating-dock {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--sc-dock-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--sc-dock-border);
+  box-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.25), var(--sc-glass-inner-glow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sc-floating-dock.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(20px);
+}
+
+.sc-floating-dock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(7, 143, 146, 0.1);
+  color: var(--sc-text-main);
+}
+
+.sc-floating-dock-btn:hover {
+  background: var(--sc-teal);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(7, 143, 146, 0.35);
+}
+
+.sc-floating-dock-btn.primary {
+  background: linear-gradient(135deg, #078f92 0%, #0aa3a6 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(7, 143, 146, 0.3);
+}
+
+/* Floating Scroll-to-Top Button */
+.sc-floating-top-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 998;
+  background: var(--sc-dock-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--sc-dock-border);
+  color: var(--sc-text-main);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0;
+  transform: translateY(12px) scale(0.9);
+  pointer-events: none;
+}
+
+.sc-floating-top-btn.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.sc-floating-top-btn:hover {
+  background: var(--sc-teal);
+  color: #ffffff;
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 12px 28px rgba(7, 143, 146, 0.35);
+}
+
+/* =====================================================================
+   DOCUMENT PAPER PRESERVATION
+===================================================================== */
+.paper {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.16), 0 5px 15px rgba(0, 0, 0, 0.06) !important;
+  border-radius: 4px !important;
+}
+
+[data-theme="dark"] .paper {
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.paper table,
+.paper th,
+.paper td,
+.paper div,
+.paper span,
+.paper b,
+.paper p {
+  color: #111827 !important;
+}
+
+/* =====================================================================
+   LOGIN SCREEN
+===================================================================== */
+.login-screen {
+  background: var(--sc-modal-backdrop) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+}
+
+.login-box {
+  background: var(--sc-glass-bg-elevated) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid var(--sc-glass-border) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.45), var(--sc-glass-inner-glow) !important;
+  padding: 32px !important;
+  color: var(--sc-text-main) !important;
+}
+
+/* =====================================================================
+   CUSTOM SCROLLBARS
+===================================================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 120, 140, 0.25);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sc-teal);
+}
+
+/* =====================================================================
+   COMPREHENSIVE ANDROID & SMALL SCREEN SUPPORT
+   Fixes layout chaos, horizontal overflow, cramped buttons, and table scaling.
+===================================================================== */
+@media (max-width: 900px) {
+  .app {
+    padding: 0 10px 36px 10px !important;
+  }
+  
+  .cards {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+  
+  .admin-kpis, .assumption-grid, .po-kpis {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .app {
+    padding: 0 8px 32px 8px !important;
+    max-width: 100% !important;
+  }
+
+  /* Compact Android Glass Topbar */
+  .topbar.app-shell-header {
+    margin: 8px 0 12px 0 !important;
+    padding: 8px 12px !important;
+    border-radius: 16px !important;
+    top: 8px !important;
+  }
+
+  .topbar-main {
+    gap: 8px !important;
+  }
+
+  .brand.app-brand {
+    gap: 8px !important;
+  }
+
+  .brandmark {
+    padding: 5px 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .brandmark span.s,
+  .brandmark span.c {
+    font-size: 15px !important;
+  }
+
+  .brandtext b {
+    font-size: 13px !important;
+  }
+
+  .brandtext span {
+    display: none !important; /* Hide long subtitle on phones */
+  }
+
+  .shell-version {
+    display: none !important; /* Save precious header space on phones */
+  }
+
+  .topbar-actions {
+    gap: 6px !important;
+  }
+
+  /* Header action buttons */
+  .printer-hub-btn-v1124,
+  .app-refresh-btn-v1079 {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+    border-radius: 10px !important;
+    white-space: nowrap !important;
+  }
+
+  .printer-hub-text-v1124,
+  .app-refresh-text-v1079,
+  .user-profile-copy,
+  .profile-chevron {
+    display: none !important;
+  }
+
+  .user-profile-btn {
+    padding: 4px 6px !important;
+    border-radius: 999px !important;
+  }
+
+  .theme-toggle {
+    width: 50px !important;
+    height: 28px !important;
+  }
+
+  /* Modals on Mobile & Android */
+  .modal {
+    padding: 6px !important;
+    align-items: flex-start !important;
+  }
+
+  .modal-card,
+  #purchaseOrderModal .modal-card,
+  #poReceiptModal .modal-card {
+    width: calc(100vw - 12px) !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - 12px) !important;
+    margin: 6px auto !important;
+    border-radius: 18px !important;
+  }
+
+  .modal-body,
+  #purchaseOrderModal .modal-body,
+  #poReceiptModal .modal-body {
+    max-height: calc(100dvh - 68px) !important;
+    padding: 12px 14px 24px 14px !important;
+  }
+
+  .modal-head {
+    padding: 12px 14px !important;
+  }
+
+  /* Form & Input Grids */
+  .grid,
+  .editor-grid,
+  .attach-grid,
+  .customer-source-row {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .field.full,
+  .section {
+    grid-column: 1 / -1 !important;
+  }
+
+  /* Panels */
+  .panel {
+    border-radius: 16px !important;
+    margin-top: 12px !important;
+  }
+
+  .panel-title {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    padding: 12px 14px !important;
+  }
+
+  .panel-title .actions {
+    width: 100% !important;
+    margin-top: 4px !important;
+  }
+
+  .panel-body {
+    padding: 12px 14px !important;
+  }
+
+  /* Actions & Button Clusters */
+  .actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .actions .btn {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-width: 120px !important;
+    text-align: center !important;
+    justify-content: center !important;
+    padding: 9px 12px !important;
+    font-size: 12px !important;
+  }
+
+  .actions .btn.sm {
+    flex: 0 1 auto !important;
+    min-width: auto !important;
+  }
+
+  /* Universal Touch Scrolling for Wide Tables */
+  .panel-body,
+  .table-wrap,
+  .table-responsive,
+  .pc-scroll,
+  .jbr-scroll,
+  .mi-scroll,
+  .po-line-scroll,
+  .doctable-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-width: 100% !important;
+  }
+
+  /* Tabs horizontal touch scroll */
+  .pc-tabs,
+  .fac-tabs,
+  .mi-subnav {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 6px !important;
+    padding-bottom: 6px !important;
+    scrollbar-width: thin !important;
+  }
+
+  .pc-tabs button,
+  .fac-tabs button,
+  .mi-subnav button {
+    white-space: nowrap !important;
+    flex: 0 0 auto !important;
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+  }
+
+  /* Paper Preview Container */
+  .paperwrap {
+    padding: 6px 2px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+  }
+
+  .editor {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Price Calculator Responsive */
+  .price-inputs {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .price-results {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .price-summary {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .price-summary button {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-kpis, .assumption-grid, .po-kpis {
+    grid-template-columns: 1fr !important;
+  }
+
+  .actions .btn {
+    flex: 1 1 100% !important;
+  }
+
+  .printer-hub-btn-v1124,
+  .app-refresh-btn-v1079 {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .sc-floating-dock {
+    bottom: 16px !important;
+    padding: 6px 12px !important;
+    gap: 6px !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  .sc-floating-dock-btn {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+  }
+
+  .sc-floating-top-btn {
+    bottom: 16px !important;
+    right: 16px !important;
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .price-inputs,
+  .price-results {
+    grid-template-columns: 1fr !important;
+  }
+}
