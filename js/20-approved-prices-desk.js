@@ -28,6 +28,7 @@
   let portalMode='quote';
   let soCart=[];
   let soDeliveries=[];
+  let soPrimaryChoiceV1150='';
   let soItemCache=[];
   let soPage=1;
   let soItemPageV1032=1;
@@ -224,7 +225,8 @@
       line2:p.line2,
       contact1:customer?.phone||'',
       contact2:'',
-      allocations:{}
+      allocations:{},
+      recipientChoice: primary ? '' : 'separate'
     };
   }
 
@@ -235,6 +237,7 @@
     if(!soDeliveries.length){
       // Do not prefill user/customer details automatically to avoid accidental submissions
       soDeliveries=[newDeliveryV1030(null,true)];
+      soPrimaryChoiceV1150='';
     }
   }
 
@@ -411,7 +414,7 @@
 
         <div class="section">Delivery Customers & Item Allocation</div>
         <div class="bp-so-delivery-hint-v1030">
-          Each delivery block represents a <b>separate customer</b>. Delivery Customer 1 is the ordering customer and automatically receives the remaining quantity. Use <b>+ Add Separate Customer</b> to divide the selected items between other customers.
+          <b>Choose the delivery recipient explicitly.</b> Delivery Customer 1 receives the remaining quantity but is blank until you select <b>+ Add My Details</b> or <b>+ Add Separate Customer</b>. Selecting a separate customer does not copy your own details.
         </div>
         <div id="bpSoDeliveriesV1030"></div>
 
@@ -544,6 +547,7 @@
     lastSOEligibleCustomerId=$('bpSoCustomerV1030')?.value||'';
     soItemPageV1032=1;
     soDeliveries=[];
+    soPrimaryChoiceV1150='';
     ensureDeliveryBaseV1030();
     bpSoRenderEligibleItemsV1030();
     renderSOCartV1030();
@@ -1211,26 +1215,30 @@
     d.line2=p.line2||'';
     d.contact1=c.phone||'';
     d.contact2='';
+    if(Number(di)===0){d.recipientChoice='mine';soPrimaryChoiceV1150='mine';}
     renderSODeliveriesV1030();
     toast(`Ordering customer details applied to Delivery Customer ${Number(di)+1}`);
   };
 
   window.bpSoAddSeparateCustomerV1030=function(di=0){
     ensureDeliveryBaseV1030();
-    const d=soDeliveries[Number(di)||0];
-    if(d && (d.name || d.line1 || d.contact1)){
-      // If current customer has details, add a new separate delivery customer block
-      bpSoAddDeliveryV1030();
-      toast('Added new separate delivery customer block');
-    }else{
-      // If blank, keep current block for the separate customer and focus name field
-      const input=document.querySelector(`.bp-so-del-name-input[data-di="${di}"]`);
-      if(input){
-        input.focus();
-        input.placeholder='Enter separate customer / company name';
+    const index=Number(di)||0;
+    const d=soDeliveries[index];
+    if(!d)return;
+    if(index===0){
+      // Explicitly choose a nominated customer rather than defaulting to the ordering customer.
+      if(d.recipientChoice!=='separate'){
+        d.name='';d.line1='';d.line2='';d.contact1='';d.contact2='';
       }
-      toast(`Enter separate customer details for Delivery Customer ${Number(di)+1}`);
+      d.recipientChoice='separate';
+      soPrimaryChoiceV1150='separate';
+      renderSODeliveriesV1030();
+      const input=document.querySelector('.bp-so-del-name-input[data-di="0"]');
+      input?.focus();
+      toast('Enter the separate recipient details for Delivery Customer 1');
+      return;
     }
+    bpSoAddDeliveryV1030();
   };
 
   window.bpSoClearDeliveryDetailsV1030=function(di=0){
@@ -1241,6 +1249,7 @@
     d.line2='';
     d.contact1='';
     d.contact2='';
+    if(Number(di)===0){d.recipientChoice='';soPrimaryChoiceV1150='';}
     renderSODeliveriesV1030();
     toast(`Delivery Customer ${Number(di)+1} details cleared`);
   };
@@ -1322,10 +1331,10 @@
                 ${
                   isPrimary
                     ? `
-                      <button class="btn ghost sm" type="button" onclick="bpSoUseMyDetailsV1030(${di})" title="Copy ordering customer name, address, and phone">
+                      <button class="btn ${d.recipientChoice==='mine'?'primary':'ghost'} sm" type="button" onclick="bpSoUseMyDetailsV1030(${di})" title="Copy ordering customer name, address, and phone">
                         + Add my details
                       </button>
-                      <button class="btn ghost sm" type="button" onclick="bpSoAddSeparateCustomerV1030(${di})" title="Enter separate customer or add another delivery customer">
+                      <button class="btn ${d.recipientChoice==='separate'?'primary':'ghost'} sm" type="button" onclick="bpSoAddSeparateCustomerV1030(${di})" title="Enter separate customer or add another delivery customer">
                         + Add Separate Customer
                       </button>
                       ${(d.name || d.line1 || d.contact1) ? `
@@ -1553,6 +1562,7 @@
   }
 
   function validateSOAllocationsV1030(){
+    if(!soDeliveries[0]?.recipientChoice)return 'Select + Add My Details or + Add Separate Customer for Delivery Customer 1 before submitting.';
     if(!soCart.length)return 'Add at least one repeat-order item.';
 
     for(const line of soCart){

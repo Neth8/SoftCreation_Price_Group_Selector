@@ -10,30 +10,13 @@ async function pcFetch(path,options={}){const r=await fetch(PC_REST+path,{...opt
 async function pcRpc(name,args){return await pcFetch('/rpc/'+name,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(args||{})})}
 function pcHas(p){
   const role=String(currentUser?.role||'').toLowerCase();
-
   if(role==='admin')return true;
-
-  /* V1.1.19 hard role separation */
-  if(role==='manager'){
-    if(p==='production_control_create')return false;
-    if([
-      'production_control_view',
-      'production_control_approve',
-      'production_control_chat',
-      'production_control_policy'
-    ].includes(p))return true;
-  }
-
-  if(role==='sales'){
-    if(p==='production_control_approve')return false;
-    if([
-      'production_control_view',
-      'production_control_create',
-      'production_control_chat'
-    ].includes(p))return true;
-  }
-
-  return typeof hasPerm==='function'&&hasPerm(p);
+  // Permissions must be granted by Admin; a role alone grants nothing.
+  if(typeof hasPerm!=='function'||!hasPerm(p))return false;
+  // Keep role separation even if a legacy account has an old approval flag.
+  if(role==='sales' && ['production_control_approve','production_control_policy'].includes(p))return false;
+  if(role==='manager' && p==='production_control_create')return false;
+  return true;
 }
 function pcEsc(v){return typeof esc==='function'?esc(v):String(v??'')}
 function pcNum(v){return Number(v||0)}
@@ -171,8 +154,9 @@ function pcEnsurePermissions(){if(typeof USER_FEATURES==='undefined')return;[['p
 function pcInstallUI(){
   if(document.getElementById('productioncontrol'))return;
   pcEnsurePermissions();
+  if(typeof VIEW_PERMS!=='undefined')VIEW_PERMS.productioncontrol='production_control_view';
   const nav=document.querySelector('.nav'),before=nav?.querySelector('[data-view="production"]')||nav?.querySelector('[data-view="settings"]');
-  if(nav){const b=document.createElement('button');b.className='navbtn';b.dataset.view='productioncontrol';b.textContent='Production Control';b.onclick=()=>showView('productioncontrol');nav.insertBefore(b,before||null)}
+  if(nav){const b=document.createElement('button');b.className='navbtn';b.dataset.view='productioncontrol';b.textContent='Production Control';b.onclick=()=>showView('productioncontrol');b.style.display=pcHas('production_control_view')?'inline-block':'none';nav.insertBefore(b,before||null)}
   const section=document.createElement('section');section.id='productioncontrol';section.className='view';section.innerHTML=`
     <div class="panel pc-shell"><div class="panel-title pc-title"><div><span>Production Control</span><small>SC HO planning → Manager approval → existing Products execution</small></div><button class="btn sm pc-refresh" onclick="pcRefresh(true)">Refresh Live Data</button></div>
     <div class="panel-body"><div class="pc-tabs"><button data-pc-view="planner" onclick="pcGo('planner')">Production Request</button><button data-pc-view="approvals" onclick="pcGo('approvals')">Manager Approvals <span id="pcPendingCount"></span></button><button data-pc-view="register" onclick="pcGo('register')">Request Register</button><button data-pc-view="history" onclick="pcGo('history')">History <span id="pcHistoryCount"></span></button><button data-pc-view="demand" onclick="pcGo('demand')">Demand / Sales Orders</button></div><div id="pcKpis" class="pc-kpis"></div><div id="pcBody"></div></div></div>`;
@@ -460,6 +444,9 @@ window.pcDemandProductionPDFV1128=async function(){
   }
 };
 function pcDemandHTML(){const groups=pcDemandGroups();return `<div class="pc-card"><div class="pc-card-head"><div><h3>Live Sales Order production demand</h3><p>Ordered − dispatched − cancelled − quantities reserved by open Production Control requests.</p></div><button class="btn navy sm" type="button" onclick="pcDemandProductionPDFV1128()">Download Demand / Cut PDF</button></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Item</th><th class="num">SO Demand</th><th class="num">JBR Cut</th><th class="num">+ Extra / Balance</th><th class="num">Cover</th><th class="num">Safety</th><th class="num">HO Stock</th><th class="num">Pipeline</th><th class="num">Recommended</th></tr></thead><tbody>${groups.map(g=>{const requested=(state.productionRequests||[]).filter(r=>pcLineKey(r)===g.key).reduce((n,r)=>n+pcNum(r.requestQty),0);const cut=pcNum(window.jbrCutForProductV1121?.(g.key)||0);const diff=cut-requested;return `<tr><td><b>${pcEsc(pcLineLabel(g))}</b><small>${g.orders.length} open SO line(s) • ${((state.productionRequests||[]).filter(r=>pcLineKey(r)===g.key)).length} production job(s)</small></td><td class="num">${pcMoney(g.demand)}</td><td class="num"><b>${pcMoney(cut)}</b></td><td class="num ${diff>0?'pc-plus-v1128':''}">${diff>0?`+${pcMoney(diff)} extra`:diff<0?`${pcMoney(Math.abs(diff))} to cut`:'0'}</td><td class="num">${pcMoney(g.cover)}</td><td class="num">${pcMoney(g.safety)}</td><td class="num">${pcMoney(g.stock)}</td><td class="num">${pcMoney(g.pipeline)}</td><td class="num"><b>${pcMoney(g.recommended)}</b></td></tr>`}).join('')||'<tr><td colspan="9">No current Sales Order demand.</td></tr>'}</tbody></table></div></div>`}
+const baseAccessApplyPC=window.applyUserAccess;
+window.applyUserAccess=function(){const result=baseAccessApplyPC?.apply(this,arguments);const nav=document.querySelector('.navbtn[data-view="productioncontrol"]');if(nav)nav.style.display=pcHas('production_control_view')?'inline-block':'none';if(document.getElementById('productioncontrol')?.classList.contains('active')&&!pcHas('production_control_view'))window.showView('dashboard');return result};
+try{applyUserAccess=window.applyUserAccess}catch(_){}
 const showBase=window.showView;
 window.showView=function(id){if(id==='productioncontrol'&&!pcHas('production_control_view'))return requirePerm('production_control_view','open Production Control');const r=showBase.apply(this,arguments);if(id==='productioncontrol')pcRefresh(false);return r};
 try{showView=window.showView}catch(_){}
