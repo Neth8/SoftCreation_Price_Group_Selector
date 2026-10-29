@@ -233,7 +233,8 @@
     if(!c)return;
 
     if(!soDeliveries.length){
-      soDeliveries=[newDeliveryV1030(c,true)];
+      // Do not prefill user/customer details automatically to avoid accidental submissions
+      soDeliveries=[newDeliveryV1030(null,true)];
     }
   }
 
@@ -452,9 +453,27 @@
               <b id="bpSoViewTitleV1030">Sales Order</b>
               <div id="bpSoViewMetaV1030" class="small"></div>
             </div>
-            <button class="closex" type="button" onclick="closeModal('bpSoViewModalV1030')">×</button>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="bpSoViewEditBtnV1030" class="btn amber sm" type="button" style="display:none" onclick="adminOpenEditSalesOrderV1030(document.getElementById('bpSoViewModalV1030')?.dataset?.soIdV1032)">
+                Edit Order (Admin)
+              </button>
+              <button class="closex" type="button" onclick="closeModal('bpSoViewModalV1030')">×</button>
+            </div>
           </div>
           <div id="bpSoViewBodyV1030" class="modal-body"></div>
+        </div>
+      </div>
+
+      <div id="adminSoEditModalV1030" class="modal">
+        <div class="modal-card" style="width:min(1150px,96vw)">
+          <div class="modal-head">
+            <div>
+              <b id="adminSoEditTitleV1030">Edit Sales Order (Admin)</b>
+              <div id="adminSoEditMetaV1030" class="small"></div>
+            </div>
+            <button class="closex" type="button" onclick="closeModal('adminSoEditModalV1030')">×</button>
+          </div>
+          <div id="adminSoEditBodyV1030" class="modal-body"></div>
         </div>
       </div>
     `);
@@ -1164,6 +1183,68 @@
     d[field]=String(value??'');
   };
 
+  window.bpSoUpdateDeliveryNameV1030=function(index,value){
+    const d=soDeliveries[Number(index)];
+    if(!d)return;
+    d.name=String(value??'');
+    // Check if matches an existing customer in state.customers
+    const match=(state.customers||[]).find(c=>c.name && c.name.trim().toLowerCase()===d.name.trim().toLowerCase());
+    if(match){
+      const p=customerAddressPartsV1030(match);
+      if(p.line1)d.line1=p.line1;
+      if(p.line2)d.line2=p.line2;
+      if(match.phone)d.contact1=match.phone;
+      renderSODeliveriesV1030();
+      toast(`Auto-filled details from Customer Master for "${match.name}"`);
+    }
+  };
+
+  window.bpSoUseMyDetailsV1030=function(di=0){
+    const c=selectedSOCustomerV1030();
+    if(!c)return toast('Select an eligible ordering customer first');
+    ensureDeliveryBaseV1030();
+    const d=soDeliveries[Number(di)||0];
+    if(!d)return;
+    const p=customerAddressPartsV1030(c);
+    d.name=c.name||'';
+    d.line1=p.line1||'';
+    d.line2=p.line2||'';
+    d.contact1=c.phone||'';
+    d.contact2='';
+    renderSODeliveriesV1030();
+    toast(`Ordering customer details applied to Delivery Customer ${Number(di)+1}`);
+  };
+
+  window.bpSoAddSeparateCustomerV1030=function(di=0){
+    ensureDeliveryBaseV1030();
+    const d=soDeliveries[Number(di)||0];
+    if(d && (d.name || d.line1 || d.contact1)){
+      // If current customer has details, add a new separate delivery customer block
+      bpSoAddDeliveryV1030();
+      toast('Added new separate delivery customer block');
+    }else{
+      // If blank, keep current block for the separate customer and focus name field
+      const input=document.querySelector(`.bp-so-del-name-input[data-di="${di}"]`);
+      if(input){
+        input.focus();
+        input.placeholder='Enter separate customer / company name';
+      }
+      toast(`Enter separate customer details for Delivery Customer ${Number(di)+1}`);
+    }
+  };
+
+  window.bpSoClearDeliveryDetailsV1030=function(di=0){
+    const d=soDeliveries[Number(di)||0];
+    if(!d)return;
+    d.name='';
+    d.line1='';
+    d.line2='';
+    d.contact1='';
+    d.contact2='';
+    renderSODeliveriesV1030();
+    toast(`Delivery Customer ${Number(di)+1} details cleared`);
+  };
+
   window.bpSoSetAllocationV1030=function(index,encodedKey,value){
     index=Number(index);
     if(index<=0 || index>=soDeliveries.length)return;
@@ -1202,7 +1283,13 @@
     ensureDeliveryBaseV1030();
     rebalanceAllocationsV1030();
 
+    const customerOptionsHtml = (state.customers||[])
+      .filter(x=>x && x.name)
+      .map(x=>`<option value="${esc(x.name)}">${esc(x.phone?`${x.name} (${x.phone})`:x.name)}</option>`)
+      .join('');
+
     box.innerHTML=
+      `<datalist id="soCustomerOptionsListV1030">${customerOptionsHtml}</datalist>` +
       soDeliveries.map((d,di)=>{
         const total=
           deliveryAllocatedV1030(d);
@@ -1217,31 +1304,47 @@
               <div>
                 <b>
                   Delivery Customer ${di+1}
-                  ${isPrimary?' • Ordering Customer / Balance':''}
+                  ${isPrimary?' • Primary / Balance Customer':' • Separate Customer'}
                 </b>
 
                 <span>
                   ${
                     isPrimary
-                      ? 'Prefilled from Customer Master. Any selected-item quantity not allocated to another delivery customer remains with this customer automatically.'
+                      ? (d.name
+                          ? `Recipient: <b>${esc(d.name)}</b>. Receives remaining balance automatically.`
+                          : `Choose <b>+ Add my details</b> to use ordering customer address, or enter separate customer details below.`)
                       : 'This is a separate customer. Enter that customer’s company / receiver details and allocate selected-item quantities below.'
                   }
                 </span>
               </div>
 
-              ${
-                di>0
-                  ? `
-                    <button
-                      class="btn red sm"
-                      type="button"
-                      onclick="bpSoRemoveDeliveryV1030(${di})"
-                    >
-                      Remove Customer
-                    </button>
-                  `
-                  : ''
-              }
+              <div class="bp-so-del-actions-v1030" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                ${
+                  isPrimary
+                    ? `
+                      <button class="btn ghost sm" type="button" onclick="bpSoUseMyDetailsV1030(${di})" title="Copy ordering customer name, address, and phone">
+                        + Add my details
+                      </button>
+                      <button class="btn ghost sm" type="button" onclick="bpSoAddSeparateCustomerV1030(${di})" title="Enter separate customer or add another delivery customer">
+                        + Add Separate Customer
+                      </button>
+                      ${(d.name || d.line1 || d.contact1) ? `
+                        <button class="btn red sm" type="button" onclick="bpSoClearDeliveryDetailsV1030(${di})" title="Clear customer details">
+                          Clear
+                        </button>
+                      ` : ''}
+                    `
+                    : `
+                      <button
+                        class="btn red sm"
+                        type="button"
+                        onclick="bpSoRemoveDeliveryV1030(${di})"
+                      >
+                        Remove Customer
+                      </button>
+                    `
+                }
+              </div>
             </div>
 
             <div class="bp-delivery-grid">
@@ -1252,8 +1355,12 @@
                 </label>
 
                 <input
+                  class="bp-so-del-name-input"
+                  data-di="${di}"
+                  list="soCustomerOptionsListV1030"
                   value="${esc(d.name||'')}"
-                  oninput="bpSoUpdateDeliveryV1030(${di},'name',this.value)"
+                  placeholder="${isPrimary ? 'Choose \"+ Add my details\" or type customer name' : 'Enter separate customer / company name'}"
+                  oninput="bpSoUpdateDeliveryNameV1030(${di},this.value)"
                 >
               </div>
 
@@ -1464,7 +1571,7 @@
       const total=deliveryAllocatedV1030(d);
       if(!(total>0))continue;
 
-      if(!String(d.name||'').trim())return `Delivery Customer ${i+1}: Customer / Company Name is required.`;
+      if(!String(d.name||'').trim())return `Delivery Customer ${i+1}: Customer / Company Name is required. Choose '+ Add my details' or enter customer name.`;
       if(!String(d.line1||'').trim())return `Delivery Customer ${i+1}: Address Line 1 is required.`;
       if(!String(d.line2||'').trim())return `Delivery Customer ${i+1}: Address Line 2 is required.`;
       if(!String(d.contact1||'').trim())return `Delivery Customer ${i+1}: Contact Number is required.`;
@@ -2074,6 +2181,11 @@
                     }
 
                     <button class="btn ghost sm" type="button" onclick="bpSoViewOrderV1030('${so.id}')">View</button>
+                    ${
+                      (currentUser?.role === 'admin' && so.recoveredStoresOrder !== true && so.readOnly !== true)
+                        ? `<button class="btn amber sm" type="button" onclick="adminOpenEditSalesOrderV1030('${so.id}')">Edit</button>`
+                        : ''
+                    }
                   </div>
                 </div>
               </div>
@@ -2151,6 +2263,11 @@
     const modal=$('bpSoViewModalV1030');
     if(modal){
       modal.dataset.soIdV1032=so.id;
+    }
+
+    const editBtn=$('bpSoViewEditBtnV1030');
+    if(editBtn){
+      editBtn.style.display=(currentUser?.role==='admin' && so.recoveredStoresOrder!==true && so.readOnly!==true)?'inline-flex':'none';
     }
 
     const deliveryRows=
@@ -2459,6 +2576,507 @@
     `;
 
     modal?.classList.add('show');
+  };
+
+  /* -------------------------------------------------------
+     Admin Sales Order Editing System
+     ------------------------------------------------------- */
+  let adminEditingSO = null;
+
+  window.adminOpenEditSalesOrderV1030 = function(soId) {
+    if (currentUser?.role !== 'admin') {
+      return toast('Administrator access is required to edit sales orders.');
+    }
+    const so = (state.salesOrders || []).find(x => x.id === soId);
+    if (!so) return toast('Sales Order not found');
+    if (so.recoveredStoresOrder === true || so.readOnly === true) {
+      return toast('Recovered Stores order: read-only. Editing is disabled.');
+    }
+
+    // Deep clone
+    adminEditingSO = JSON.parse(JSON.stringify(so));
+    adminEditingSO.lines = (adminEditingSO.lines || []).map(l => ({
+      ...l,
+      qty: Number(l.qty || 0),
+      price: Number(l.price || 0)
+    }));
+
+    if (!Array.isArray(adminEditingSO.deliveries) || !adminEditingSO.deliveries.length) {
+      const p = customerAddressPartsV1030({ address: so.shipTo?.address, phone: so.shipTo?.phone });
+      adminEditingSO.deliveries = [{
+        id: uid('sodel'),
+        sequence: 1,
+        primary: true,
+        name: so.shipTo?.name || so.customerName || '',
+        line1: p.line1 || '',
+        line2: p.line2 || '',
+        contact1: so.shipTo?.phone || so.customerPhone || '',
+        contact2: so.shipTo?.phone2 || '',
+        allocations: adminEditingSO.lines.map((l, lineIndex) => ({
+          lineIndex,
+          qty: Number(l.qty || 0)
+        }))
+      }];
+    } else {
+      adminEditingSO.deliveries = adminEditingSO.deliveries.map((d, di) => {
+        let allocs = [];
+        if (Array.isArray(d.allocations)) {
+          allocs = adminEditingSO.lines.map((l, lineIndex) => {
+            const match = d.allocations.find(a => Number(a.lineIndex) === lineIndex || (a.lineKey && (a.lineKey === l.cartKey || a.lineKey === l.itemId)));
+            return {
+              lineIndex,
+              qty: match ? Number(match.qty || 0) : (di === 0 ? Number(l.qty || 0) : 0)
+            };
+          });
+        } else if (d.allocations && typeof d.allocations === 'object') {
+          allocs = adminEditingSO.lines.map((l, lineIndex) => {
+            const key = l.cartKey || l.itemId || '';
+            return {
+              lineIndex,
+              qty: Number(d.allocations[key] || 0)
+            };
+          });
+        } else {
+          allocs = adminEditingSO.lines.map((l, lineIndex) => ({
+            lineIndex,
+            qty: di === 0 ? Number(l.qty || 0) : 0
+          }));
+        }
+        return {
+          id: d.id || uid('sodel'),
+          sequence: d.sequence || (di + 1),
+          primary: di === 0,
+          name: d.name || '',
+          line1: d.line1 || '',
+          line2: d.line2 || '',
+          contact1: d.contact1 || '',
+          contact2: d.contact2 || '',
+          allocations: allocs
+        };
+      });
+    }
+
+    renderAdminEditSOModalV1030();
+    const modal = $('adminSoEditModalV1030');
+    if (modal) modal.classList.add('show');
+  };
+
+  window.adminEditUpdateField = function(field, val) {
+    if (!adminEditingSO) return;
+    adminEditingSO[field] = val;
+  };
+
+  window.adminEditUpdateLineQty = function(lineIndex, newQty) {
+    if (!adminEditingSO) return;
+    const l = adminEditingSO.lines[Number(lineIndex)];
+    if (!l) return;
+    const qty = Math.max(0, Number(newQty || 0));
+    l.qty = qty;
+
+    // Auto balance to primary customer if single delivery
+    if (adminEditingSO.deliveries.length === 1) {
+      const a = adminEditingSO.deliveries[0].allocations.find(x => x.lineIndex === Number(lineIndex));
+      if (a) a.qty = qty;
+    }
+    renderAdminEditSOModalV1030();
+  };
+
+  window.adminEditSetAllocation = function(di, lineIndex, val) {
+    if (!adminEditingSO) return;
+    const d = adminEditingSO.deliveries[Number(di)];
+    if (!d) return;
+    let alloc = d.allocations.find(a => a.lineIndex === Number(lineIndex));
+    if (!alloc) {
+      alloc = { lineIndex: Number(lineIndex), qty: 0 };
+      d.allocations.push(alloc);
+    }
+    alloc.qty = Math.max(0, Number(val || 0));
+    renderAdminEditSOModalV1030();
+  };
+
+  window.adminEditBalanceToPrimary = function() {
+    if (!adminEditingSO || !adminEditingSO.deliveries.length) return;
+    const primary = adminEditingSO.deliveries[0];
+    adminEditingSO.lines.forEach((l, li) => {
+      const otherAlloc = adminEditingSO.deliveries.slice(1).reduce((s, d) => {
+        const a = d.allocations.find(x => x.lineIndex === li);
+        return s + Number(a?.qty || 0);
+      }, 0);
+      const remaining = Math.max(0, Number(l.qty || 0) - otherAlloc);
+      let a0 = primary.allocations.find(x => x.lineIndex === li);
+      if (!a0) {
+        a0 = { lineIndex: li, qty: remaining };
+        primary.allocations.push(a0);
+      } else {
+        a0.qty = remaining;
+      }
+    });
+    renderAdminEditSOModalV1030();
+    toast('Balanced remaining quantities to Delivery Customer 1');
+  };
+
+  window.adminEditAddDelivery = function() {
+    if (!adminEditingSO) return;
+    adminEditingSO.deliveries.push({
+      id: uid('sodel'),
+      sequence: adminEditingSO.deliveries.length + 1,
+      primary: false,
+      name: '',
+      line1: '',
+      line2: '',
+      contact1: '',
+      contact2: '',
+      allocations: adminEditingSO.lines.map((l, lineIndex) => ({
+        lineIndex,
+        qty: 0
+      }))
+    });
+    renderAdminEditSOModalV1030();
+  };
+
+  window.adminEditRemoveDelivery = function(di) {
+    if (!adminEditingSO || di <= 0 || di >= adminEditingSO.deliveries.length) return;
+    adminEditingSO.deliveries.splice(di, 1);
+    adminEditingSO.deliveries.forEach((d, i) => { d.sequence = i + 1; });
+    renderAdminEditSOModalV1030();
+  };
+
+  window.adminEditUseMyDetails = function(di = 0) {
+    if (!adminEditingSO) return;
+    const cust = (state.customers || []).find(c => c.id === adminEditingSO.customerId || c.name === adminEditingSO.customerName);
+    if (!cust) return toast('Customer record not found');
+    const p = customerAddressPartsV1030(cust);
+    const d = adminEditingSO.deliveries[Number(di)];
+    if (!d) return;
+    d.name = cust.name || '';
+    d.line1 = p.line1 || '';
+    d.line2 = p.line2 || '';
+    d.contact1 = cust.phone || '';
+    d.contact2 = '';
+    renderAdminEditSOModalV1030();
+    toast('Customer Master details applied');
+  };
+
+  window.adminEditUpdateDeliveryName = function(di, val) {
+    if (!adminEditingSO) return;
+    const d = adminEditingSO.deliveries[Number(di)];
+    if (!d) return;
+    d.name = String(val || '');
+    const match = (state.customers || []).find(c => c.name && c.name.trim().toLowerCase() === d.name.trim().toLowerCase());
+    if (match) {
+      const p = customerAddressPartsV1030(match);
+      if (p.line1) d.line1 = p.line1;
+      if (p.line2) d.line2 = p.line2;
+      if (match.phone) d.contact1 = match.phone;
+      renderAdminEditSOModalV1030();
+      toast(`Auto-filled details for "${match.name}"`);
+    }
+  };
+
+  window.adminEditUpdateDeliveryField = function(di, field, val) {
+    if (!adminEditingSO) return;
+    const d = adminEditingSO.deliveries[Number(di)];
+    if (!d) return;
+    if (['line1', 'line2', 'contact1', 'contact2'].includes(field)) {
+      d[field] = String(val ?? '');
+    }
+  };
+
+  function renderAdminEditSOModalV1030() {
+    const box = $('adminSoEditBodyV1030');
+    if (!box || !adminEditingSO) return;
+
+    $('adminSoEditTitleV1030').textContent = `Edit Sales Order — ${adminEditingSO.soNo}`;
+    $('adminSoEditMetaV1030').textContent = `Customer: ${adminEditingSO.customerName} • Created by: ${adminEditingSO.ownerDisplay || adminEditingSO.ownerUser || 'User'} (${adminEditingSO.date})`;
+
+    const grandTotal = adminEditingSO.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.price || 0), 0);
+
+    const customerOptionsHtml = (state.customers || [])
+      .filter(c => c && c.name)
+      .map(c => `<option value="${esc(c.name)}">${esc(c.phone ? `${c.name} (${c.phone})` : c.name)}</option>`)
+      .join('');
+
+    box.innerHTML = `
+      <datalist id="adminEditCustomerList">${customerOptionsHtml}</datalist>
+
+      <div class="grid">
+        <div class="field">
+          <label>Sales Order Date <span class="required-dot">*</span></label>
+          <input type="date" value="${adminEditingSO.date || today()}" onchange="adminEditUpdateField('date', this.value)">
+        </div>
+        <div class="field">
+          <label>Required Delivery Date</label>
+          <input type="date" value="${adminEditingSO.needDate || ''}" onchange="adminEditUpdateField('needDate', this.value)">
+        </div>
+        <div class="field full">
+          <label>Customer PO / Reference</label>
+          <input value="${esc(adminEditingSO.customerRef || '')}" placeholder="Customer PO number or reference" oninput="adminEditUpdateField('customerRef', this.value)">
+        </div>
+        <div class="field full">
+          <label>Special Instructions / Production Note</label>
+          <textarea placeholder="Instructions for stores / dispatch" oninput="adminEditUpdateField('note', this.value)">${esc(adminEditingSO.note || '')}</textarea>
+        </div>
+      </div>
+
+      <div class="section" style="margin-top:16px">Ordered Items & Quantities</div>
+      <div style="overflow:auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Item / Specification</th>
+              <th>Source PI</th>
+              <th>Unit Price</th>
+              <th style="width:130px">Order Qty</th>
+              <th>Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${adminEditingSO.lines.map((l, li) => `
+              <tr>
+                <td>
+                  <b>${esc([l.desc, l.size, l.material, l.layout, l.pcs ? l.pcs + ' pcs' : ''].filter(Boolean).join(' • '))}</b>
+                </td>
+                <td>${esc(l.sourcePISerial || adminEditingSO.sourcePISerial || '-')}</td>
+                <td>LKR ${money(l.price)}</td>
+                <td>
+                  <input type="number" min="0.01" step="0.01" value="${l.qty}" style="width:100%" onchange="adminEditUpdateLineQty(${li}, this.value)">
+                </td>
+                <td><b>LKR ${money(Number(l.qty || 0) * Number(l.price || 0))}</b></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sumline">
+        <span>Updated Order Total</span>
+        <strong>LKR ${money(grandTotal)}</strong>
+      </div>
+
+      <div class="section" style="margin-top:16px">Delivery Customers & Item Allocation</div>
+      <div class="bp-so-delivery-hint-v1030" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span>Manage delivery destinations. Allocate items for each recipient below.</span>
+        <button class="btn ghost sm" type="button" onclick="adminEditBalanceToPrimary()">⚡ Balance Remaining to Customer 1</button>
+      </div>
+
+      <div class="admin-so-deliveries-list">
+        ${adminEditingSO.deliveries.map((d, di) => {
+          const isPrimary = di === 0;
+          return `
+            <div class="bp-so-delivery-card-v1030 admin-so-edit-card" style="margin-bottom:14px;padding:16px;border:1px solid var(--sc-glass-border-subtle);border-radius:14px;background:var(--sc-glass-bg-card)">
+              <div class="bp-so-delivery-title-v1030" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <div>
+                  <b>Delivery Customer ${di + 1} ${isPrimary ? '• Primary / Balance' : '• Separate Customer'}</b>
+                  <span>${isPrimary ? 'Primary delivery recipient.' : 'Separate customer / destination.'}</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  ${isPrimary ? `
+                    <button class="btn ghost sm" type="button" onclick="adminEditUseMyDetails(${di})">+ Add my details</button>
+                  ` : `
+                    <button class="btn red sm" type="button" onclick="adminEditRemoveDelivery(${di})">Remove Customer</button>
+                  `}
+                </div>
+              </div>
+
+              <div class="bp-delivery-grid">
+                <div class="field full">
+                  <label>Customer / Company Name <span class="required-dot">*</span></label>
+                  <input list="adminEditCustomerList" value="${esc(d.name || '')}" placeholder="Customer or company name" oninput="adminEditUpdateDeliveryName(${di}, this.value)">
+                </div>
+                <div class="field">
+                  <label>Address Line 1 <span class="required-dot">*</span></label>
+                  <input value="${esc(d.line1 || '')}" oninput="adminEditUpdateDeliveryField(${di}, 'line1', this.value)">
+                </div>
+                <div class="field">
+                  <label>Address Line 2 <span class="required-dot">*</span></label>
+                  <input value="${esc(d.line2 || '')}" oninput="adminEditUpdateDeliveryField(${di}, 'line2', this.value)">
+                </div>
+                <div class="field">
+                  <label>Contact Number <span class="required-dot">*</span></label>
+                  <input type="tel" value="${esc(d.contact1 || '')}" oninput="adminEditUpdateDeliveryField(${di}, 'contact1', this.value)">
+                </div>
+                <div class="field">
+                  <label>Second Contact Number (Optional)</label>
+                  <input type="tel" value="${esc(d.contact2 || '')}" oninput="adminEditUpdateDeliveryField(${di}, 'contact2', this.value)">
+                </div>
+              </div>
+
+              <div class="bp-so-allocation-head-v1030" style="margin-top:12px">
+                <b>Items Allocated to Customer ${di + 1}</b>
+              </div>
+
+              <div class="bp-so-allocation-list-v1030">
+                ${adminEditingSO.lines.map((l, li) => {
+                  const alloc = d.allocations.find(a => a.lineIndex === li);
+                  const allocQty = alloc ? Number(alloc.qty || 0) : 0;
+                  return `
+                    <div class="bp-so-allocation-row-v1030">
+                      <div>
+                        <b>${esc([l.desc, l.size, l.material].filter(Boolean).join(' • '))}</b>
+                        <span>Total Ordered: <b>${money(l.qty)} ${esc(l.unit)}</b></span>
+                      </div>
+                      <div class="field">
+                        <label>Allocated Qty</label>
+                        <input type="number" min="0" step="0.01" max="${l.qty}" value="${allocQty}" onchange="adminEditSetAllocation(${di}, ${li}, this.value)">
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="actions" style="margin:12px 0">
+        <button class="btn ghost" type="button" onclick="adminEditAddDelivery()">+ Add Separate Customer</button>
+      </div>
+
+      <div id="adminEditWarning" style="margin:10px 0"></div>
+
+      <div class="actions" style="margin-top:20px;border-top:1px solid var(--sc-divider);padding-top:14px">
+        <button class="btn primary" type="button" onclick="adminSaveSalesOrderV1030()">Save Changes</button>
+        <button class="btn ghost" type="button" onclick="closeModal('adminSoEditModalV1030')">Cancel</button>
+      </div>
+    `;
+  }
+
+  window.adminSaveSalesOrderV1030 = function() {
+    if (!adminEditingSO) return;
+    if (currentUser?.role !== 'admin') {
+      return toast('Administrator access is required.');
+    }
+
+    const so = (state.salesOrders || []).find(x => x.id === adminEditingSO.id);
+    if (!so) return toast('Sales Order not found in state.');
+
+    // 1. Validate Lines
+    if (!adminEditingSO.lines.length || adminEditingSO.lines.some(l => !(Number(l.qty) > 0))) {
+      return toast('All items must have a valid quantity greater than 0.');
+    }
+
+    // 2. Validate Allocations
+    for (let li = 0; li < adminEditingSO.lines.length; li++) {
+      const l = adminEditingSO.lines[li];
+      const sumAllocated = adminEditingSO.deliveries.reduce((sum, d) => {
+        const a = d.allocations.find(x => x.lineIndex === li);
+        return sum + Number(a?.qty || 0);
+      }, 0);
+
+      if (Math.abs(sumAllocated - Number(l.qty || 0)) > 0.001) {
+        const msg = `Item "${l.desc}" ordered quantity (${money(l.qty)}) does not match total allocated quantity (${money(sumAllocated)}). Please balance allocations.`;
+        const warn = $('adminEditWarning');
+        if (warn) warn.innerHTML = `<div class="bp-so-validation-error-v1030">${esc(msg)}</div>`;
+        return toast(msg);
+      }
+    }
+
+    // 3. Validate Delivery Customers
+    for (let di = 0; di < adminEditingSO.deliveries.length; di++) {
+      const d = adminEditingSO.deliveries[di];
+      const hasAlloc = d.allocations.some(a => Number(a.qty) > 0);
+      if (hasAlloc) {
+        if (!String(d.name || '').trim()) return toast(`Delivery Customer ${di + 1}: Customer / Company Name is required.`);
+        if (!String(d.line1 || '').trim()) return toast(`Delivery Customer ${di + 1}: Address Line 1 is required.`);
+        if (!String(d.line2 || '').trim()) return toast(`Delivery Customer ${di + 1}: Address Line 2 is required.`);
+        if (!String(d.contact1 || '').trim()) return toast(`Delivery Customer ${di + 1}: Contact Number is required.`);
+      }
+    }
+
+    // 4. Update Sales Order
+    so.date = adminEditingSO.date || so.date;
+    so.needDate = adminEditingSO.needDate || '';
+    so.customerRef = adminEditingSO.customerRef || '';
+    so.note = adminEditingSO.note || '';
+    so.lines = adminEditingSO.lines;
+    so.total = adminEditingSO.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.price || 0), 0);
+    so.deliveries = adminEditingSO.deliveries.filter(d => d.allocations.some(a => Number(a.qty) > 0));
+
+    const first = so.deliveries[0];
+    so.shipTo = {
+      name: first?.name || so.customerName,
+      phone: first?.contact1 || so.customerPhone || '',
+      phone2: first?.contact2 || '',
+      address: [first?.line1, first?.line2].filter(Boolean).join(', '),
+      map: ''
+    };
+    so.method = so.deliveries.length > 1 ? MIXED : DIRECT;
+    so.updatedAt = new Date().toISOString();
+
+    so.history = so.history || [];
+    so.history.push({
+      action: 'Edited by Administrator (' + (currentUser?.display || currentUser?.username || 'Admin') + ')',
+      by: currentUser?.display || currentUser?.username || 'Admin',
+      username: currentUser?.username || 'admin',
+      at: so.updatedAt
+    });
+
+    // 5. Update linked Dealer Fulfilment Plan
+    const plan = (state.dealerFulfilments || []).find(p => p.sourceSOId === so.id || p.id === so.fulfilmentPlanId);
+    if (plan) {
+      plan.instructions = so.note || '';
+      plan.poRef = so.customerRef || '';
+      plan.lines = so.lines.map(l => ({
+        desc: l.desc,
+        size: l.size,
+        material: l.material,
+        layout: l.layout,
+        pcs: l.pcs,
+        qty: l.qty,
+        unit: l.unit
+      }));
+
+      const newConsignments = [];
+      so.deliveries.forEach((d, di) => {
+        const allocs = d.allocations.map(a => ({ lineIndex: Number(a.lineIndex), qty: Number(a.qty || 0) })).filter(a => a.qty > 0);
+        if (!allocs.length) return;
+        const existing = plan.consignments?.[di];
+        const c = existing ? { ...existing } : {
+          id: uid('con'),
+          consignmentNo: `${plan.planNo}/S${String(di + 1).padStart(2, '0')}`,
+          payer: 'Customer',
+          charge: 0,
+          blind: false,
+          status: 'Awaiting Instructions',
+          courier: '',
+          tracking: '',
+          dispatchDate: '',
+          expectedDate: '',
+          deliveredDate: '',
+          receiver: '',
+          deliveredQty: 0,
+          proof: null,
+          packageImages: [],
+          history: []
+        };
+        c.recipient = d.name;
+        c.phone = d.contact1;
+        c.phone2 = d.contact2 || '';
+        c.address = [d.line1, d.line2].filter(Boolean).join(', ');
+        c.allocations = allocs;
+        c.note = so.note || '';
+        c.updatedAt = so.updatedAt;
+        c.updatedBy = currentUser?.display || currentUser?.username || 'Admin';
+        newConsignments.push(c);
+      });
+      plan.consignments = newConsignments;
+      plan.updatedAt = so.updatedAt;
+    }
+
+    saveState();
+    if (typeof audit === 'function') {
+      audit('ADMIN_EDIT_SALES_ORDER', `${so.soNo} updated by ${currentUser?.username || 'admin'}`);
+    }
+
+    closeModal('adminSoEditModalV1030');
+    if ($('bpSoViewModalV1030')?.classList.contains('show')) {
+      bpSoViewOrderV1030(so.id);
+    }
+    renderMySalesOrdersV1030();
+    try { renderSalesOrders91?.(); } catch(_) {}
+    try { renderDealerFulfilment?.(); } catch(_) {}
+
+    toast(`Sales Order ${so.soNo} updated successfully!`);
   };
 
   function bpSoRefreshV1030(){

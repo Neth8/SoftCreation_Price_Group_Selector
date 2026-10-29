@@ -1505,3 +1505,44 @@ textarea:focus {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Delivery customer actions & Admin SO Edit styling */
+.bp-so-del-actions-v1030 {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bp-so-del-actions-v1030 .btn {
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+  border-radius: 8px !important;
+  white-space: nowrap;
+}
+
+#adminSoEditModalV1030 .modal-card {
+  max-width: 1150px;
+  width: 96vw;
+}
+
+.admin-so-edit-card {
+  border: 1px solid var(--sc-glass-border-subtle, rgba(0, 0, 0, 0.08)) !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  background: var(--sc-glass-bg-card, rgba(255, 255, 255, 0.6)) !important;
+}
+
+@media (max-width: 640px) {
+  .bp-so-delivery-title-v1030 {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .bp-so-del-actions-v1030 {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
