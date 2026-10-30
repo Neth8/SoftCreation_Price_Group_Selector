@@ -110,7 +110,7 @@
       if(materialSelect.dataset.sig!==sig){materialSelect.innerHTML='<option value="">All materials</option>'+materials.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');materialSelect.dataset.sig=sig;if(materials.includes(selected))materialSelect.value=selected}
     }
     const q=String($('productionProductsSearch')?.value||'').trim().toLowerCase(),material=$('productionProductsMaterial')?.value||'';
-    const filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc,...g.jobs.map(r=>r.customerName||''),...g.jobs.map(r=>r.piSerial||'')].join(' ').toLowerCase().includes(q))).filter(g=>{const statuses=['Requested','Approved','Planned','In Production','QC Check','Finished','Dispatched','Received','GRN Closed'];return (g.jobs||[]).some(r=>statuses.includes(String(r.status||'Requested'))&&( ['Finished','Dispatched','Received','GRN Closed'].includes(String(r.status||'Requested'))?Math.max(0,Number(productionProductQtyV103(r,true)||0)):Math.max(0,Number(r.requestQty||0)))>0);});
+    const filtered=groups.filter(g=>(!material||g.material===material)&&(!q||[g.size,g.material,g.layout,g.pcs,g.unit,g.desc,...g.jobs.map(r=>r.customerName||''),...g.jobs.map(r=>r.piSerial||'')].join(' ').toLowerCase().includes(q))).filter(g=>(g.jobs||[]).some(r=>!window.pcIsArchivedProductionJobV1130?.(r)&&!['Dispatched','Received','GRN Closed'].includes(String(r.status||''))));
 
     const stageQty=(g,statuses,finished=false)=>(g.jobs||[]).filter(r=>statuses.includes(String(r.status||'Requested'))).reduce((n,r)=>n+(finished?productionProductQtyV103(r,true):Math.max(0,Number(r.requestQty||0))),0);
     const totals=groups.reduce((a,g)=>{

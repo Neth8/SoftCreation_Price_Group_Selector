@@ -119,20 +119,23 @@ pcFetch('/spgs_prod_control_requests?workspace=eq.'+encodeURIComponent(PC_WORKSP
    sales-order lines are fully dispatched.  Archive is derived from dispatched
    quantities, not the product specification, so a fresh SO starts a new cycle. */
 function pcRequestFullyDispatchedV1130(request){
-  if(!request || request.status==='Pending Approval' || request.status==='Returned')return false;
+  if(!request || ['Pending Approval','Returned'].includes(String(request.status)))return false;
   const lines=(pcCloud.lines||[]).filter(l=>String(l.request_id)===String(request.id));
   if(!lines.length)return false;
   const allocations=(pcCloud.allocations||[]).filter(a=>lines.some(l=>String(l.id)===String(a.request_line_id)));
-  if(!allocations.length)return false; // Stock-only production is not a completed SO
+  if(!allocations.length || !pcOrdexaReady)return false;
+  // Compare with the verified dispatch snapshot even when the sales order
+  // has not yet been hydrated into this browser's local state.
   return allocations.every(a=>{
+    const index=Number(a.source_so_line_index);
     const so=(state.salesOrders||[]).find(x=>String(x.id)===String(a.source_so_id));
-    if(!so)return false;
-    const index=Number(a.source_line_index);
-    const line=so.lines?.[index];
-    if(!line)return false;
-    const ordered=pcNum(line.qty),cancelled=pcNum(line.cancelledQty);
-    const required=Math.max(0,ordered-cancelled);
-    return pcDispatchedForSOLine(so,index)+0.00001>=required;
+    const line=so?.lines?.[index];
+    const required=line?Math.max(0,pcNum(line.qty)-pcNum(line.cancelledQty)):pcNum(a.allocated_qty);
+    const key=String(a.source_so_id)+'|'+index;
+    const hasCloud=pcOrdexaSent.has(key);
+    if(!hasCloud&&!line)return false;
+    const dispatched=line?pcDispatchedForSOLine(so,index):pcOrdexaSent.get(key);
+    return required>0 && dispatched+0.00001>=required;
   });
 }
 function pcHistoryRequestIdsV1130(){
@@ -144,6 +147,7 @@ function pcIsArchivedProductionJobV1130(job){
   const id=job.productionControlRequestId;
   return !!id && pcHistoryRequestIdsV1130().has(String(id));
 }
+window.pcIsArchivedProductionJobV1130=pcIsArchivedProductionJobV1130;
 function pcRequestLines(id){return pcCloud.lines.filter(x=>x.request_id===id).sort((a,b)=>a.line_no-b.line_no)}
 function pcRequestAlloc(id){return pcCloud.allocations.filter(x=>x.request_line_id===id)}
 function pcRequestMsgs(id){return pcCloud.messages.filter(x=>x.request_id===id).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at))}
@@ -443,7 +447,25 @@ window.pcDemandProductionPDFV1128=async function(){
     toast('Could not generate Production Demand PDF: '+(e?.message||e));
   }
 };
-function pcDemandHTML(){const groups=pcDemandGroups();return `<div class="pc-card"><div class="pc-card-head"><div><h3>Live Sales Order production demand</h3><p>Ordered − dispatched − cancelled − quantities reserved by open Production Control requests.</p></div><button class="btn navy sm" type="button" onclick="pcDemandProductionPDFV1128()">Download Demand / Cut PDF</button></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Item</th><th class="num">SO Demand</th><th class="num">JBR Cut</th><th class="num">+ Extra / Balance</th><th class="num">Cover</th><th class="num">Safety</th><th class="num">HO Stock</th><th class="num">Pipeline</th><th class="num">Recommended</th></tr></thead><tbody>${groups.map(g=>{const requested=(state.productionRequests||[]).filter(r=>pcLineKey(r)===g.key).reduce((n,r)=>n+pcNum(r.requestQty),0);const cut=pcNum(window.jbrCutForProductV1121?.(g.key)||0);const diff=cut-requested;return `<tr><td><b>${pcEsc(pcLineLabel(g))}</b><small>${g.orders.length} open SO line(s) • ${((state.productionRequests||[]).filter(r=>pcLineKey(r)===g.key)).length} production job(s)</small></td><td class="num">${pcMoney(g.demand)}</td><td class="num"><b>${pcMoney(cut)}</b></td><td class="num ${diff>0?'pc-plus-v1128':''}">${diff>0?`+${pcMoney(diff)} extra`:diff<0?`${pcMoney(Math.abs(diff))} to cut`:'0'}</td><td class="num">${pcMoney(g.cover)}</td><td class="num">${pcMoney(g.safety)}</td><td class="num">${pcMoney(g.stock)}</td><td class="num">${pcMoney(g.pipeline)}</td><td class="num"><b>${pcMoney(g.recommended)}</b></td></tr>`}).join('')||'<tr><td colspan="9">No current Sales Order demand.</td></tr>'}</tbody></table></div></div>`}
+let pcDemandPageV2026=1;
+let pcDemandPageSizeV2026=10;
+let pcDemandSearchV2026='';
+window.pcSetDemandPageV2026=function(n){pcDemandPageV2026=Math.max(1,Number(n)||1);pcRender()};
+window.pcSetDemandSizeV2026=function(n){pcDemandPageSizeV2026=[10,25,50].includes(Number(n))?Number(n):10;pcDemandPageV2026=1;pcRender()};
+window.pcSetDemandSearchV2026=function(v){pcDemandSearchV2026=String(v||'');pcDemandPageV2026=1;pcRender();const e=document.getElementById('pcDemandSearchV2026');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length)}};
+function pcDemandHTML(){
+  const all=pcDemandGroups();
+  const q=pcDemandSearchV2026.trim().toLowerCase();
+  const groups=q?all.filter(g=>[pcLineLabel(g),g.key,...g.orders.map(o=>o.sourceSoNo),...g.orders.map(o=>o.customer)].join(' ').toLowerCase().includes(q)):all;
+  const pages=Math.max(1,Math.ceil(groups.length/pcDemandPageSizeV2026));
+  pcDemandPageV2026=Math.min(pcDemandPageV2026,pages);
+  const start=(pcDemandPageV2026-1)*pcDemandPageSizeV2026;
+  const rows=groups.slice(start,start+pcDemandPageSizeV2026);
+  return `<div class="pc-card"><div class="pc-card-head"><div><h3>Live Sales Order production demand</h3><p>Outstanding order demand and production planning.</p></div><button class="btn navy sm" type="button" onclick="pcDemandProductionPDFV1128()">Download Demand / Cut PDF</button></div>
+  <div class="pc-demand-controls-v2026"><input id="pcDemandSearchV2026" type="search" placeholder="Search item, customer or Sales Order" value="${pcEsc(pcDemandSearchV2026)}" oninput="pcSetDemandSearchV2026(this.value)"><label>Rows <select onchange="pcSetDemandSizeV2026(this.value)">${[10,25,50].map(n=>`<option value="${n}" ${pcDemandPageSizeV2026===n?'selected':''}>${n}</option>`).join('')}</select></label></div>
+  <div class="pc-scroll"><table class="pc-table"><thead><tr><th>Item</th><th class="num">SO Demand</th><th class="num">JBR Cut</th><th class="num">+ Extra / Balance</th><th class="num">Cover</th><th class="num">Safety</th><th class="num">HO Stock</th><th class="num">Pipeline</th><th class="num">Recommended</th></tr></thead><tbody>${rows.map(g=>{const requested=(state.productionRequests||[]).filter(r=>pcLineKey(r)===g.key&&!pcIsArchivedProductionJobV1130(r)).reduce((n,r)=>n+pcNum(r.requestQty),0);const cut=pcNum(window.jbrCutForProductV1121?.(g.key)||0);const diff=cut-requested;return `<tr><td><b>${pcEsc(pcLineLabel(g))}</b><small>${g.orders.length} open SO line(s)</small></td><td class="num">${pcMoney(g.demand)}</td><td class="num"><b>${pcMoney(cut)}</b></td><td class="num ${diff>0?'pc-plus-v1128':''}">${diff>0?`+${pcMoney(diff)} extra`:diff<0?`${pcMoney(Math.abs(diff))} to cut`:'0'}</td><td class="num">${pcMoney(g.cover)}</td><td class="num">${pcMoney(g.safety)}</td><td class="num">${pcMoney(g.stock)}</td><td class="num">${pcMoney(g.pipeline)}</td><td class="num"><b>${pcMoney(g.recommended)}</b></td></tr>`}).join('')||'<tr><td colspan="9">No matching open Sales Order demand.</td></tr>'}</tbody></table></div>
+  <div class="pc-demand-pagination-v2026"><span>${groups.length?`${start+1}–${Math.min(start+rows.length,groups.length)} of ${groups.length}`:'0 results'}</span><div><button class="btn ghost sm" ${pcDemandPageV2026===1?'disabled':''} onclick="pcSetDemandPageV2026(${pcDemandPageV2026-1})">Previous</button><span>Page ${pcDemandPageV2026} / ${pages}</span><button class="btn ghost sm" ${pcDemandPageV2026>=pages?'disabled':''} onclick="pcSetDemandPageV2026(${pcDemandPageV2026+1})">Next</button></div></div></div>`;
+}
 const baseAccessApplyPC=window.applyUserAccess;
 window.applyUserAccess=function(){const result=baseAccessApplyPC?.apply(this,arguments);const nav=document.querySelector('.navbtn[data-view="productioncontrol"]');if(nav)nav.style.display=pcHas('production_control_view')?'inline-block':'none';if(document.getElementById('productioncontrol')?.classList.contains('active')&&!pcHas('production_control_view'))window.showView('dashboard');return result};
 try{applyUserAccess=window.applyUserAccess}catch(_){}

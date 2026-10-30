@@ -413,13 +413,11 @@
         </div>
 
         <div class="section">Delivery Customers & Item Allocation</div>
-        <div class="bp-so-delivery-hint-v1030">
-          <b>Choose the delivery recipient explicitly.</b> Delivery Customer 1 receives the remaining quantity but is blank until you select <b>+ Add My Details</b> or <b>+ Add Separate Customer</b>. Selecting a separate customer does not copy your own details.
-        </div>
         <div id="bpSoDeliveriesV1030"></div>
 
         <div class="actions bp-so-bottom-actions-v1030">
-          <button class="btn ghost" type="button" onclick="bpSoAddDeliveryV1030()">+ Add Separate Customer</button>
+          <button class="btn ghost" type="button" onclick="bpSoUseMyDetailsV1030(0)">+ Add my details</button>
+          <button class="btn ghost" type="button" onclick="bpSoBottomSeparateV2026()">+ Add Separate Customer</button>
         </div>
 
         <div id="bpSoValidationV1030"></div>
@@ -1156,6 +1154,12 @@
   /* -------------------------------------------------------
      Multiple delivery customers + item allocation
      ------------------------------------------------------- */
+  window.bpSoBottomSeparateV2026=function(){
+    ensureDeliveryBaseV1030();
+    if(!soDeliveries[0]?.recipientChoice){bpSoAddSeparateCustomerV1030(0);return;}
+    bpSoAddDeliveryV1030();
+  };
+
   window.bpSoAddDeliveryV1030=function(){
     const c=selectedSOCustomerV1030();
     if(!c)return toast('Select an eligible customer first');
@@ -1316,43 +1320,10 @@
                   ${isPrimary?' • Primary / Balance Customer':' • Separate Customer'}
                 </b>
 
-                <span>
-                  ${
-                    isPrimary
-                      ? (d.name
-                          ? `Recipient: <b>${esc(d.name)}</b>. Receives remaining balance automatically.`
-                          : `Choose <b>+ Add my details</b> to use ordering customer address, or enter separate customer details below.`)
-                      : 'This is a separate customer. Enter that customer’s company / receiver details and allocate selected-item quantities below.'
-                  }
-                </span>
               </div>
 
               <div class="bp-so-del-actions-v1030" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                ${
-                  isPrimary
-                    ? `
-                      <button class="btn ${d.recipientChoice==='mine'?'primary':'ghost'} sm" type="button" onclick="bpSoUseMyDetailsV1030(${di})" title="Copy ordering customer name, address, and phone">
-                        + Add my details
-                      </button>
-                      <button class="btn ${d.recipientChoice==='separate'?'primary':'ghost'} sm" type="button" onclick="bpSoAddSeparateCustomerV1030(${di})" title="Enter separate customer or add another delivery customer">
-                        + Add Separate Customer
-                      </button>
-                      ${(d.name || d.line1 || d.contact1) ? `
-                        <button class="btn red sm" type="button" onclick="bpSoClearDeliveryDetailsV1030(${di})" title="Clear customer details">
-                          Clear
-                        </button>
-                      ` : ''}
-                    `
-                    : `
-                      <button
-                        class="btn red sm"
-                        type="button"
-                        onclick="bpSoRemoveDeliveryV1030(${di})"
-                      >
-                        Remove Customer
-                      </button>
-                    `
-                }
+                ${isPrimary ? '' : `<button class="btn red sm" type="button" onclick="bpSoRemoveDeliveryV1030(${di})">Remove Customer</button>`}
               </div>
             </div>
 
