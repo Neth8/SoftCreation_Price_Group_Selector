@@ -957,7 +957,7 @@ function miRenderInvoice(inv,hostId){
   const tableHeadH=25;
 
   /* Keep the final summary safely above the fixed signature/footer art. */
-  const summaryTopBase=(inv.vatEnabled||delivery>0)?525:545;
+  const summaryTopBase=(inv.vatEnabled||paid>0)?505:525;
   const footerLimit=705;
   const finalRows=Math.max(1,Math.floor((summaryTopBase-tableTop-tableHeadH-18)/rowH));
   const continuationRows=Math.max(1,Math.floor((footerLimit-tableTop-tableHeadH-14)/rowH));
@@ -1038,7 +1038,7 @@ function miRenderInvoice(inv,hostId){
       <div class="mi-dyn-header" style="top:${headerTop}pt">
         <div class="mi-dyn-doc-row">
           <div><b>Date of Invoice</b><i>:</i><span>${miFmtDate(inv.invoiceDate)}</span></div>
-          <div><b>Tax Invoice No</b><i>:</i><span>${miEsc(inv.invoiceNo||'')}</span></div>
+          <div><b>Invoice No</b><i>:</i><span>${miEsc(inv.invoiceNo||'')}</span></div>
         </div>
 
         <div class="mi-dyn-party-row" style="min-height:${partyH}pt">
@@ -1072,12 +1072,11 @@ function miRenderInvoice(inv,hostId){
 
       ${isLast?`
         <div class="mi-ex-summary mi-ex-summary-paged ${(inv.vatEnabled||delivery>0)?'mi-summary-vat-on':''}" style="top:${summaryTop}pt">
-          <div class="mi-ex-sumrow"><div>Value of Supply (Excl. VAT)</div><div class="v">${miMoney(subtotal)}</div></div>
+          <div class="mi-ex-sumrow"><div>Total Value of Supply</div><div class="v">${miMoney(subtotal)}</div></div>
            ${inv.vatEnabled?`<div class="mi-ex-sumrow"><div>VAT 18%</div><div class="v">${miMoney(vat)}</div></div>`:''}
-           ${delivery>0?`<div class="mi-ex-sumrow"><div>Delivery Charge</div><div class="v">${miMoney(delivery)}</div></div>`:''}
-           <div class="mi-ex-sumrow"><div>Total Invoice Value</div><div class="v">${miMoney(total)}</div></div>
-          <div class="mi-ex-sumrow"><div>Advance Paid</div><div class="v">${miMoney(paid)}</div></div>
-          <div class="mi-ex-sumrow"><div>Balance Payment</div><div class="v">${miMoney(bal)}</div></div>
+           <div class="mi-ex-sumrow"><div>Delivery Charges</div><div class="v">${miMoney(delivery)}</div></div>
+           <div class="mi-ex-sumrow"><div>Total Amount</div><div class="v">${miMoney(total)}</div></div>
+          ${paid>0?`<div class="mi-ex-sumrow"><div>Advance Paid</div><div class="v">${miMoney(paid)}</div></div><div class="mi-ex-sumrow"><div>Balance Payment</div><div class="v">${miMoney(bal)}</div></div>`:''}
           <div class="mi-ex-words">Total Amount In Words : ${miAmountWords(total)}</div>
           <div class="mi-ex-mode">Mode of Payment : ${miEsc(inv.paymentMode||'Cash / Card / Bank Transfer')}</div>
         </div>
