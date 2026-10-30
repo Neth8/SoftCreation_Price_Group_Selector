@@ -244,6 +244,7 @@ function pcIntelligenceHTML(g){
  const allocated=g.orders.reduce((n,o)=>n+o.allocated,0);
  return `<div class="pc-card pc-simple-v1142"><h3>Production quantity planner</h3>
  <p class="pc-muted">See the current Sales Order requirement, then add extra production only if needed.</p>
+ ${g.pipeline>0||allocated>0?`<div class="pc-live-production-alert-v20261030" role="alert"><strong>⚠ PRODUCTION ALREADY ASSIGNED / IN PROGRESS</strong><span>${pcMoney(g.pipeline)} rolls in existing production pipeline · ${pcMoney(allocated)} rolls assigned to Sales Orders. Check outstanding demand before requesting more.</span></div>`:''}
  <div class="pc-simple-stats-v1142">
  <div><small>Current open Sales Orders</small><strong>${pcMoney(soOpen)} rolls</strong></div>
  <div><small>Already assigned to production</small><strong>${pcMoney(allocated)} rolls</strong></div>
@@ -285,9 +286,9 @@ function pcApprovalsHTML(){
   const selected=rows.find(r=>r.id===pcSelectedRequest)||rows[0]||null;
   if(selected)pcSelectedRequest=selected.id;
   return `<div class="pc-card pc-approval-dashboard"><div class="pc-card-head"><div><h3>Manager approval queue</h3><p class="pc-muted">${rows.length} waiting for decision · ${approved} approved requests</p></div><button class="btn ghost sm" onclick="pcRefresh(true)">Refresh approvals</button></div>
-   <div class="pc-approval-list">${rows.map(r=>{const lines=pcRequestLines(r.id);const qty=lines.reduce((n,l)=>n+pcNum(l.requested_qty),0);return `<div class="pc-approval-entry ${r.id===selected?.id?'selected':''}"><div><b>${pcEsc(r.request_no||r.id)}</b><small>${pcEsc(r.created_by_display||r.created_by||'Sales')} · Required ${pcEsc(r.required_date||'-')}</small><span>${lines.length} item(s) · ${pcMoney(qty)} rolls</span></div><button class="btn primary sm" onclick="pcOpenApproval('${r.id}')">Review request</button></div>`}).join('')||'<div class="pc-approval-empty">No requests waiting for manager approval.</div>'}</div></div>${selected?pcRequestDetailHTML(selected):''}`;
+   <div class="pc-approval-list">${rows.map(r=>{const lines=pcRequestLines(r.id);const qty=lines.reduce((n,l)=>n+pcNum(l.requested_qty),0);return `<div class="pc-approval-entry ${r.id===selected?.id?'selected':''}"><div><b>${pcEsc(r.request_no||r.id)}</b><small>${pcEsc(r.created_by_display||r.created_by||'Sales')} · Required ${pcEsc(r.required_date||'-')}</small><span>${lines.length} item(s) · ${pcMoney(qty)} rolls</span></div><button class="btn primary sm" onclick="pcOpenApproval('${r.id}')">Review request</button></div>`}).join('')||'<div class="pc-approval-empty">No requests waiting for manager approval.</div>'}</div></div>`;
 }
-window.pcOpenApproval=function(id){pcSelectedRequest=id;pcView='approvals';pcRender();document.querySelector('#pcBody .pc-detail')?.scrollIntoView({behavior:'smooth',block:'start'});};
+window.pcOpenApproval=function(id){pcSelectedRequest=id;pcView='approvals';pcRender();pcOpenDetailModalV20261030(id);};
 function pcRegisterHTML(){
   const role=String(currentUser?.role||'').toLowerCase();
   const archived=pcHistoryRequestIdsV1130();
@@ -300,20 +301,44 @@ function pcRegisterHTML(){
     return Date.parse(b.created_at||0)-Date.parse(a.created_at||0);
   });
   const selected=rows.find(x=>x.id===pcSelectedRequest)||rows[0];if(selected&&!pcSelectedRequest)pcSelectedRequest=selected.id;
-  return `<div class="pc-card"><div class="pc-card-head"><h3>Production request register</h3><span class="pc-pill">${rows.length} request(s)</span></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Request</th><th>Required</th><th>Items / Rolls</th><th>Status</th><th>Created By</th><th></th></tr></thead><tbody>${rows.map(r=>{const ls=pcRequestLines(r.id);return `<tr><td><b>${pcEsc(r.request_no)}</b><small>${new Date(r.created_at).toLocaleString()}</small></td><td>${pcEsc(r.required_date||'-')}</td><td>${ls.length} item(s) • ${pcMoney(ls.reduce((n,l)=>n+pcNum(l.requested_qty),0))}</td><td><span class="pc-status ${String(r.status).toLowerCase().replace(/\s+/g,'-')}">${pcEsc(r.status)}</span></td><td>${pcEsc(r.created_by_display||r.created_by)}</td><td><button class="btn ghost sm" onclick="pcOpenRequest('${r.id}')">Review →</button></td></tr>`}).join('')||'<tr><td colspan="6">No Production Control requests yet.</td></tr>'}</tbody></table></div></div>${selected?pcRequestDetailHTML(selected):''}`;
+  return `<div class="pc-card"><div class="pc-card-head"><h3>Production request register</h3><span class="pc-pill">${rows.length} request(s)</span></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>Request</th><th>Required</th><th>Items / Rolls</th><th>Status</th><th>Created By</th><th></th></tr></thead><tbody>${rows.map(r=>{const ls=pcRequestLines(r.id);return `<tr><td><b>${pcEsc(r.request_no)}</b><small>${new Date(r.created_at).toLocaleString()}</small></td><td>${pcEsc(r.required_date||'-')}</td><td>${ls.length} item(s) • ${pcMoney(ls.reduce((n,l)=>n+pcNum(l.requested_qty),0))}</td><td><span class="pc-status ${String(r.status).toLowerCase().replace(/\s+/g,'-')}">${pcEsc(r.status)}</span></td><td>${pcEsc(r.created_by_display||r.created_by)}</td><td><button class="btn ghost sm" onclick="pcOpenRequest('${r.id}')">Review →</button></td></tr>`}).join('')||'<tr><td colspan="6">No Production Control requests yet.</td></tr>'}</tbody></table></div></div>`;
 }
+let pcHistoryPageV20261030=1,pcHistorySizeV20261030=10,pcHistorySearchV20261030='';
+window.pcHistoryFilterV20261030=function(value){pcHistorySearchV20261030=String(value||'');pcHistoryPageV20261030=1;pcRender();const el=document.getElementById('pcHistorySearchV20261030');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}};
+window.pcHistorySizeChangedV20261030=function(value){pcHistorySizeV20261030=Number(value)||10;pcHistoryPageV20261030=1;pcRender();};
+window.pcHistoryMoveV20261030=function(page){pcHistoryPageV20261030=Math.max(1,Number(page)||1);pcRender();};
 function pcHistoryHTMLV1130(){
   const archived=pcHistoryRequestIdsV1130();
-  const rows=(pcCloud.requests||[]).filter(r=>archived.has(String(r.id)))
+  const all=(pcCloud.requests||[]).filter(r=>archived.has(String(r.id)))
     .sort((a,b)=>Date.parse(b.created_at||0)-Date.parse(a.created_at||0));
-  const selected=rows.find(r=>r.id===pcSelectedRequest)||rows[0]||null;
-  return `<div class="pc-card"><div class="pc-card-head"><div><h3>History — All Sales Orders Dispatched</h3><p>Completed order cycles remain searchable. A new sales order creates a separate active cycle.</p></div><span class="pc-pill">${rows.length} archived request(s)</span></div>
+  const term=pcHistorySearchV20261030.toLowerCase().trim();
+  const rows=term?all.filter(r=>[r.request_no,r.required_date,r.created_by_display,r.created_by,
+    ...pcRequestLines(r.id).flatMap(l=>[l.description,l.size_label,l.item_key,...(pcCloud.allocations||[]).filter(a=>a.request_line_id===l.id).map(a=>a.source_so_no)])]
+    .some(v=>String(v||'').toLowerCase().includes(term))):all;
+  const pages=Math.max(1,Math.ceil(rows.length/pcHistorySizeV20261030));
+  pcHistoryPageV20261030=Math.min(pcHistoryPageV20261030,pages);
+  const subset=rows.slice((pcHistoryPageV20261030-1)*pcHistorySizeV20261030,pcHistoryPageV20261030*pcHistorySizeV20261030);
+  return `<div class="pc-card"><div class="pc-card-head"><div><h3>History — All Sales Orders Dispatched</h3><p>Completed order cycles remain searchable. A new sales order creates a separate active cycle.</p></div><span class="pc-pill">${all.length} archived request(s)</span></div>
+  <div class="pc-history-tools-v20261030"><input id="pcHistorySearchV20261030" type="search" value="${pcEsc(pcHistorySearchV20261030)}" placeholder="Search request, Sales Order, item..." oninput="pcHistoryFilterV20261030(this.value)"><label>Rows <select onchange="pcHistorySizeChangedV20261030(this.value)">${[10,25,50].map(n=>`<option value="${n}" ${pcHistorySizeV20261030===n?'selected':''}>${n}</option>`).join('')}</select></label></div>
   <div class="pc-scroll"><table class="pc-table"><thead><tr><th>Request</th><th>Required</th><th>Items / Rolls</th><th>Dispatch</th><th>Created By</th><th></th></tr></thead><tbody>
-  ${rows.map(r=>{const ls=pcRequestLines(r.id);return `<tr><td><b>${pcEsc(r.request_no)}</b><small>${new Date(r.created_at).toLocaleString()}</small></td><td>${pcEsc(r.required_date||'-')}</td><td>${ls.length} item(s) • ${pcMoney(ls.reduce((n,l)=>n+pcNum(l.requested_qty),0))}</td><td><span class="pc-status approved">ALL DISPATCHED</span></td><td>${pcEsc(r.created_by_display||r.created_by||'-')}</td><td><button class="btn ghost sm" onclick="pcOpenHistoryV1130('${r.id}')">View →</button></td></tr>`}).join('')||'<tr><td colspan="6">No fully dispatched production requests yet.</td></tr>'}
-  </tbody></table></div></div>${selected?pcRequestDetailHTML(selected):''}`;
+  ${subset.map(r=>{const ls=pcRequestLines(r.id);return `<tr><td><b>${pcEsc(r.request_no)}</b><small>${new Date(r.created_at).toLocaleString()}</small></td><td>${pcEsc(r.required_date||'-')}</td><td>${ls.length} item(s) • ${pcMoney(ls.reduce((n,l)=>n+pcNum(l.requested_qty),0))}</td><td><span class="pc-status approved">ALL DISPATCHED</span></td><td>${pcEsc(r.created_by_display||r.created_by||'-')}</td><td><button class="btn ghost sm" onclick="pcOpenHistoryV1130('${r.id}')">View →</button></td></tr>`}).join('')||'<tr><td colspan="6">No matching fully dispatched production requests.</td></tr>'}
+  </tbody></table></div><div class="pc-history-pages-v20261030"><span>${rows.length?((pcHistoryPageV20261030-1)*pcHistorySizeV20261030+1):0}–${Math.min(pcHistoryPageV20261030*pcHistorySizeV20261030,rows.length)} of ${rows.length}</span><button type="button" class="btn ghost sm" ${pcHistoryPageV20261030<=1?'disabled':''} onclick="pcHistoryMoveV20261030(${pcHistoryPageV20261030-1})">Previous</button><span>Page ${pcHistoryPageV20261030} / ${pages}</span><button type="button" class="btn ghost sm" ${pcHistoryPageV20261030>=pages?'disabled':''} onclick="pcHistoryMoveV20261030(${pcHistoryPageV20261030+1})">Next</button></div></div>`;
 }
-window.pcOpenHistoryV1130=function(id){pcSelectedRequest=id;pcView='history';pcRender();};
-window.pcOpenRequest=function(id){pcSelectedRequest=id;pcRender()}
+window.pcOpenHistoryV1130=function(id){pcSelectedRequest=id;pcOpenDetailModalV20261030(id);};
+window.pcOpenRequest=function(id){pcSelectedRequest=id;pcOpenDetailModalV20261030(id);};
+function pcOpenDetailModalV20261030(id){
+  const request=(pcCloud.requests||[]).find(r=>String(r.id)===String(id));if(!request)return;
+  pcCloseDetailModalV20261030();
+  const host=document.createElement('div');host.id='pcDetailModalV20261030';
+  host.className='pc-detail-overlay-v20261030';host.setAttribute('role','dialog');
+  host.setAttribute('aria-modal','true');host.setAttribute('aria-label','Production request details');
+  host.innerHTML=`<div class="pc-detail-window-v20261030"><div class="pc-detail-toolbar-v20261030"><strong>Production Request Details</strong><button type="button" class="btn ghost sm" onclick="pcCloseDetailModalV20261030()">Close ✕</button></div><div class="pc-detail-content-v20261030">${pcRequestDetailHTML(request)}</div></div>`;
+  host.addEventListener('click',event=>{if(event.target===host)pcCloseDetailModalV20261030();});
+  document.body.appendChild(host);
+}
+function pcCloseDetailModalV20261030(){document.getElementById('pcDetailModalV20261030')?.remove();}
+window.pcCloseDetailModalV20261030=pcCloseDetailModalV20261030;
+
 function pcRequestDetailHTML(r){
   const lines=pcRequestLines(r.id),msgs=pcRequestMsgs(r.id),audit=pcRequestAudit(r.id),canApprove=pcHas('production_control_approve')&&r.status==='Pending Approval';
   return `<div class="pc-card pc-detail"><div class="pc-card-head"><div><h3>${pcEsc(r.request_no)} · Evidence & Approval</h3><p>Required ${pcEsc(r.required_date||'-')} • ${pcEsc(r.material_mode||'')}</p></div><span class="pc-status ${String(r.status).toLowerCase().replace(/\s+/g,'-')}">${pcEsc(r.status)}</span></div>${canApprove?`<div class="pc-approval-actions"><strong>Manager decision required</strong><div><button class="btn green" onclick="pcApproveRequest('${r.id}')">Approve & Release to Production</button><button class="btn amber" onclick="pcOpenReturn('${r.id}')">Return with Reason</button></div></div>`:''}${r.return_reason?`<div class="notice"><b>Returned:</b> ${pcEsc(r.return_reason)}</div>`:''}

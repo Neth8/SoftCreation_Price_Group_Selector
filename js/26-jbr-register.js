@@ -281,10 +281,18 @@
     if($('jbrFlatRemainV2'))$('jbrFlatRemainV2').textContent='Packing classification pending';
     if($('jbrFlatWarnV2'))$('jbrFlatWarnV2').textContent=!valid?'Complete the shared feed and each JBR punch count/width before saving.':'';
   }
+  // UI-only coalescing: input state updates immediately; unchanged calculations run
+  // once after typing settles, instead of repeatedly within every keypress.
+  let jbrTypingTimerV20261030=null;
+  function jbrFlushTypingV20261030(){
+    if(jbrTypingTimerV20261030!==null){clearTimeout(jbrTypingTimerV20261030);jbrTypingTimerV20261030=null;}
+    try{jbrCalcV1055()}catch(e){console.error(e)}
+  }
   window.jbrRunEditV1140=function(i,key,v){
     const r=jbrRunEntriesV1140[i];if(!r)return;
-    r[key]=v===''?'':Number(v);jbrRunManualV1140=true;jbrRunSummaryV1140();
-    try{jbrCalcV1055()}catch(e){console.error(e)}
+    r[key]=v===''?'':Number(v);jbrRunManualV1140=true;
+    if(jbrTypingTimerV20261030!==null)clearTimeout(jbrTypingTimerV20261030);
+    jbrTypingTimerV20261030=setTimeout(jbrFlushTypingV20261030,160);
   };
   window.jbrRunAddV1140=function(){
     if(jbrRunEntriesV1140.length>=30)return toast('Maximum 30 JBRs per entry');
@@ -296,6 +304,7 @@
   window.jbrRunSuggestV1140=function(){jbrRunSummaryV1140()};
   window.jbrRunRefreshV1140=function(){jbrRunSummaryV1140()};
   window.jbrFlatUpdateV2=function(){
+    if(jbrTypingTimerV20261030!==null){clearTimeout(jbrTypingTimerV20261030);jbrTypingTimerV20261030=null;}
     jbrRunSummaryV1140();
     const entries=jbrRunEntriesV1140;
     const valid=jbrJobFeedV2026()>0&&entries.length>0&&entries.every(r=>Number(r.width)>0&&r.count!==''&&Number.isSafeInteger(Number(r.count))&&Number(r.count)>0);
