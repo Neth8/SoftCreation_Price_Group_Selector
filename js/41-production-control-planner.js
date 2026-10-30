@@ -129,13 +129,16 @@ function pcRequestFullyDispatchedV1130(request){
   return allocations.every(a=>{
     const index=Number(a.source_so_line_index);
     const so=(state.salesOrders||[]).find(x=>String(x.id)===String(a.source_so_id));
-    const line=so?.lines?.[index];
-    const required=line?Math.max(0,pcNum(line.qty)-pcNum(line.cancelledQty)):pcNum(a.allocated_qty);
     const key=String(a.source_so_id)+'|'+index;
-    const hasCloud=pcOrdexaSent.has(key);
-    if(!hasCloud&&!line)return false;
-    const dispatched=line?pcDispatchedForSOLine(so,index):pcOrdexaSent.get(key);
-    return required>0 && dispatched+0.00001>=required;
+    // Archiving a Production Control request is based on the quantity actually
+    // allocated to that request, NOT the full Sales Order line quantity. A
+    // single Sales Order line may be covered by several production requests.
+    const required=pcNum(a.allocated_qty);
+    const cloudSent=pcOrdexaSent.has(key)?pcNum(pcOrdexaSent.get(key)):0;
+    const legacySent=so?pcLegacyDispatchedForSOLine(so,index):0;
+    const dispatched=Math.max(cloudSent,legacySent);
+    if(required<=0 || (!pcOrdexaSent.has(key) && legacySent<=0))return false;
+    return dispatched+0.00001>=required;
   });
 }
 function pcHistoryRequestIdsV1130(){
