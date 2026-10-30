@@ -7554,3 +7554,9 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .pack-waste-sqm-live-v2026 small{display:block;line-height:1.5;color:#856a3d}
 
 .pc-demand-controls-v2026,.pc-demand-pagination-v2026{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 15px}.pc-demand-controls-v2026 input{max-width:400px;min-width:200px;flex:1;padding:9px 12px;border:1px solid #cfdee2;border-radius:9px}.pc-demand-controls-v2026 label,.pc-demand-pagination-v2026{font-size:12px}.pc-demand-controls-v2026 select{padding:7px;border:1px solid #cfdee2;border-radius:8px}.pc-demand-pagination-v2026>div{display:flex;align-items:center;gap:10px}.bp-so-bottom-actions-v1030{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+
+/* Manual invoice delivery fee is a separate, VAT-exclusive amount. */
+.mi-delivery-input{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:12px 0;padding:10px 12px;background:#f4f9fa;border:1px solid #cddfe2;border-radius:10px;}
+.mi-delivery-input label{font-weight:750;font-size:12px;color:#30535f;}
+.mi-delivery-input input{width:145px;max-width:100%;padding:8px 10px;border:1px solid #bdcfd5;border-radius:8px;background:#fff;}
+.mi-delivery-input small{font-size:10px;color:#637982;}

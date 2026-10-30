@@ -330,9 +330,9 @@ function pcOpenDetailModalV20261030(id){
   const request=(pcCloud.requests||[]).find(r=>String(r.id)===String(id));if(!request)return;
   pcCloseDetailModalV20261030();
   const host=document.createElement('div');host.id='pcDetailModalV20261030';
-  host.className='pc-detail-overlay-v20261030';host.setAttribute('role','dialog');
+  host.className='modal show pc-detail-overlay-v20261030';host.setAttribute('role','dialog');
   host.setAttribute('aria-modal','true');host.setAttribute('aria-label','Production request details');
-  host.innerHTML=`<div class="pc-detail-window-v20261030"><div class="pc-detail-toolbar-v20261030"><strong>Production Request Details</strong><button type="button" class="btn ghost sm" onclick="pcCloseDetailModalV20261030()">Close ✕</button></div><div class="pc-detail-content-v20261030">${pcRequestDetailHTML(request)}</div></div>`;
+  host.innerHTML=`<div class="modal-card pc-detail-window-v20261030"><div class="pc-detail-toolbar-v20261030"><strong>Production Request Details</strong><button type="button" class="btn ghost sm" onclick="pcCloseDetailModalV20261030()">Close ✕</button></div><div class="pc-detail-content-v20261030">${pcRequestDetailHTML(request)}</div></div>`;
   host.addEventListener('click',event=>{if(event.target===host)pcCloseDetailModalV20261030();});
   document.body.appendChild(host);
 }

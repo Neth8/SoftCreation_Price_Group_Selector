@@ -195,7 +195,8 @@ function miInvoiceObject(row){
     createdAt:row.created_at,
     updatedAt:row.updated_at,
     vatEnabled:miDb.lines.some(x=>x.invoice_id===row.id&&x.item_code===MI_VAT_CODE),
-    items:miDb.lines.filter(x=>x.invoice_id===row.id&&x.item_code!==MI_VAT_CODE).map(x=>({
+    deliveryCharge:miDb.lines.filter(x=>x.invoice_id===row.id&&x.item_code===MI_DELIVERY_CODE).reduce((sum,x)=>sum+miNum(x.qty)*miNum(x.unit_price),0),
+    items:miDb.lines.filter(x=>x.invoice_id===row.id&&x.item_code!==MI_VAT_CODE&&x.item_code!==MI_DELIVERY_CODE).map(x=>({
       id:x.id,code:x.item_code||'',desc:x.description||'',qty:miNum(x.qty),unitPrice:miNum(x.unit_price)
     })),
     payments:miDb.payments.filter(x=>x.invoice_id===row.id).map(x=>({
@@ -204,12 +205,14 @@ function miInvoiceObject(row){
   };
 }
 const MI_VAT_CODE='__SC_MANUAL_VAT_18__';
+const MI_DELIVERY_CODE='__SC_MANUAL_DELIVERY_CHARGE__';
+function miDeliveryCharge(inv){return Math.max(0,miNum(inv?.deliveryCharge));}
 function miSubtotal(inv){return (inv.items||[]).reduce((sum,i)=>sum+miNum(i.qty)*miNum(i.unitPrice),0)}
 function miVatAmount(inv){return inv.vatEnabled?Math.round((miSubtotal(inv)*18/118+Number.EPSILON)*100)/100:0}
 function miNetAmount(inv){return Math.round((miSubtotal(inv)-miVatAmount(inv)+Number.EPSILON)*100)/100}
 function miInvoices(){return miDb.invoices.map(miInvoiceObject)}
 function miInvoice(id){const r=miDb.invoices.find(x=>x.id===id);return r?miInvoiceObject(r):null}
-function miTotal(inv){return Math.round((miSubtotal(inv)+Number.EPSILON)*100)/100}
+function miTotal(inv){return Math.round((miSubtotal(inv)+miDeliveryCharge(inv)+Number.EPSILON)*100)/100}
 function miPaid(inv){return (inv.payments||[]).reduce((s,p)=>s+miNum(p.amount),0)}
 function miBalance(inv){return Math.max(0,miTotal(inv)-miPaid(inv))}
 function miPayStatus(inv){const t=miTotal(inv),p=miPaid(inv);return p<=0?'Unpaid':p+0.005>=t?'Paid':'Partially Paid'}
@@ -442,8 +445,10 @@ function miEditorHTML(){
         <div class="mi-item-head"><span>Item Code</span><span>Description</span><span>Qty</span><span>Unit Price</span><span>Amount</span><span></span></div>
         <div id="miItems"></div>
         <label class="mi-vat-check"><input type="checkbox" id="miVatEnabled" onchange="miRefreshEditor()" ${locked?'disabled':''}> Show included VAT (18/118 of VAT-inclusive item prices)</label>
+        <div class="mi-delivery-input"><label for="miDeliveryCharge">Delivery Charge (Rs.)</label><input id="miDeliveryCharge" type="number" min="0" step="0.01" value="0" oninput="miRefreshEditor()" ${locked?'disabled':''}><small>Added separately after item VAT; zero means no delivery fee.</small></div>
         <div class="mi-total-row">Value excluding VAT: <b id="miEditorSubtotal">Rs. 0.00</b></div>
         <div class="mi-total-row">VAT (18%): <b id="miEditorVat">Rs. 0.00</b></div>
+        <div class="mi-total-row">Delivery Charge: <b id="miEditorDelivery">Rs. 0.00</b></div>
         <div class="mi-total-row">Invoice Total: <b id="miEditorTotal">Rs. 0.00</b></div>
       </div>
 
@@ -490,6 +495,7 @@ function miAfterEditorRender(){
   mi$('miSupplyDate').value=inv?.supplyDate||miToday();
   mi$('miAdditional').value=inv?.additionalInfo||'';
   mi$('miVatEnabled').checked=!!inv?.vatEnabled;
+  mi$('miDeliveryCharge').value=miDeliveryCharge(inv).toFixed(2);
   mi$('miPaymentMode').value=inv?.paymentMode||'Cash / Card / Bank Transfer';
   mi$('miErpCustomerId').value=inv?.erpCustomerId||miSelectedErpCustomer?.id||'';
   mi$('miErpCustomerCode').value=inv?.erpCustomerCode||miSelectedErpCustomer?.code||'';
@@ -532,6 +538,7 @@ function miDraft(){
     supplyDate:mi$('miSupplyDate')?.value||'',
     additionalInfo:String(mi$('miAdditional')?.value||'').trim(),
     vatEnabled:!!mi$('miVatEnabled')?.checked,
+    deliveryCharge:miDeliveryCharge({deliveryCharge:mi$('miDeliveryCharge')?.value}),
     paymentMode:String(mi$('miPaymentMode')?.value||'').trim(),
     erpCustomerId:String(mi$('miErpCustomerId')?.value||'').trim(),
     erpCustomerCode:String(mi$('miErpCustomerCode')?.value||'').trim(),
@@ -577,6 +584,7 @@ window.miRefreshEditor=function(){
   const inv=miDraft();
   if(mi$('miEditorSubtotal'))mi$('miEditorSubtotal').textContent='Rs. '+miMoney(miNetAmount(inv));
   if(mi$('miEditorVat'))mi$('miEditorVat').textContent='Rs. '+miMoney(miVatAmount(inv));
+  if(mi$('miEditorDelivery'))mi$('miEditorDelivery').textContent='Rs. '+miMoney(miDeliveryCharge(inv));
   if(mi$('miEditorTotal'))mi$('miEditorTotal').textContent='Rs. '+miMoney(miTotal(inv));
   if(mi$('miPaidDisplay'))mi$('miPaidDisplay').value='Rs. '+miMoney(miPaid(inv));
   if(mi$('miBalanceDisplay'))mi$('miBalanceDisplay').value='Rs. '+miMoney(miBalance(inv));
@@ -636,7 +644,8 @@ window.miSaveInvoice=async function(silent=false){
     internal_note:inv.internalNote,
     user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},
     lines:[...inv.items.map((x,i)=>({line_no:i+1,item_code:x.code,description:x.desc,qty:x.qty,unit_price:x.unitPrice})),
-      ...(inv.vatEnabled?[{line_no:inv.items.length+1,item_code:MI_VAT_CODE,description:'VAT 18% included (breakdown only)',qty:1,unit_price:0}]:[])],
+      ...(inv.vatEnabled?[{line_no:inv.items.length+1,item_code:MI_VAT_CODE,description:'VAT 18% included (breakdown only)',qty:1,unit_price:0}]:[]),
+      ...(miDeliveryCharge(inv)>0?[{line_no:inv.items.length+(inv.vatEnabled?2:1),item_code:MI_DELIVERY_CODE,description:'Delivery Charge (excluded from item VAT)',qty:1,unit_price:miDeliveryCharge(inv)}]:[])],
     payments:inv.payments.map(x=>({payment_date:x.date,amount:x.amount,method:x.method,reference_note:x.note||''}))
   };
   try{
@@ -924,7 +933,7 @@ function miAmountWords(n){n=miNum(n);let ru=Math.floor(n+1e-9),cents=Math.round(
 function miRenderInvoice(inv,hostId){
   const host=mi$(hostId);if(!host)return;
 
-  const total=miTotal(inv),subtotal=miNetAmount(inv),vat=miVatAmount(inv),paid=miPaid(inv),bal=miBalance(inv);
+  const total=miTotal(inv),subtotal=miNetAmount(inv),vat=miVatAmount(inv),delivery=miDeliveryCharge(inv),paid=miPaid(inv),bal=miBalance(inv);
   const rawAddress=String(inv.customerAddress||'').trim();
   const addressLines=rawAddress
     ? rawAddress.split(/\n/).reduce((n,line)=>n+Math.max(1,Math.ceil(String(line||'').length/34)),0)
@@ -948,7 +957,7 @@ function miRenderInvoice(inv,hostId){
   const tableHeadH=25;
 
   /* Keep the final summary safely above the fixed signature/footer art. */
-  const summaryTopBase=inv.vatEnabled?525:545;
+  const summaryTopBase=(inv.vatEnabled||delivery>0)?525:545;
   const footerLimit=705;
   const finalRows=Math.max(1,Math.floor((summaryTopBase-tableTop-tableHeadH-18)/rowH));
   const continuationRows=Math.max(1,Math.floor((footerLimit-tableTop-tableHeadH-14)/rowH));
@@ -1062,10 +1071,11 @@ function miRenderInvoice(inv,hostId){
       `:''}
 
       ${isLast?`
-        <div class="mi-ex-summary mi-ex-summary-paged ${inv.vatEnabled?'mi-summary-vat-on':''}" style="top:${summaryTop}pt">
+        <div class="mi-ex-summary mi-ex-summary-paged ${(inv.vatEnabled||delivery>0)?'mi-summary-vat-on':''}" style="top:${summaryTop}pt">
           <div class="mi-ex-sumrow"><div>Value of Supply (Excl. VAT)</div><div class="v">${miMoney(subtotal)}</div></div>
-          ${inv.vatEnabled?`<div class="mi-ex-sumrow"><div>VAT 18%</div><div class="v">${miMoney(vat)}</div></div>`:''}
-          <div class="mi-ex-sumrow"><div>Total Value of Supply</div><div class="v">${miMoney(total)}</div></div>
+           ${inv.vatEnabled?`<div class="mi-ex-sumrow"><div>VAT 18%</div><div class="v">${miMoney(vat)}</div></div>`:''}
+           ${delivery>0?`<div class="mi-ex-sumrow"><div>Delivery Charge</div><div class="v">${miMoney(delivery)}</div></div>`:''}
+           <div class="mi-ex-sumrow"><div>Total Invoice Value</div><div class="v">${miMoney(total)}</div></div>
           <div class="mi-ex-sumrow"><div>Advance Paid</div><div class="v">${miMoney(paid)}</div></div>
           <div class="mi-ex-sumrow"><div>Balance Payment</div><div class="v">${miMoney(bal)}</div></div>
           <div class="mi-ex-words">Total Amount In Words : ${miAmountWords(total)}</div>
