@@ -14,6 +14,8 @@
       const first=row.querySelector('td:first-child');
       const serial=first?.querySelector('b')?.textContent?.trim();
       const so=byNumber.get(serial);if(!so||!first)return;
+      const isCancelled=!!(so.cancelledAt||so.cancelled_at||['cancelled','canceled'].includes(String(so.status||so.order_status||'').toLowerCase()));
+      if(isCancelled){first.querySelector('.spgs-live-chip-slot')?.remove();row.classList.remove('spgs-so-fully','spgs-so-partial','spgs-so-new','spgs-so-unknown');return;}
       const status=statusFor(so),type=classes[status]||'unknown';
       let wrap=first.querySelector('.spgs-live-chip-slot');
       if(!wrap){wrap=document.createElement('span');wrap.className='spgs-live-chip-slot';first.appendChild(wrap);}

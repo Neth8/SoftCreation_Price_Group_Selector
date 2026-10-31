@@ -1610,3 +1610,26 @@ textarea:focus {
   .brandmark span.s,.brandmark span.c{font-size:11px!important}
   .topbar-actions{gap:2px!important}
 }
+
+/* Sales Orders tab: cancelled order state, separate from ERP sync status. */
+#soList91 .sc-so-cancel-badge-v54{display:inline-flex;align-items:center;margin:5px 0 0 8px;padding:4px 9px;border:1px solid #dc2626;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:10px;font-weight:950;letter-spacing:.05em;vertical-align:middle}
+#soList91 .sc-so-cancelled-status-v54{color:#b91c1c;font-weight:900;font-size:11px;margin-bottom:5px}
+#soList91 tr.sc-so-cancelled-row-v54{background:rgba(254,226,226,.3)}
+@media(max-width:600px){#soList91 .sc-so-cancel-badge-v54{margin:6px 0 0;display:table}}
+
+/* Dashboard pagination + process analytics: independent of all order modules */
+.sc-dash-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 5px;font-size:12px;color:var(--muted,#6f7c8e)}
+.sc-dash-pager-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.sc-dash-pager select{border:1px solid #cbdfe1;border-radius:7px;background:var(--bg,#fff);color:var(--ink,#17243c);padding:6px;max-width:75px}
+.sc-dashboard-process-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,315px),1fr));gap:14px;margin:15px 0}
+.sc-dashboard-process-grid .sc-bi-card{min-width:0;margin:0}
+.sc-process-card h3{margin:0 0 15px;font-size:15px}
+.sc-process-card small{display:block;margin-top:12px;font-size:10px;line-height:1.4;opacity:.72}
+.sc-process-bars{display:flex;align-items:end;gap:8px;height:170px;overflow-x:auto;padding:5px 0 0}
+.sc-process-bar-col{flex:1 0 27px;min-width:27px;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:end;gap:5px}
+.sc-process-bar-value{font-size:10px;font-weight:800}.sc-process-bar-track{height:105px;width:min(100%,37px);display:flex;align-items:end;background:rgba(21,143,147,.08);border-radius:6px 6px 0 0;overflow:hidden}
+.sc-process-bar{background:linear-gradient(180deg,#0aa3a6,#087f83);width:100%;border-radius:5px 5px 0 0;min-height:2px}.sc-process-bar-label{font-size:9px;text-align:center;white-space:nowrap}
+.sc-process-metrics{display:flex;gap:10px;flex-wrap:wrap}.sc-process-metrics>div{flex:1;min-width:65px;padding:10px;background:rgba(21,143,147,.08);border-radius:9px}
+.sc-process-metrics b{display:block;font-size:23px}.sc-process-metrics span{font-size:10px;opacity:.75}.sc-process-progress{height:13px;border-radius:50px;background:rgba(21,143,147,.12);overflow:hidden;margin:15px 0 8px}.sc-process-progress>span{display:block;height:100%;background:#078f92;border-radius:50px}
+.sc-process-user-row{margin-bottom:10px}.sc-process-user-row>div:first-child{display:flex;justify-content:space-between;gap:9px;font-size:11px;margin-bottom:5px}.sc-process-user-track{background:rgba(21,143,147,.12);height:8px;border-radius:10px;overflow:hidden}.sc-process-user-track i{display:block;height:100%;background:#088e91;border-radius:10px}
+@media(max-width:600px){.sc-dashboard-process-grid{grid-template-columns:1fr}.sc-dash-pager{font-size:11px}.sc-dash-pager-actions{width:100%;justify-content:space-between}}

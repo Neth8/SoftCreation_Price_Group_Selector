@@ -35,6 +35,7 @@ window.scConfirmCancelOrderV2=async function(){
   selected.status='Cancelled';selected.cancelledAt=result.cancelled_at;selected.cancellationReason=reason;selected.cancelledBy=user.username;selected.updatedAt=new Date().toISOString();
   if(typeof window.saveState==='function')window.saveState();
   if(typeof window.bpSoRefreshV1030==='function')window.bpSoRefreshV1030();
+  if(typeof window.renderSalesOrders91==='function')window.renderSalesOrders91();
   const modal=$('scCancelModalV2'); selected=null;if(typeof window.closeModal==='function')window.closeModal('scCancelModalV2');else modal.classList.remove('show');
   window.toast?.('Sales Order cancelled. '+(result.print_jobs||0)+' cancellation receipts queued.');
  }catch(e){$('scCancelErrorV2').textContent=String(e?.message||e).slice(0,300);}

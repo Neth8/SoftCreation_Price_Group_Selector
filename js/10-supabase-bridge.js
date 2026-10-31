@@ -156,6 +156,11 @@ window.spgsLoadProductionSeen=
   }
   // Cancellation requires the existing SPGS password; verification occurs inside Supabase.
   window.spgsCancelSalesOrderRPCV2=async (args)=>spgsFetch('/rpc/softcreation_cancel_sales_order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(args)});
+  // Read-only cancellation status for the separate Sales Orders list.
+  window.spgsReadCancelledSOStatusesV54=async function(){
+    const rows=await spgsFetch('/softcreation_sales_orders?select=source_so_id,cancelled_at&cancelled_at=not.is.null&limit=1000');
+    return Array.isArray(rows)?rows:[];
+  };
   // Stores-origin orders are intentionally READ-ONLY and are never inserted into state.salesOrders.
   window.spgsReadStoresOrdersV4=async function(username){
     const filter=username?'&created_by_username=eq.'+encodeURIComponent(username):'';
