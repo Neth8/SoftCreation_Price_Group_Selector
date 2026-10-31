@@ -1971,7 +1971,7 @@
   }
 
   function portalSOStatusInfoV1032(so){
-    if(so.cancelledAt || String(so.status||'').toLowerCase()==='cancelled')return {label:'CANCELLED',cls:'issue',plan:null,consignments:[],lastUpdated:Date.parse(so.cancelledAt||so.updatedAt)||0};
+    if(so.cancelledAt || so.cancelled_at || ['cancelled','canceled'].includes(String(so.status||so.order_status||'').trim().toLowerCase()))return {label:'CANCELLED',cls:'sc-cancelled-status-v4',plan:null,consignments:[],lastUpdated:Date.parse(so.cancelledAt||so.cancelled_at||so.updatedAt)||0};
     const p=
       (state.dealerFulfilments||[])
         .find(x=>
@@ -2120,7 +2120,7 @@
 
                 <div class="portal-item bp-so-history-row-v1030">
                   <div>
-                    <b>${esc(so.soNo||'Sales Order')}</b>
+                    <b>${esc(so.soNo||'Sales Order')}</b>${status.label==='CANCELLED'?'<span class="sc-so-cancelled-chip-v4">CANCELLED</span>':''}
 
                     <div class="small">
                       ${esc(so.date||'')}
