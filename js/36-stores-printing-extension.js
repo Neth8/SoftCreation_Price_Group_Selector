@@ -701,6 +701,7 @@
       toast('Sales Order not found');
       return;
     }
+    if(window.scSOIsCancelledV57?.(so)){toast('Cancelled Sales Order: normal receipt reprint disabled.');return;}
     if(so.recoveredStoresOrder===true||so.readOnly===true){toast('Recovered Stores order: reprint disabled.');return;}
 
     try{

@@ -1633,3 +1633,11 @@ textarea:focus {
 .sc-process-metrics b{display:block;font-size:23px}.sc-process-metrics span{font-size:10px;opacity:.75}.sc-process-progress{height:13px;border-radius:50px;background:rgba(21,143,147,.12);overflow:hidden;margin:15px 0 8px}.sc-process-progress>span{display:block;height:100%;background:#078f92;border-radius:50px}
 .sc-process-user-row{margin-bottom:10px}.sc-process-user-row>div:first-child{display:flex;justify-content:space-between;gap:9px;font-size:11px;margin-bottom:5px}.sc-process-user-track{background:rgba(21,143,147,.12);height:8px;border-radius:10px;overflow:hidden}.sc-process-user-track i{display:block;height:100%;background:#088e91;border-radius:10px}
 @media(max-width:600px){.sc-dashboard-process-grid{grid-template-columns:1fr}.sc-dash-pager{font-size:11px}.sc-dash-pager-actions{width:100%;justify-content:space-between}}
+
+/* Dashboard BI immediately below KPI cards — responsive, read-only visual presentation. */
+#dashboard > .sc-dashboard-process-grid{margin:20px 0 14px;align-items:stretch}
+#dashboard > .sc-dashboard-process-grid .sc-bi-card{box-shadow:0 6px 22px rgba(15,45,62,.055);border-radius:16px}
+#dashboard > .sc-bi-wrap{margin:0 0 20px;align-items:stretch;gap:14px}
+#dashboard > .sc-bi-wrap .sc-bi-card{box-shadow:0 6px 22px rgba(15,45,62,.055);border-radius:16px}
+#dashboard > .sc-bi-wrap .sc-bi-table{width:100%}
+@media(max-width:700px){#dashboard > .sc-dashboard-process-grid,#dashboard > .sc-bi-wrap{grid-template-columns:1fr;gap:12px}}

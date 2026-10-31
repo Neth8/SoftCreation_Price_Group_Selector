@@ -2165,7 +2165,7 @@
                     <button class="btn ghost sm" type="button" onclick="bpSoViewOrderV1030('${so.id}')">View</button>
                     ${(!so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true && (currentUser?.role==='admin' || so.ownerUser===currentUser?.username)) ? `<button class="btn red sm" type="button" onclick="scOpenCancelOrderV2('${so.id}')">Cancel Order</button>` : ''}
                     ${
-                      (currentUser?.role === 'admin' && so.recoveredStoresOrder !== true && so.readOnly !== true)
+                      (currentUser?.role === 'admin' && !window.scSOIsCancelledV57?.(so) && so.recoveredStoresOrder !== true && so.readOnly !== true)
                         ? `<button class="btn amber sm" type="button" onclick="adminOpenEditSalesOrderV1030('${so.id}')">Edit</button>`
                         : ''
                     }
@@ -2252,7 +2252,7 @@
     if(scCancelBtn){ scCancelBtn.style.display=(!so.cancelledAt && String(so.status||'').toLowerCase()!=='cancelled' && (currentUser?.role==='admin'||so.ownerUser===currentUser?.username))?'inline-flex':'none'; scCancelBtn.dataset.soId=so.id; }
     const editBtn=$('bpSoViewEditBtnV1030');
     if(editBtn){
-      editBtn.style.display=(currentUser?.role==='admin' && !so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true)?'inline-flex':'none';
+      editBtn.style.display=(currentUser?.role==='admin' && !window.scSOIsCancelledV57?.(so) && so.recoveredStoresOrder!==true && so.readOnly!==true)?'inline-flex':'none';
     }
 
     const deliveryRows=
@@ -2574,6 +2574,7 @@
     }
     const so = (state.salesOrders || []).find(x => x.id === soId);
     if (!so) return toast('Sales Order not found');
+    if (window.scSOIsCancelledV57?.(so)) return toast('Cancelled Sales Order: view only.');
     if (so.recoveredStoresOrder === true || so.readOnly === true) {
       return toast('Recovered Stores order: read-only. Editing is disabled.');
     }
@@ -2934,6 +2935,7 @@
 
     const so = (state.salesOrders || []).find(x => x.id === adminEditingSO.id);
     if (!so) return toast('Sales Order not found in state.');
+    if (window.scSOIsCancelledV57?.(so)) return toast('Cancelled Sales Order: editing disabled.');
 
     // 1. Validate Lines
     if (!adminEditingSO.lines.length || adminEditingSO.lines.some(l => !(Number(l.qty) > 0))) {
