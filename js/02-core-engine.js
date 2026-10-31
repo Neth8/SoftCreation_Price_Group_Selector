@@ -924,7 +924,7 @@ async function downloadDocPDF(doc){
     toast('Generating PDF exactly from A4 preview...');
     cap=await createPaperForCapture(doc);
     const canvas=await html2canvas(cap.paper,{
-      scale:4,
+      scale:2,
       backgroundColor:'#ffffff',
       useCORS:true,
       allowTaint:true,
@@ -934,11 +934,11 @@ async function downloadDocPDF(doc){
       windowWidth:794,
       windowHeight:1123
     });
-    const img=canvas.toDataURL('image/png',1);
+    const img=canvas.toDataURL('image/jpeg',0.86);
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({orientation:'p',unit:'mm',format:'a4',compress:true});
     try{pdf.setDisplayMode(1.0,'continuous','UseNone')}catch(e){}
-    pdf.addImage(img,'PNG',0,0,210,297,'previewExact','FAST');
+    pdf.addImage(img,'JPEG',0,0,210,297,'previewExact','FAST');
     pdf.save((doc.serial||'document').replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
     toast('PDF generated exactly from preview');
   }catch(err){

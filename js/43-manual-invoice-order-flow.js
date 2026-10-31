@@ -1091,12 +1091,21 @@ window.miPrintDraft=function(){
   miDoPrint(inv);
 };
 window.miPrintInvoice=function(id){const inv=miInvoice(id);if(inv)miDoPrint(inv)};
-function miDoPrint(inv){
+async function miDoPrint(inv){
   miRenderInvoice(inv,'miPrintHost');
+  const host=document.getElementById('miPrintHost');
+  if(!host)return;
+  const images=[...host.querySelectorAll('img')];
+  await Promise.all(images.map(img=>img.complete && img.naturalWidth ? Promise.resolve() : new Promise(resolve=>{
+    let done=false;const finish=()=>{if(!done){done=true;resolve()}};
+    img.addEventListener('load',finish,{once:true});
+    img.addEventListener('error',finish,{once:true});
+    setTimeout(finish,3000);
+  })));
   document.body.classList.add('mi-printing');
   const cleanup=()=>{document.body.classList.remove('mi-printing');window.removeEventListener('afterprint',cleanup)};
   window.addEventListener('afterprint',cleanup);
-  setTimeout(()=>{window.print();setTimeout(cleanup,800)},80);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));
 }
 
 /* ---------------- integration ---------------- */

@@ -993,6 +993,57 @@ async function spgsStartProductionRealtime(){
     await spgsFetch('/spgs_users?on_conflict=id',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(users.map(spgsUserToRow))});
     spgsLastUsersJson=sig;
   }
+  // READ-ONLY cross-user refresh, every 60 seconds while visible.
+  // Local edits are never sent by this routine. Saves continue through existing functions.
+  let spgsPollRunning=false;
+  async function spgsPollCollection(field,load,ready){
+    if(!ready)return false;
+    const remote=await load();
+    if(!Array.isArray(remote))return false;
+    const local=Array.isArray(state[field])?state[field]:[];
+    // Keep newer local records and don't erase local-only records during a pull.
+    const byId=new Map(local.filter(x=>x?.id).map(x=>[x.id,x]));
+    let changed=false;
+    for(const item of remote){
+      const old=byId.get(item.id);
+      const remoteTime=Date.parse(item._spgsUpdatedAt||item.updatedAt||0)||0;
+      const localTime=Date.parse(old?._spgsUpdatedAt||old?.updatedAt||0)||0;
+      if(!old||remoteTime>localTime){byId.set(item.id,item);changed=true}
+    }
+    if(changed)state[field]=[...byId.values()];
+    return changed;
+  }
+  async function spgsSafePoll(){
+    if(spgsPollRunning||!spgsReady||!currentUser||document.hidden||spgsSaving||spgsSaveTimer)return;
+    // Do not overwrite inputs while any form/dialog is being edited.
+    if(document.querySelector('.modal.show,.mi-modal-backdrop,.spgs-modal.show,[role="dialog"]:not([hidden])'))return;
+    if(document.activeElement?.matches('input,textarea,select,[contenteditable="true"]'))return;
+    spgsPollRunning=true;
+    try{
+      let changed=false;
+      const sources=[
+        ['productionRequests',spgsLoadProduction,true],
+        ['purchaseOrders',spgsLoadPurchaseOrders,spgsPurchaseCloudReady],
+        ['quoteRequests',spgsLoadQuoteRequests,spgsQuoteRequestCloudReady],
+        ['salesOrders',spgsLoadSalesOrders,spgsSalesOrderCloudReady],
+        ['dealerFulfilments',spgsLoadOrderFulfilments,spgsFulfilmentCloudReady]
+      ];
+      for(const [field,load,ready] of sources){
+        try{if(await spgsPollCollection(field,load,ready))changed=true}
+        catch(e){console.warn('Polling '+field+' failed',e)}
+      }
+      if(changed){
+        spgsWriteLocal();
+        try{refreshAll()}catch(e){console.warn('Polling view refresh failed',e)}
+      }
+    }finally{spgsPollRunning=false}
+  }
+  function spgsStartSafePolling(){
+    if(window.__spgsPollTimer)return;
+    window.__spgsPollTimer=setInterval(()=>{spgsSafePoll().catch(console.warn)},60000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)spgsSafePoll().catch(console.warn)});
+  }
+
   async function spgsLoadCloudState(){
     const rows=await spgsFetch(`/spgs_app_state?workspace=eq.${encodeURIComponent(SPGS_WORKSPACE)}&select=payload,revision,updated_at&limit=1`);
     return rows?.[0]||null;
@@ -1191,33 +1242,9 @@ spgsProductionJson=
       await spgsSyncUsers(true);
       spgsLastUsersJson=JSON.stringify(state.users);
       spgsReady=true;
-      try{
-    await spgsStartProductionRealtime();
-}catch(e){
-    console.error(
-        'Production realtime could not start',
-        e
-    );
-
-    toast(
-        'Production realtime offline - normal cloud save still works'
-    );
-}
-      if(spgsEntityStoreReady){
-        try{await spgsStartEntityRealtime()}catch(e){console.error('Per-record entity realtime could not start',e)}
-      }
-      if(spgsPurchaseCloudReady){
-        try{await spgsStartPurchaseOrdersRealtime()}catch(e){console.error('Purchase Orders realtime could not start',e)}
-      }
-      if(spgsQuoteRequestCloudReady){
-        try{await spgsStartQuoteRequestsRealtime()}catch(e){console.error('Quote Requests realtime could not start',e)}
-      }
-      if(spgsSalesOrderCloudReady){
-        try{await spgsStartSalesOrdersRealtime()}catch(e){console.error('Sales Orders realtime could not start',e)}
-      }
-      if(spgsFulfilmentCloudReady){
-        try{await spgsStartFulfilmentRealtime()}catch(e){console.error('Order Fulfilment realtime could not start',e)}
-      }
+      // Polling mode: no Supabase websocket subscriptions are opened.
+      // Never merge server records during a local pending save or an editing dialog.
+      spgsStartSafePolling();
       spgsWriteLocal();
 
       const session=(()=>{try{return JSON.parse(sessionStorage.getItem('sc_active_user_v75_clean')||'null')}catch(e){return null}})();

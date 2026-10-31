@@ -421,7 +421,7 @@
 
       for(let i=0;i<pages.length;i++){
         const canvas=await html2canvas(pages[i],{
-          scale:4,
+          scale:2,
           backgroundColor:'#ffffff',
           useCORS:true,
           allowTaint:true,
@@ -433,8 +433,8 @@
         });
 
         if(i>0)pdf.addPage('a4','p');
-        const img=canvas.toDataURL('image/png',1);
-        pdf.addImage(img,'PNG',0,0,210,297,`quotePage${i+1}`,'FAST');
+        const img=canvas.toDataURL('image/jpeg',0.83);
+        pdf.addImage(img,'JPEG',0,0,210,297,`quotePage${i+1}`,'FAST');
       }
 
       pdf.save((doc.serial||'quotation').replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
