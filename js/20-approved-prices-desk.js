@@ -1971,6 +1971,7 @@
   }
 
   function portalSOStatusInfoV1032(so){
+    if(so.cancelledAt || String(so.status||'').toLowerCase()==='cancelled')return {label:'CANCELLED',cls:'issue',plan:null,consignments:[],lastUpdated:Date.parse(so.cancelledAt||so.updatedAt)||0};
     const p=
       (state.dealerFulfilments||[])
         .find(x=>
@@ -2162,6 +2163,7 @@
                     }
 
                     <button class="btn ghost sm" type="button" onclick="bpSoViewOrderV1030('${so.id}')">View</button>
+                    ${(!so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true && (currentUser?.role==='admin' || so.ownerUser===currentUser?.username)) ? `<button class="btn red sm" type="button" onclick="scOpenCancelOrderV2('${so.id}')">Cancel Order</button>` : ''}
                     ${
                       (currentUser?.role === 'admin' && so.recoveredStoresOrder !== true && so.readOnly !== true)
                         ? `<button class="btn amber sm" type="button" onclick="adminOpenEditSalesOrderV1030('${so.id}')">Edit</button>`
@@ -2246,9 +2248,11 @@
       modal.dataset.soIdV1032=so.id;
     }
 
+    const scCancelBtn=document.getElementById('scCancelViewBtnV2');
+    if(scCancelBtn){ scCancelBtn.style.display=(!so.cancelledAt && String(so.status||'').toLowerCase()!=='cancelled' && (currentUser?.role==='admin'||so.ownerUser===currentUser?.username))?'inline-flex':'none'; scCancelBtn.dataset.soId=so.id; }
     const editBtn=$('bpSoViewEditBtnV1030');
     if(editBtn){
-      editBtn.style.display=(currentUser?.role==='admin' && so.recoveredStoresOrder!==true && so.readOnly!==true)?'inline-flex':'none';
+      editBtn.style.display=(currentUser?.role==='admin' && !so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true)?'inline-flex':'none';
     }
 
     const deliveryRows=

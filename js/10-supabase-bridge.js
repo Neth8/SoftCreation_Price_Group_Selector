@@ -154,6 +154,8 @@ window.spgsLoadProductionSeen=
     if(res.status===204)return null;
     const text=await res.text();return text?JSON.parse(text):null;
   }
+  // Cancellation requires the existing SPGS password; verification occurs inside Supabase.
+  window.spgsCancelSalesOrderRPCV2=async (args)=>spgsFetch('/rpc/softcreation_cancel_sales_order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(args)});
   // Stores-origin orders are intentionally READ-ONLY and are never inserted into state.salesOrders.
   window.spgsReadStoresOrdersV4=async function(username){
     const filter=username?'&created_by_username=eq.'+encodeURIComponent(username):'';
