@@ -406,7 +406,7 @@ function buildDocHTML(doc,forPrint=false){
 
   const rows=activeDocLines(doc).map((l,idx)=>{
     const amt=Number(l.qty||0)*Number(l.price||0);
-    const spec=[l.size,l.material,l.layout,l.pcs?`${l.pcs} pcs / roll`:null].filter(Boolean).join(' | ');
+    const spec=[l.size,l.material,l.layout,l.pcs?`${l.pcs} pcs / roll`:null].filter(Boolean).join(' / ');
     if(vatMode){
       const r=Number(state.settings.vat||18)/100,net=Number(l.price||0)/(1+r),netAmount=Number(l.qty||0)*net;
       return `<tr>
@@ -667,7 +667,7 @@ function pdfDrawReferenceTable(pdf,doc,startY){
   let y=startY+headH;
 
   rows.forEach((l,idx)=>{
-    const spec=[l.size,l.material,l.layout,l.pcs?`${l.pcs} labels / roll`:null].filter(Boolean).join(' | ');
+    const spec=[l.size,l.material,l.layout,l.pcs?`${l.pcs} labels / roll`:null].filter(Boolean).join(' / ');
     const amt=Number(l.qty||0)*Number(l.price||0);
     let cells;
 
