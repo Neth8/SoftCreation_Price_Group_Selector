@@ -17,7 +17,7 @@
     const r=x.r||{};const costOK=Number(x.cost?.costPerRoll)>0;
     const table=[
       ['Production job',r.orderNo||'-'],['Customer',r.customerName||'-'],['Source PI',r.piSerial||'-'],
-      ['Product',[r.size,r.material,r.layout,`${money2(r.pcs||0)} pcs/roll`].filter(Boolean).join(' / ')],
+      ['Product',[r.size,r.material,r.layout,`${money2(r.pcs||0)} pcs/roll`].filter(Boolean).join(' ')],
       ['Job status',r.status||'-'],['Requested',`${money2(r.requestQty)} ${r.unit||'rolls'}`],
       ['Finished',`${money2(x.actualQty)} ${r.unit||'rolls'}`],
       ['Cost per roll',costOK?'LKR '+money2(x.cost.costPerRoll):'Unavailable'],

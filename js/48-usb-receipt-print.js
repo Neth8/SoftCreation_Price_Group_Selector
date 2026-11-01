@@ -27,7 +27,7 @@
       'CUSTOMER\n',
       wrapV1126(r?.customerName||d?.customerName||'-'),
       'ITEM\n',
-      wrapV1126([r?.size,r?.material,r?.layout,Number(r?.pcs||0)>0?`${r.pcs} pcs/roll`:'' ].filter(Boolean).join(' / ')),
+      wrapV1126([r?.size,r?.material,r?.layout,Number(r?.pcs||0)>0?`${r.pcs} pcs/roll`:'' ].filter(Boolean).join(' ')),
       lineV1126()
     ];
 

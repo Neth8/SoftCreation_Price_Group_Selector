@@ -1,13 +1,21 @@
 /* Display-only legacy item-name separator cleanup. Keep '|'-delimited identity keys intact. */
 (()=>{'use strict';
-  const replacement=s=>String(s).replace(/\s*\|\s*/g,' ').replace(/ {2,}/g,' ');
+  const replacement=s=>{
+    let v=String(s).replace(/\s+\|\s+/g,' ');
+    // Only remove forward slashes when the text represents an item specification.
+    // Never modify URLs, dates, 'pcs/roll', prices, or internal identity keys.
+    const isItemSpec=/\b\d+(?:\.\d+)?\s*mm\s*[x×]\s*\d+(?:\.\d+)?\s*mm\s*\/\s*/i.test(v)
+      || /\b(?:DT ECO|DT TOP|ELP HYBRID|TT|PVC|HIGHSTICK)\s*\/\s*\d+\s*UP\b/i.test(v);
+    if(isItemSpec) v=v.replace(/\s+\/\s+(?=(?:DT ECO|DT TOP|ELP HYBRID|TT|PVC|HIGHSTICK|\d+\s*UP|\d+\s*(?:PCS|LABELS)\b))/gi,' ');
+    return v.replace(/ {2,}/g,' ');
+  };
   const skip=new Set(['SCRIPT','STYLE','NOSCRIPT','CODE','PRE','TEXTAREA','INPUT','SVG']);
   function clean(root){
     if(!root||root.nodeType===8)return;
     if(root.nodeType===3){
       const parent=root.parentElement;
       if(parent&&skip.has(parent.tagName))return;
-      if(root.nodeValue&&/\s\|\s/.test(root.nodeValue))root.nodeValue=replacement(root.nodeValue);
+      if(root.nodeValue&&(/\s\|\s/.test(root.nodeValue)||/mm\s*\//i.test(root.nodeValue)||/\bUP\s*\//i.test(root.nodeValue)))root.nodeValue=replacement(root.nodeValue);
       return;
     }
     if(root.nodeType!==1&&root.nodeType!==9&&root.nodeType!==11)return;
@@ -15,7 +23,7 @@
     const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     const list=[];while(walk.nextNode())list.push(walk.currentNode);
     for(const node of list){const parent=node.parentElement;if(parent&&parent.closest('script,style,noscript,code,pre,textarea,svg'))continue;
-      if(node.nodeValue&&/\s\|\s/.test(node.nodeValue))node.nodeValue=replacement(node.nodeValue);
+      if(node.nodeValue&&(/\s\|\s/.test(node.nodeValue)||/mm\s*\//i.test(node.nodeValue)||/\bUP\s*\//i.test(node.nodeValue)))node.nodeValue=replacement(node.nodeValue);
     }
   }
   function start(){

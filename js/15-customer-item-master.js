@@ -221,7 +221,7 @@
     mp.innerHTML='<option value="">-- Customer Item Master --</option>'+items.map(item=>{
       const price=currentPricingForItem(item,customer.id,mode);
       const count=scHistoryForItemV1021(customer,item,'').length;
-      const label=[item.size,item.material,item.layout,item.pcs?item.pcs+'pcs':''].filter(Boolean).join(' / ');
+      const label=[item.size,item.material,item.layout,item.pcs?item.pcs+'pcs':''].filter(Boolean).join(' ');
       return `<option value="${item.id}">${esc(label)} — LKR ${money(price)}${count?` • ${count} change${count===1?'':'s'}`:''}</option>`;
     }).join('');
 
@@ -246,7 +246,7 @@
     const text=$('customerItemProfileText');
     if(text){
       const count=scHistoryForItemV1021(customer,item,'').length;
-      text.textContent=`${[item.size,item.material,item.layout,item.pcs?item.pcs+' pcs':''].filter(Boolean).join(' / ')} • Current LKR ${money(price)} • ${count} recorded change${count===1?'':'s'}${latest?.user?` • Last by ${latest.user}`:''}`;
+      text.textContent=`${[item.size,item.material,item.layout,item.pcs?item.pcs+' pcs':''].filter(Boolean).join(' ')} • Current LKR ${money(price)} • ${count} recorded change${count===1?'':'s'}${latest?.user?` • Last by ${latest.user}`:''}`;
     }
   };
 
@@ -363,7 +363,7 @@
     const canUse=scCanUseHistoryV1021(customer,item);
     const body=$('savedPricesBody');
     if(!body)return;
-    const itemLabel=[item.size,item.material,item.layout,item.pcs?item.pcs+' pcs':''].filter(Boolean).join(' / ');
+    const itemLabel=[item.size,item.material,item.layout,item.pcs?item.pcs+' pcs':''].filter(Boolean).join(' ');
     body.innerHTML=`
       <div class="customer-price-modal-head">
         <div><b>${esc(customer.name)}</b><span>${esc(itemLabel)}</span></div>
@@ -405,7 +405,7 @@
       ${items.length?`<div class="customer-price-summary-grid">${items.map(item=>{
         const list=scHistoryForItemV1021(customer,item,'');
         const latest=list[0];
-        const label=[item.size,item.material,item.layout,item.pcs?item.pcs+' pcs':''].filter(Boolean).join(' / ');
+        const label=[item.size,item.material,item.layout,item.pcs?item.pcs+' pcs':''].filter(Boolean).join(' ');
         const price=currentPricingForItem(item,customer.id,mode);
         return `<div class="customer-price-item-card">
           <div class="customer-price-item-title"><b>${esc(label)}</b><span>${esc(item.desc||'ELP')}</span></div>

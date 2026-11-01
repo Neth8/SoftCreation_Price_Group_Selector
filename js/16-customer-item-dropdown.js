@@ -69,7 +69,7 @@
       item?.material,
       item?.layout,
       item?.pcs?item.pcs+' pcs':''
-    ].filter(Boolean).join(' / ');
+    ].filter(Boolean).join(' ');
   }
 
   function scHistoryChangeV1023(list,index){
