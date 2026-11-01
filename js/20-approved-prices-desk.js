@@ -3235,7 +3235,7 @@
       const m=p.materialRates;
 
       $('admTT').value=m.TT;
-      $('admDTTop').value=m['DT TOP'];
+      $('admDTTop').value=m['ELP HYBRID'];
       $('admPVC').value=m.PVC;
       $('admDTEco').value=m['DT ECO'];
       $('admHighstick').value=m.HIGHSTICK;
