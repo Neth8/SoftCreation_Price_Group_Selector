@@ -1644,3 +1644,12 @@ textarea:focus {
 
 /* v20261103: Production Control search */
 .pc-search-nov3{padding:10px 14px;} .pc-search-nov3 input{width:100%;max-width:580px;border-radius:9px;border:1px solid #aab9c8;padding:11px 13px;background:var(--card,#fff);color:inherit;}
+/* GRN-based finance register */
+.sc-finance-summary-v60{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
+.sc-finance-summary-v60>div{border:1px solid #d3e4e6;border-radius:14px;padding:15px;background:var(--surface,#f6fafb)}
+.sc-finance-summary-v60 small{display:block;font-size:12px;color:#59717b;font-weight:700;margin-bottom:5px}
+.sc-finance-summary-v60 strong{font-size:23px;color:#14353d}
+.sc-finance-pager-v60{display:flex;justify-content:flex-end;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px}
+#scFinanceRowsV60 .tablewrap{overflow-x:auto}
+#scFinanceRowsV60 .table{min-width:860px}
+#scFinanceRowsV60 .table td{vertical-align:middle}
