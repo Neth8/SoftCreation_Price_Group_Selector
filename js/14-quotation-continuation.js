@@ -360,7 +360,10 @@
     const result=scBaseRenderCurrentV1019.apply(this,arguments);
     try{
       const doc=state.current;
-      if(scQuoteIsPagedDocument(doc))scRenderQuotationV1019(target,doc);
+      // Device quotations already render an interactive full preview above.
+      // Measuring and rebuilding pagination on every added device blocks the UI.
+      // The PDF export still builds the correctly paginated pages on demand.
+      if(scQuoteIsPagedDocument(doc) && doc.category!=='device')scRenderQuotationV1019(target,doc);
     }catch(err){
       console.error('Multi-page quotation preview failed',err);
       scResetPaperTargetV1019(target);
