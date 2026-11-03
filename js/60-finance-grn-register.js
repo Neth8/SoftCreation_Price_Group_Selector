@@ -60,18 +60,58 @@
     const area=jbrInfo.rows.reduce((s,j)=>s+(n(j.jbr_width_mm)*n(j.jbr_length_m)/1000),0);
     const validArea=jbrInfo.rows.length>0&&jbrInfo.rows.every(j=>n(j.jbr_width_mm)>0&&n(j.jbr_length_m)>0&&String(j.process_status)==='Fully Die Cut');
     const rate=materialRate(r),cost=validArea&&rate!=null?area*rate:null;
-    const good=n(g.receivedQty), perGood=cost!=null&&good>0?cost/good:null;
-    const mismatch=cut>0?cut-good:null;
-    const amount=x=>x==null?'Not available':'LKR '+fmt(x);
-    const field=(label,value)=>`<tr><td style="padding:9px;border-bottom:1px solid #dde5e7;font-weight:600;width:48%">${escText(label)}</td><td style="padding:9px;border-bottom:1px solid #dde5e7">${escText(value)}</td></tr>`;
+    const good=n(g.receivedQty);
+    // Difference is NOT confirmed scrap: material may remain unpacked, be reusable, or be awaiting QC.
+    // Roll-equivalent m² uses measured input area / actual cut rolls, not the original requested quantity.
+    const sqmPerCut=validArea&&cut>0?area/cut:null;
+    const potentialWasteRolls=jbrInfo.rows.length&&cut>0?Math.max(0,cut-good):null;
+    const potentialWasteSqm=sqmPerCut!=null&&potentialWasteRolls!=null?sqmPerCut*potentialWasteRolls:null;
+    const potentialWasteCost=potentialWasteSqm!=null&&rate!=null?potentialWasteSqm*rate:null;
+    const cutRollCost=cost!=null&&cut>0?cost/cut:null;
+    const perGood=cost!=null&&good>0?cost/good:null;
+    const excessRolls=jbrInfo.rows.length?Math.max(0,good-cut):null;
+    const amount=x=>x==null?'Unavailable':'LKR '+fmt(x);
+    const sqm=x=>x==null?'Unavailable':fmt(x)+' m²';
+    const rolls=x=>x==null?'Unavailable':fmt(x)+' Rolls';
+    const field=(label,value,tone='')=>{
+      const styles={area:['#e7f5ff','#075985','#0284c7'],focus:['#e6f8f2','#075943','#0d9488'],warning:['#fff1df','#9a3412','#f59e0b'],ordinary:['#ffffff','#172b35','#dde5e7']};
+      const st=styles[tone]||styles.ordinary;
+      return `<tr style="background:${st[0]}"><td style="padding:9px 11px;border-bottom:1px solid ${st[2]};font-weight:${tone?'800':'600'};width:48%;color:${st[1]}">${escText(label)}</td><td style="padding:9px 11px;border-bottom:1px solid ${st[2]};font-weight:${tone?'800':'400'};color:${st[1]}">${escText(value)}</td></tr>`;
+    };
+    const tile=(title,value,color,shade,detail)=>`<div style="background:${shade};border:1px solid ${color};border-top:4px solid ${color};border-radius:9px;padding:11px 13px;min-width:0;box-sizing:border-box;break-inside:avoid"><div style="font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${color}">${escText(title)}</div><div style="font-size:19px;font-weight:800;color:${color};margin-top:6px">${escText(value)}</div><div style="font-size:10px;color:#526370;margin-top:5px">${escText(detail)}</div></div>`;
     const reportRows=[
       ['GRN Number',g.grnNo],['Receipt date',g.date||g.createdAt||'-'],['Production order',g.orderNo||r?.orderNo||'-'],['Dispatch number',g.dispatchNo||'-'],['Customer',g.customerName||r?.customerName||'-'],
-      ['Product',[r?.size,r?.material,r?.layout,r?.pcs?`${r.pcs} pcs/roll`:null].filter(Boolean).join(' ')||g.item||'-'],['Factory dispatched',fmt(g.dispatchedQty)+' Rolls'],['Stores received',fmt(g.receivedQty)+' Rolls'],['Stores variance',fmt(g.variance)+' Rolls'],['Variance explanation',g.factoryReason||g.storesReason||g.reason||'No variance'],
-      ['Linked JBR records',jbrInfo.rows.length],['JBR cut rolls (linked)',jbrInfo.rows.length?fmt(cut):'Unavailable'],['Measured JBR input area',validArea?fmt(area)+' m²':'Unavailable'],['Current material rate',rate==null?'Unavailable':'LKR '+fmt(rate)+' / m²'],
-      ['Indicative material cost',amount(cost)],['Indicative material cost per received roll',amount(perGood)],['JBR cut minus received rolls',mismatch==null?'Unavailable':fmt(mismatch)+' Rolls — investigate, not automatically waste']
+      ['Product',[r?.size,r?.material,r?.layout,r?.pcs?`${r.pcs} pcs/roll`:null].filter(Boolean).join(' ')||g.item||'-'],
+      ['Factory dispatched',rolls(n(g.dispatchedQty))],['Stores received (good)',rolls(good)],['Stores variance',rolls(n(g.variance))],['Variance explanation',g.factoryReason||g.storesReason||g.reason||'No variance'],
+      ['Linked JBR records',String(jbrInfo.rows.length)],['JBR cut rolls (linked)',jbrInfo.rows.length?rolls(cut):'Unavailable'],
+      ['Measured JBR input area',sqm(validArea?area:null),'area'],
+      ['Single cut roll material area',sqm(sqmPerCut),'area'],
+      ['Current material rate',rate==null?'Unavailable':'LKR '+fmt(rate)+' / m²'],
+      ['Total measured material cost',amount(cost),'focus'],
+      ['Material cost per cut roll',amount(cutRollCost)],
+      ['Material cost per received good roll',amount(perGood),'focus'],
+      ['Potential waste / unaccounted rolls',rolls(potentialWasteRolls),'warning'],
+      ['Potential waste area',sqm(potentialWasteSqm),'warning'],
+      ['Potential waste material cost',amount(potentialWasteCost),'warning'],
+      ['Received above linked cut rolls',rolls(excessRolls)]
     ];
-    return `<div style="font:14px Arial,sans-serif;color:#172b35;padding:30px;width:760px;box-sizing:border-box;background:#fff"><div style="border-bottom:4px solid #098e91;padding-bottom:15px"><h1 style="color:#098e91;margin:0">SoftCreation</h1><h2 style="margin:10px 0 4px">STORES GRN · PRODUCTION COSTING</h2><div>${escText(g.grnNo||'')}</div></div><table style="width:100%;border-collapse:collapse;margin-top:20px">${reportRows.map(x=>field(...x)).join('')}</table><p style="font-size:12px;line-height:1.6;color:#556a75;margin-top:24px">Material-only estimate based on linked fully die-cut JBR widths and lengths and the <b>current</b> Admin material rate. This is not a historical rate snapshot and excludes labor, overheads, packaging and other costs. A shortfall is not automatically waste; account for damage, reuse and outstanding stock separately. ${escText(jbrInfo.error||'')}</p><p style="font-size:12px">Generated ${new Date().toLocaleString()} · Finance copy</p></div>`;
+    return `<div style="font:13px Arial,sans-serif;color:#172b35;padding:25px;width:760px;box-sizing:border-box;background:#fff">
+      <div style="border-bottom:4px solid #098e91;padding-bottom:13px"><h1 style="color:#098e91;margin:0;font-size:28px">SoftCreation</h1><h2 style="margin:8px 0 4px;font-size:19px">STORES GRN · PRODUCTION COSTING</h2><div>${escText(g.grnNo||'')}</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:16px 0 8px">
+        ${tile('Measured JBR input area',sqm(validArea?area:null),'#075985','#e7f5ff','Actual JBR width × measured length')}
+        ${tile('Single cut roll area',sqm(sqmPerCut),'#075985','#e7f5ff','Measured area ÷ actual cut rolls')}
+        ${tile('Good roll material cost',amount(perGood),'#075943','#e6f8f2','Total input material cost ÷ GRN received rolls')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:8px 0 12px">
+        ${tile('Potential waste rolls',rolls(potentialWasteRolls),'#9a3412','#fff1df','Cut rolls not in this GRN receipt')}
+        ${tile('Potential waste area',sqm(potentialWasteSqm),'#9a3412','#fff1df','Potential rolls × area per cut roll')}
+        ${tile('Potential waste cost',amount(potentialWasteCost),'#9a3412','#fff1df','Potential waste area × current m² rate')}
+      </div>
+      <div style="padding:9px 11px;background:#fff8e9;border-left:4px solid #d97706;font-size:11px;line-height:1.5"><b>Important — not confirmed scrap:</b> Differences between JBR cut rolls and Stores received rolls may represent stock awaiting dispatch, incomplete packing, rework or real waste. Verify physical reconciliation before recording a waste expense. Estimated waste cost is a portion of total measured material cost; it is <b>not an additional cost</b>.</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:13px;font-size:12px">${reportRows.map(x=>field(...x)).join('')}</table>
+      <p style="font-size:11px;line-height:1.6;color:#556a75;margin-top:17px">Material-only estimate based on linked fully die-cut JBR widths and processed lengths, using the <b>current</b> Admin material rate. This is not a historical rate snapshot and excludes labor, overheads, packing and other costs. If multiple GRNs share the same JBR batch, these figures are batch-level and must not be summed across separate GRN PDFs. ${escText(jbrInfo.error||'')}</p><p style="font-size:11px">Generated ${new Date().toLocaleString()} · Finance copy</p></div>`;
   }
+
   window.scFinanceCostingPdfV60=async function(id){
     if(!allowed())return toast('Finance access required');
     const g=grns().find(x=>String(x.id)===String(id));if(!g||!financeReady(g))return toast('GRN not ready for Finance');
