@@ -31,6 +31,7 @@ let miCustomerTimer=null;
 let miCustomerSeq=0;
 let miLocked=false;
 let miViewingId='';
+let miPreviewTimerNov3=null;
 
 const mi$=id=>document.getElementById(id);
 const miNum=v=>Number(v||0);
@@ -431,10 +432,10 @@ function miEditorHTML(){
         <div id="miCustomerDocuments" class="mi-customer-documents"><div class="mi-muted">Select a customer to view related quotations, pro formas and sales orders.</div></div>
         <input id="miErpCustomerId" type="hidden"><input id="miErpCustomerCode" type="hidden">
         <div class="mi-grid2 mi-gap-top">
-          <div class="field"><label>Customer Name *</label><input id="miCustomerName" readonly></div>
+          <div class="field"><label>Customer Name *</label><input id="miCustomerName" ${locked?'disabled':''}></div>
           <div class="field"><label>Purchaser's TIN</label><input id="miCustomerTIN" ${locked?'disabled':''}></div>
-          <div class="field"><label>Email</label><input id="miCustomerEmail" readonly></div>
-          <div class="field"><label>Telephone No</label><input id="miCustomerPhone" readonly></div>
+          <div class="field"><label>Email</label><input id="miCustomerEmail" ${locked?'disabled':''}></div>
+          <div class="field"><label>Telephone No</label><input id="miCustomerPhone" ${locked?'disabled':''}></div>
           <div class="field full"><label>ERP Address</label><select id="miCustomerAddressPick" onchange="miAddressChanged(this.value)" ${locked?'disabled':''}><option value="">Select ERP customer first</option></select></div>
           <div class="field full"><label>Invoice Address *</label><textarea id="miCustomerAddress" ${locked?'disabled':''}></textarea></div>
         </div>
@@ -589,7 +590,12 @@ window.miRefreshEditor=function(){
   if(mi$('miPaidDisplay'))mi$('miPaidDisplay').value='Rs. '+miMoney(miPaid(inv));
   if(mi$('miBalanceDisplay'))mi$('miBalanceDisplay').value='Rs. '+miMoney(miBalance(inv));
   if(mi$('miPayStatusDisplay'))mi$('miPayStatusDisplay').value=miPayStatus(inv);
-  miRenderInvoice(inv,'miPreviewHost');
+  clearTimeout(miPreviewTimerNov3);
+  miPreviewTimerNov3=setTimeout(()=>{
+    if(document.getElementById('miPreviewHost') && document.querySelector('#miItems')){
+      try{miRenderInvoice(miDraft(),'miPreviewHost')}catch(e){console.warn('Manual invoice preview:',e)}
+    }
+  },350);
 };
 function miRenderPayments(){
   const host=mi$('miPaymentHistory');if(!host)return;
@@ -1122,4 +1128,16 @@ miInstallPermissions();
 miInstallUI();
 try{applyUserAccess()}catch(_){}
 if(currentUser&&miCan('manual_invoice_view'))miRefresh(false);
+
+// Read-only Manual Invoice lists refresh every 12 seconds; never discard draft edits.
+let miAutoPollingNov3=false;
+setInterval(async()=>{
+  if(miAutoPollingNov3||document.hidden||!document.querySelector('#manualinvoices.active'))return;
+  if(miPage==='editor'||miPage==='viewer')return;
+  if(document.activeElement?.matches('input,textarea,select,[contenteditable="true"]'))return;
+  miAutoPollingNov3=true;
+  try{await miLoad();miRender()}catch(error){console.warn('Manual Invoice background refresh:',error)}
+  finally{miAutoPollingNov3=false}
+},12000);
+
 })();

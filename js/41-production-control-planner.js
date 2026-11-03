@@ -3,6 +3,7 @@
 (function(){
 'use strict';
 const PC_REST='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1',PC_WORKSPACE='softcreation_main',PC_KEY_STORE='spgs_supabase_browser_key_v1';
+let pcSearchTermNov3='';
 let pcView='planner',pcCloud={requests:[],lines:[],allocations:[],messages:[],audit:[],policies:[],releases:[]},pcBasket=[],pcSelectedRequest='',pcReturnTarget='',pcPlannerItemKey='';
 function pcKey(){const k=(localStorage.getItem(PC_KEY_STORE)||'').trim();if(!k)throw new Error('SoftCreation cloud key is not configured on this device.');return k}
 function pcHeaders(extra={}){const k=pcKey(),h={apikey:k,...extra};if(k.startsWith('eyJ'))h.Authorization='Bearer '+k;return h}
@@ -166,10 +167,19 @@ function pcInstallUI(){
   if(nav){const b=document.createElement('button');b.className='navbtn';b.dataset.view='productioncontrol';b.textContent='Production Control';b.onclick=()=>showView('productioncontrol');b.style.display=pcHas('production_control_view')?'inline-block':'none';nav.insertBefore(b,before||null)}
   const section=document.createElement('section');section.id='productioncontrol';section.className='view';section.innerHTML=`
     <div class="panel pc-shell"><div class="panel-title pc-title"><div><span>Production Control</span><small>SC HO planning → Manager approval → existing Products execution</small></div><button class="btn sm pc-refresh" onclick="pcRefresh(true)">Refresh Live Data</button></div>
-    <div class="panel-body"><div class="pc-tabs"><button data-pc-view="planner" onclick="pcGo('planner')">Production Request</button><button data-pc-view="approvals" onclick="pcGo('approvals')">Manager Approvals <span id="pcPendingCount"></span></button><button data-pc-view="register" onclick="pcGo('register')">Request Register</button><button data-pc-view="history" onclick="pcGo('history')">History <span id="pcHistoryCount"></span></button><button data-pc-view="demand" onclick="pcGo('demand')">Demand / Sales Orders</button></div><div id="pcKpis" class="pc-kpis"></div><div id="pcBody"></div></div></div>`;
+    <div class="panel-body"><div class="pc-tabs"><button data-pc-view="planner" onclick="pcGo('planner')">Production Request</button><button data-pc-view="approvals" onclick="pcGo('approvals')">Manager Approvals <span id="pcPendingCount"></span></button><button data-pc-view="register" onclick="pcGo('register')">Request Register</button><button data-pc-view="history" onclick="pcGo('history')">History <span id="pcHistoryCount"></span></button><button data-pc-view="demand" onclick="pcGo('demand')">Demand / Sales Orders</button></div><div id="pcKpis" class="pc-kpis"></div><div class="pc-search-nov3"><input type="search" id="pcSearchNov3" placeholder="Search current view: order, request, customer, material, item..." oninput="pcSearchChangedNov3(this.value)" aria-label="Search Production Control"></div><div id="pcBody"></div></div></div>`;
   const firstModal=document.querySelector('.modal');if(firstModal)firstModal.insertAdjacentElement('beforebegin',section);else document.querySelector('.app')?.appendChild(section);
   document.body.insertAdjacentHTML('beforeend',`<div id="pcReturnModal" class="modal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><b>Return Production Request</b><button class="closex" onclick="closeModal('pcReturnModal')">×</button></div><div class="modal-body"><div class="field"><label>Return Reason</label><textarea id="pcReturnReason" placeholder="Explain what HO Stores must correct"></textarea></div><div class="actions"><button class="btn amber" onclick="pcConfirmReturn()">Return to HO Stores</button></div></div></div></div>`);
 }
+window.pcSearchChangedNov3=function(value){
+ pcSearchTermNov3=String(value||'').trim().toLowerCase();
+ const body=document.getElementById('pcBody');if(!body)return;
+ // Filter visible rows/cards without changing any underlying production quantities.
+ const groups=body.querySelectorAll('tbody tr,.pc-approval-entry,.pc-demand-title,.pc-history-entry');
+ groups.forEach(row=>{
+   row.style.display=(!pcSearchTermNov3||row.textContent.toLowerCase().includes(pcSearchTermNov3))?'':'none';
+ });
+};
 window.pcGo=function(v){pcView=v;pcRender()}
 window.pcRefresh=async function(showToast=false){try{await pcLoadOrdexaSent();await pcLoadCloud();await pcConsumeReleases();await pcLoadCloud();pcRender();if(showToast)toast('Production Control live data refreshed')}catch(e){console.error(e);const b=document.getElementById('pcBody');if(b)b.innerHTML=`<div class="notice"><b>Production Control database is not ready.</b><br>${pcEsc(e.message)}<br><br>Run <b>01_PRODUCTION_CONTROL_DATABASE.sql</b> in Supabase, then refresh.</div>`;if(showToast)toast('Production Control refresh failed')}}
 
@@ -232,6 +242,8 @@ function pcRender(){
         : pcDemandHTML();
 
   b.innerHTML=roleBanner+body;
+  const search=document.getElementById('pcSearchNov3');if(search&&search.value!==pcSearchTermNov3)search.value=pcSearchTermNov3;
+  if(pcSearchTermNov3)window.pcSearchChangedNov3(pcSearchTermNov3);
 }
 function pcPlannerHTML(){
   const groups=pcDemandGroups();if(!pcPlannerItemKey&&groups.length)pcPlannerItemKey=groups[0].key;const g=pcGroup(pcPlannerItemKey)||groups[0];

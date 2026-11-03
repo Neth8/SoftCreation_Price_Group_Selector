@@ -42,7 +42,7 @@ function init(){
  }
  document.querySelector('[data-view="salesorders"]')?.addEventListener('click',()=>setTimeout(()=>{decorate();void sync()},150));
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void sync()});
- setInterval(()=>void sync(),15000);
+ setInterval(()=>void sync(),12000);
  decorate();void sync();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();

@@ -154,6 +154,19 @@ window.spgsLoadProductionSeen=
     if(res.status===204)return null;
     const text=await res.text();return text?JSON.parse(text):null;
   }
+  window.spgsUploadPODocumentNov3=async function(file,quoteId){
+    if(!file||!file.size)return null;
+    if(file.size>10*1024*1024)throw new Error('The PO document exceeds 10 MB.');
+    const allowed={'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
+    const ext=allowed[file.type];
+    if(!ext)throw new Error('Only PDF, JPG, PNG and WebP documents are accepted.');
+    const cleanId=String(quoteId||'quote').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const path=cleanId+'/'+(crypto.randomUUID?crypto.randomUUID():String(Date.now()))+'.'+ext;
+    const base='https://qyxgamverzdmhtvezbft.supabase.co/storage/v1/object/customer-po-documents/';
+    const res=await fetch(base+path,{method:'POST',headers:spgsHeaders({'Content-Type':file.type,'x-upsert':'false'}),body:file});
+    if(!res.ok)throw new Error('Storage '+res.status+': '+(await res.text()).slice(0,240));
+    return {bucket:'customer-po-documents',path,name:file.name,size:file.size,mime:file.type,uploadedAt:new Date().toISOString()};
+  };
   // Cancellation requires the existing SPGS password; verification occurs inside Supabase.
   window.spgsCancelSalesOrderRPCV2=async (args)=>spgsFetch('/rpc/softcreation_cancel_sales_order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(args)});
   // Read-only cancellation status for the separate Sales Orders list.
@@ -1039,6 +1052,22 @@ async function spgsStartProductionRealtime(){
         try{if(await spgsPollCollection(field,load,ready))changed=true}
         catch(e){console.warn('Polling '+field+' failed',e)}
       }
+      // Per-record collections (customers/items/docs/devices/settings) are
+      // stored in spgs_entities; realtime is disabled, so poll those too.
+      if(spgsEntityStoreReady){
+        try{
+          const rows=await spgsLoadEntities();
+          if(rows.length){
+            const signatures=rows.map(r=>spgsEntityKey(r.entity_type,r.id)+':'+spgsEntitySignature(r.payload,r.sort_order));
+            const remote=new Set(signatures);
+            const local=spgsEntityRowsFromState().map(r=>spgsEntityKey(r.entity_type,r.id)+':'+spgsEntitySignature(r.payload,r.sort_order));
+            if(signatures.length!==local.length || local.some(k=>!remote.has(k))){
+              spgsApplyEntityRows(rows,{replace:true});
+              changed=true;
+            }
+          }
+        }catch(e){console.warn('Entity polling failed',e)}
+      }
       if(changed){
         spgsWriteLocal();
         try{refreshAll()}catch(e){console.warn('Polling view refresh failed',e)}
@@ -1047,7 +1076,7 @@ async function spgsStartProductionRealtime(){
   }
   function spgsStartSafePolling(){
     if(window.__spgsPollTimer)return;
-    window.__spgsPollTimer=setInterval(()=>{spgsSafePoll().catch(console.warn)},60000);
+    window.__spgsPollTimer=setInterval(()=>{spgsSafePoll().catch(console.warn)},12000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)spgsSafePoll().catch(console.warn)});
   }
 

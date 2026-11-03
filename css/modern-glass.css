@@ -1641,3 +1641,6 @@ textarea:focus {
 #dashboard > .sc-bi-wrap .sc-bi-card{box-shadow:0 6px 22px rgba(15,45,62,.055);border-radius:16px}
 #dashboard > .sc-bi-wrap .sc-bi-table{width:100%}
 @media(max-width:700px){#dashboard > .sc-dashboard-process-grid,#dashboard > .sc-bi-wrap{grid-template-columns:1fr;gap:12px}}
+
+/* v20261103: Production Control search */
+.pc-search-nov3{padding:10px 14px;} .pc-search-nov3 input{width:100%;max-width:580px;border-radius:9px;border:1px solid #aab9c8;padding:11px 13px;background:var(--card,#fff);color:inherit;}

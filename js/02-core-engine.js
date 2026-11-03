@@ -2975,10 +2975,14 @@ function installProductionConversionV8(){
       ${productionConversionRowsV8(d)}
     `;
 
+    const poInput=document.getElementById('convPoRefNov3');
+    if(poInput)poInput.value=String(d.poRef||'');
+    const poFile=document.getElementById('convPoFileNov3');
+    if(poFile)poFile.value='';
     $('convertModal').classList.add('show');
   };
 
-  createPIFromSelection=function(){
+  createPIFromSelection=async function(){
     if(!requirePerm('convert_pi','create a PI'))return;
 
     const q=
@@ -2998,22 +3002,9 @@ function installProductionConversionV8(){
       return toast('Select a delivery method');
     }
 
-    let poRef=String(q.poRef||'').trim();
-
-    if(!poRef){
-      const entered=window.prompt(
-        'Enter Customer PO / Reference for this Pro Forma Invoice',
-        ''
-      );
-
-      if(entered===null)return;
-
-      poRef=String(entered||'').trim();
-
-      if(!poRef){
-        return toast('Enter the customer PO / Reference');
-      }
-    }
+    // App-based PO details; no native browser prompt. A PO reference is optional.
+    const poRef=String(document.getElementById('convPoRefNov3')?.value||q.poRef||'').trim();
+    const poFile=document.getElementById('convPoFileNov3')?.files?.[0]||null;
 
     const plans=sel.map(i=>({
       i,
@@ -3035,6 +3026,15 @@ function installProductionConversionV8(){
       };
     });
 
+    let poDocument=null;
+    if(poFile){
+      try{
+        const submitButton=document.querySelector('#convertModal button[onclick="createPIFromSelection()"]');
+        if(submitButton)submitButton.disabled=true;
+        try{poDocument=await window.spgsUploadPODocumentNov3(poFile,q.id);}finally{if(submitButton)submitButton.disabled=false;}
+      }catch(e){console.error('Customer PO upload failed',e);toast('PO upload failed: '+e.message);return;}
+    }
+
     const pi={
       ...JSON.parse(JSON.stringify(q)),
       id:uid('doc'),
@@ -3042,6 +3042,7 @@ function installProductionConversionV8(){
       serial:serialFor('PI',q.core,q.rev||0),
       sourceQuoteId:q.id,
       poRef,
+      poDocument,
       lines:selectedLines,
       date:today(),
       validity:0,
