@@ -55,143 +55,154 @@
       return {rows:(Array.isArray(data)?data:[]).filter(j=>Array.isArray(j.source_job_ids)&&j.source_job_ids.includes(r.id)),error:null};
     }catch(e){return {rows:[],error:e.message||'JBR data unavailable'}}
   }
-  // Finance PDF precision: calculate using raw numeric measurements. Round only at display time.
-  const financeArea=x=>x==null?'Unavailable':n(x).toLocaleString('en-US',{minimumFractionDigits:6,maximumFractionDigits:6})+' m²';
-  const financeMoney=x=>x==null?'Unavailable':'LKR '+n(x).toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4});
-  const financeRolls=x=>x==null?'Unavailable':n(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' Rolls';
-  const financeCss=`
-    .finance-pdf-page-v61{width:794px;height:1123px;padding:42px 48px 43px;box-sizing:border-box;background:#fff;color:#172b35;font:13px Arial,sans-serif;overflow:hidden;position:relative}
-    .finance-pdf-head-v61{border-bottom:3px solid #099397;padding-bottom:12px;margin-bottom:18px}
-    .finance-pdf-head-v61 h1{font-size:25px;color:#078b90;margin:0 0 4px}
-    .finance-pdf-head-v61 h2{font-size:16px;margin:0;color:#163847}
-    .finance-pdf-foot-v61{position:absolute;bottom:29px;left:48px;right:48px;display:flex;justify-content:space-between;border-top:1px solid #cad9dd;padding-top:7px;color:#657983;font-size:10px}
-    .finance-pdf-grid-v61{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0}
-    .finance-pdf-tile-v61{border:1px solid var(--c);border-left:5px solid var(--c);border-radius:8px;padding:13px;background:var(--bg);min-height:86px;box-sizing:border-box}
-    .finance-pdf-tile-v61 .lbl{font-size:10px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--c)}
-    .finance-pdf-tile-v61 .val{font-size:19px;font-weight:800;color:#163847;margin-top:8px;overflow-wrap:anywhere}
-    .finance-pdf-tile-v61 .desc{font-size:10px;margin-top:6px;color:#526875}
-    .finance-pdf-section-v61{font-size:15px;font-weight:800;color:#0c6879;margin:18px 0 9px}
-    .finance-pdf-table-v61{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
-    .finance-pdf-table-v61 td,.finance-pdf-table-v61 th{padding:10px 11px;text-align:left;border-bottom:1px solid #dbe5e9;vertical-align:top;overflow-wrap:anywhere}
-    .finance-pdf-table-v61 td:first-child{width:45%;font-weight:700;color:#345260}
-    .finance-pdf-table-v61 tr.area td{background:#e7f5ff;color:#075985;font-weight:800}
-    .finance-pdf-table-v61 tr.focus td{background:#e6f8f2;color:#075943;font-weight:800}
-    .finance-pdf-table-v61 tr.warning td{background:#fff1df;color:#9a3412;font-weight:800}
-    .finance-pdf-note-v61{background:#fff8e9;border-left:4px solid #d97706;padding:12px 13px;line-height:1.6;font-size:11px;margin:18px 0}
-    .finance-pdf-muted-v61{color:#586d77;font-size:11px;line-height:1.6}
-  `;
-  function financePdfPages(g,r,jbrInfo){
-    const linked=jbrInfo.rows||[];
-    const cut=linked.reduce((s,j)=>s+n(j.actual_cut_rolls),0);
-    // mm × m / 1000 = m². Never round individual JBRs before summing.
-    const area=linked.reduce((s,j)=>s+(n(j.jbr_width_mm)*n(j.jbr_length_m)/1000),0);
-    const validArea=linked.length>0&&linked.every(j=>n(j.jbr_width_mm)>0&&n(j.jbr_length_m)>0&&String(j.process_status)==='Fully Die Cut');
+  function htmlReport(g,r,jbrInfo){
+    const cut=jbrInfo.rows.reduce((s,j)=>s+n(j.actual_cut_rolls),0);
+    const area=jbrInfo.rows.reduce((s,j)=>s+(n(j.jbr_width_mm)*n(j.jbr_length_m)/1000),0);
+    const validArea=jbrInfo.rows.length>0&&jbrInfo.rows.every(j=>n(j.jbr_width_mm)>0&&n(j.jbr_length_m)>0&&String(j.process_status)==='Fully Die Cut');
     const rate=materialRate(r),cost=validArea&&rate!=null?area*rate:null;
-    const received=n(g.receivedQty);
+    const good=n(g.receivedQty);
+    // Difference is NOT confirmed scrap: material may remain unpacked, be reusable, or be awaiting QC.
+    // Roll-equivalent m² uses measured input area / actual cut rolls, not the original requested quantity.
     const sqmPerCut=validArea&&cut>0?area/cut:null;
-    const shortage=linked.length&&cut>0?Math.max(0,cut-received):null;
-    const wasteSqm=sqmPerCut!=null&&shortage!=null?sqmPerCut*shortage:null;
-    const wasteCost=wasteSqm!=null&&rate!=null?wasteSqm*rate:null;
-    const excess=linked.length?Math.max(0,received-cut):null;
-    const product=[r?.size,r?.material,r?.layout,r?.pcs?`${r.pcs} pcs/roll`:null].filter(Boolean).join(' ')||g.item||'-';
-    const line=(k,v,kind='')=>`<tr class="${kind}"><td>${escText(k)}</td><td>${escText(v)}</td></tr>`;
-    const table=(rows)=>`<table class="finance-pdf-table-v61"><tbody>${rows.map(x=>line(...x)).join('')}</tbody></table>`;
-    const tile=(title,value,detail,kind='area')=>{
-      const colors={area:['#075985','#e7f5ff'],focus:['#087055','#e6f8f2'],warning:['#a14d0b','#fff1df']};
-      const [c,bg]=colors[kind];
-      return `<div class="finance-pdf-tile-v61" style="--c:${c};--bg:${bg}"><div class="lbl">${escText(title)}</div><div class="val">${escText(value)}</div><div class="desc">${escText(detail)}</div></div>`;
+    const potentialWasteRolls=jbrInfo.rows.length&&cut>0?Math.max(0,cut-good):null;
+    const potentialWasteSqm=sqmPerCut!=null&&potentialWasteRolls!=null?sqmPerCut*potentialWasteRolls:null;
+    const potentialWasteCost=potentialWasteSqm!=null&&rate!=null?potentialWasteSqm*rate:null;
+    const cutRollCost=cost!=null&&cut>0?cost/cut:null;
+    const perGood=cost!=null&&good>0?cost/good:null;
+    const excessRolls=jbrInfo.rows.length?Math.max(0,good-cut):null;
+    const amount=x=>x==null?'Unavailable':'LKR '+fmt(x);
+    const sqm=x=>x==null?'Unavailable':fmt(x)+' m²';
+    const rolls=x=>x==null?'Unavailable':fmt(x)+' Rolls';
+    const field=(label,value,tone='')=>{
+      const styles={area:['#e7f5ff','#075985','#0284c7'],focus:['#e6f8f2','#075943','#0d9488'],warning:['#fff1df','#9a3412','#f59e0b'],ordinary:['#ffffff','#172b35','#dde5e7']};
+      const st=styles[tone]||styles.ordinary;
+      return `<tr style="background:${st[0]}"><td style="padding:9px 11px;border-bottom:1px solid ${st[2]};font-weight:${tone?'800':'600'};width:48%;color:${st[1]}">${escText(label)}</td><td style="padding:9px 11px;border-bottom:1px solid ${st[2]};font-weight:${tone?'800':'400'};color:${st[1]}">${escText(value)}</td></tr>`;
     };
-    const label=(title,no)=>`<div class="finance-pdf-head-v61"><h1>SoftCreation</h1><h2>GRN PRODUCTION COSTING · ${escText(title)}</h2><div style="font-size:12px;margin-top:7px">${escText(g.grnNo||'')} · ${escText(g.date||g.createdAt||'-')}</div></div>`;
-    const footer=(no,total)=>`<div class="finance-pdf-foot-v61"><span>Finance · Material Costing · ${escText(g.grnNo||'')}</span><span>Page ${no} of ${total}</span></div>`;
-    const wrap=(no,title,content)=>`<section class="finance-pdf-page-v61">${label(title,no)}${content}__FOOTER_${no}__</section>`;
-    const page1=wrap(1,'Overview',`
-      <div class="finance-pdf-grid-v61">
-        ${tile('Measured JBR input area',financeArea(validArea?area:null),'Sum of actual linked JBR input areas')}
-        ${tile('Area per cut roll',financeArea(sqmPerCut),'Measured area ÷ cut rolls')}
-        ${tile('Material cost per good roll',financeMoney(cost!=null&&received>0?cost/received:null),'Total material cost ÷ Stores received','focus')}
-        ${tile('Total input material cost',financeMoney(cost),'Input m² × Admin material rate','focus')}
+    const tile=(title,value,color,shade,detail)=>`<div style="background:${shade};border:1px solid ${color};border-top:4px solid ${color};border-radius:9px;padding:11px 13px;min-width:0;box-sizing:border-box;break-inside:avoid"><div style="font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${color}">${escText(title)}</div><div style="font-size:19px;font-weight:800;color:${color};margin-top:6px">${escText(value)}</div><div style="font-size:10px;color:#526370;margin-top:5px">${escText(detail)}</div></div>`;
+    const reportRows=[
+      ['GRN Number',g.grnNo],['Receipt date',g.date||g.createdAt||'-'],['Production order',g.orderNo||r?.orderNo||'-'],['Dispatch number',g.dispatchNo||'-'],['Customer',g.customerName||r?.customerName||'-'],
+      ['Product',[r?.size,r?.material,r?.layout,r?.pcs?`${r.pcs} pcs/roll`:null].filter(Boolean).join(' ')||g.item||'-'],
+      ['Factory dispatched',rolls(n(g.dispatchedQty))],['Stores received (good)',rolls(good)],['Stores variance',rolls(n(g.variance))],['Variance explanation',g.factoryReason||g.storesReason||g.reason||'No variance'],
+      ['Linked JBR records',String(jbrInfo.rows.length)],['JBR cut rolls (linked)',jbrInfo.rows.length?rolls(cut):'Unavailable'],
+      ['Measured JBR input area',sqm(validArea?area:null),'area'],
+      ['Single cut roll material area',sqm(sqmPerCut),'area'],
+      ['Current material rate',rate==null?'Unavailable':'LKR '+fmt(rate)+' / m²'],
+      ['Total measured material cost',amount(cost),'focus'],
+      ['Material cost per cut roll',amount(cutRollCost)],
+      ['Material cost per received good roll',amount(perGood),'focus'],
+      ['Potential waste / unaccounted rolls',rolls(potentialWasteRolls),'warning'],
+      ['Potential waste area',sqm(potentialWasteSqm),'warning'],
+      ['Potential waste material cost',amount(potentialWasteCost),'warning'],
+      ['Received above linked cut rolls',rolls(excessRolls)]
+    ];
+    return `<div style="font:13px Arial,sans-serif;color:#172b35;padding:25px;width:760px;box-sizing:border-box;background:#fff">
+      <div style="border-bottom:4px solid #098e91;padding-bottom:13px"><h1 style="color:#098e91;margin:0;font-size:28px">SoftCreation</h1><h2 style="margin:8px 0 4px;font-size:19px">STORES GRN · PRODUCTION COSTING</h2><div>${escText(g.grnNo||'')}</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:16px 0 8px">
+        ${tile('Measured JBR input area',sqm(validArea?area:null),'#075985','#e7f5ff','Actual JBR width × measured length')}
+        ${tile('Single cut roll area',sqm(sqmPerCut),'#075985','#e7f5ff','Measured area ÷ actual cut rolls')}
+        ${tile('Good roll material cost',amount(perGood),'#075943','#e6f8f2','Total input material cost ÷ GRN received rolls')}
       </div>
-      <div class="finance-pdf-section-v61">Order & receipt details</div>
-      ${table([
-        ['Production order',g.orderNo||r?.orderNo||'-'],
-        ['Dispatch number',g.dispatchNo||'-'],
-        ['Customer',g.customerName||r?.customerName||'-'],
-        ['Product',product],
-        ['Factory dispatched',financeRolls(n(g.dispatchedQty))],
-        ['Stores received',financeRolls(received),'focus'],
-        ['Stores variance',financeRolls(n(g.variance))],
-        ['Material rate (current)',rate==null?'Unavailable':financeMoney(rate)+' / m²']
-      ])}
-      <div class="finance-pdf-note-v61"><b>Precision policy:</b> Calculations use unrounded JBR lengths, widths and rates. Area is shown to 6 decimal places; monetary values to 4 decimal places. Display rounding does not affect calculated totals.</div>
-    `);
-    const details=linked.slice().sort((a,b)=>n(a.jbr_seq)-n(b.jbr_seq));
-    const jbrLine=j=>{
-      const a=n(j.jbr_width_mm)*n(j.jbr_length_m)/1000;
-      return `<tr><td style="width:12%">${escText(j.jbr_seq??'-')}</td><td>${escText(n(j.jbr_width_mm).toFixed(2))}</td><td>${escText(n(j.jbr_length_m).toFixed(4))}</td><td>${escText(financeRolls(n(j.actual_cut_rolls)))}</td><td>${escText(financeArea(a))}</td></tr>`;
-    };
-    const chunks=[];
-    for(let i=0;i<details.length;i+=9)chunks.push(details.slice(i,i+9));
-    if(!chunks.length)chunks.push([]);
-    const pages2=chunks.map((chunk,i)=>wrap(2+i,'Measured JBR inputs'+(i?' (continued)':''),`
-      <div class="finance-pdf-section-v61">Linked JBR measurements ${chunks.length>1?'— group '+(i+1)+' of '+chunks.length:''}</div>
-      <table class="finance-pdf-table-v61" style="font-size:11px"><thead><tr style="background:#e8f4f7;color:#075985"><th>JBR</th><th>Width (mm)</th><th>Length (m)</th><th>Cut rolls</th><th>Area (m²)</th></tr></thead><tbody>${chunk.length?chunk.map(jbrLine).join(''):'<tr><td colspan="5">No linked JBR measurements available</td></tr>'}</tbody></table>
-      ${i===0?`<div class="finance-pdf-section-v61">Measured input reconciliation</div>
-      ${table([
-        ['Linked JBR records',String(details.length)],
-        ['Total cut rolls',financeRolls(details.length?cut:null)],
-        ['Measured JBR input area',financeArea(validArea?area:null),'area'],
-        ['Single cut roll material area',financeArea(sqmPerCut),'area'],
-        ['Current material rate',rate==null?'Unavailable':financeMoney(rate)+' / m²'],
-        ['Measured total input material cost',financeMoney(cost),'focus'],
-        ['Material cost per cut roll',financeMoney(cost!=null&&cut>0?cost/cut:null)]
-      ])}`:''}
-      <p class="finance-pdf-muted-v61">JBR input area = width (mm) × processed length (m) ÷ 1,000. Actual machine input width is used.</p>
-    `));
-    const lastNo=2+pages2.length;
-    const page3=wrap(lastNo,'Waste & reconciliation',`
-      <div class="finance-pdf-grid-v61">
-        ${tile('Potential waste rolls',financeRolls(shortage),'Cut rolls minus Stores received','warning')}
-        ${tile('Potential waste area',financeArea(wasteSqm),'Potential rolls × area per cut roll','warning')}
-        ${tile('Potential waste material cost',financeMoney(wasteCost),'Potential area × material rate','warning')}
-        ${tile('Good roll material cost',financeMoney(cost!=null&&received>0?cost/received:null),'Total input cost ÷ Stores received','focus')}
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:8px 0 12px">
+        ${tile('Potential waste rolls',rolls(potentialWasteRolls),'#9a3412','#fff1df','Cut rolls not in this GRN receipt')}
+        ${tile('Potential waste area',sqm(potentialWasteSqm),'#9a3412','#fff1df','Potential rolls × area per cut roll')}
+        ${tile('Potential waste cost',amount(potentialWasteCost),'#9a3412','#fff1df','Potential waste area × current m² rate')}
       </div>
-      ${table([
-        ['Cut rolls recorded',financeRolls(details.length?cut:null)],
-        ['Stores received rolls',financeRolls(received),'focus'],
-        ['Potential waste / unaccounted rolls',financeRolls(shortage),'warning'],
-        ['Potential waste area',financeArea(wasteSqm),'warning'],
-        ['Potential waste material cost',financeMoney(wasteCost),'warning'],
-        ['Received above linked cut rolls',financeRolls(excess)],
-        ['Stores variance explanation',g.factoryReason||g.storesReason||g.reason||'No variance']
-      ])}
-      <div class="finance-pdf-note-v61"><b>Not confirmed waste:</b> Cut-to-receipt differences may be pending stock, rework, incomplete packing or actual scrap. The potential waste cost is already included in total material cost and must never be added again.</div>
-      <p class="finance-pdf-muted-v61">This PDF is a material-only estimate at the current Admin rate; the system has not frozen a historical material-rate snapshot. Labor, electricity, packing and overheads are excluded. The same JBR production batch may support multiple GRNs; do not add batch-level costing totals across multiple reports. ${escText(jbrInfo.error||'')}</p>
-    `);
-    const pages=[page1,...pages2,page3];
-    return {css:financeCss,pages:pages.map((html,i)=>html.replace('__FOOTER_'+(i+1)+'__',footer(i+1,pages.length)))};
+      <div style="padding:9px 11px;background:#fff8e9;border-left:4px solid #d97706;font-size:11px;line-height:1.5"><b>Important — not confirmed scrap:</b> Differences between JBR cut rolls and Stores received rolls may represent stock awaiting dispatch, incomplete packing, rework or real waste. Verify physical reconciliation before recording a waste expense. Estimated waste cost is a portion of total measured material cost; it is <b>not an additional cost</b>.</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:13px;font-size:12px">${reportRows.map(x=>field(...x)).join('')}</table>
+      <p style="font-size:11px;line-height:1.6;color:#556a75;margin-top:17px">Material-only estimate based on linked fully die-cut JBR widths and processed lengths, using the <b>current</b> Admin material rate. This is not a historical rate snapshot and excludes labor, overheads, packing and other costs. If multiple GRNs share the same JBR batch, these figures are batch-level and must not be summed across separate GRN PDFs. ${escText(jbrInfo.error||'')}</p><p style="font-size:11px">Generated ${new Date().toLocaleString()} · Finance copy</p></div>`;
+  }
+
+  // Keep the original report and all of its costing formulas untouched.
+  // Paginate its DOM before capturing: each A4 image contains complete table rows.
+  function paginateFinanceReportV60(report, mount){
+    const source=[...report.children];
+    const sourceTable=source.find(el=>el.tagName==='TABLE');
+    if(!sourceTable)throw Error('Finance report table not found');
+    const sourceRows=[...sourceTable.querySelectorAll('tr')];
+    const tableIndex=source.indexOf(sourceTable);
+    const pages=[];
+    const maxContentBottom=1000; // px at 760px wide; leaves a safe A4 footer margin
+    function newPage(continued){
+      const page=document.createElement('div');
+      page.style.cssText='width:760px;height:1060px;padding:25px;box-sizing:border-box;background:#fff;color:#172b35;font:13px Arial,sans-serif;position:relative;overflow:visible';
+      if(continued){
+        const header=source[0].cloneNode(true);
+        header.style.marginBottom='14px';
+        page.appendChild(header);
+        const caption=document.createElement('div');
+        caption.textContent='PRODUCTION COSTING — CONTINUED';
+        caption.style.cssText='font-size:11px;font-weight:800;color:#078b90;margin-bottom:12px';
+        page.appendChild(caption);
+      }
+      mount.appendChild(page);
+      pages.push(page);
+      return page;
+    }
+    function fits(page){
+      const last=page.lastElementChild;
+      if(!last)return true;
+      return last.getBoundingClientRect().bottom-page.getBoundingClientRect().top<=maxContentBottom;
+    }
+    function newTable(page){
+      const t=sourceTable.cloneNode(false);
+      const body=document.createElement('tbody');
+      t.appendChild(body);page.appendChild(t);
+      return body;
+    }
+    let page=newPage(false);
+    for(const part of source.slice(0,tableIndex)){
+      page.appendChild(part.cloneNode(true));
+      if(!fits(page))throw Error('Finance report introduction exceeds one A4 page');
+    }
+    let tbody=newTable(page);
+    for(const row of sourceRows){
+      const copy=row.cloneNode(true);
+      tbody.appendChild(copy);
+      if(!fits(page)){
+        tbody.removeChild(copy);
+        if(!tbody.children.length)throw Error('Finance PDF row is too tall');
+        page=newPage(true);
+        tbody=newTable(page);
+        tbody.appendChild(copy);
+        if(!fits(page))throw Error('Finance PDF row exceeds page height');
+      }
+    }
+    for(const part of source.slice(tableIndex+1)){
+      const copy=part.cloneNode(true);
+      page.appendChild(copy);
+      if(!fits(page)){
+        page.removeChild(copy);
+        page=newPage(true);
+        page.appendChild(copy);
+        if(!fits(page))throw Error('Finance PDF notes exceed page height');
+      }
+    }
+    pages.forEach((p,i)=>{
+      const foot=document.createElement('div');
+      foot.style.cssText='position:absolute;left:25px;right:25px;bottom:15px;padding-top:7px;border-top:1px solid #d4e2e6;font-size:10px;color:#617580;display:flex;justify-content:space-between';
+      foot.innerHTML='<span>SoftCreation · Finance production costing</span><span>Page '+(i+1)+' / '+pages.length+'</span>';
+      p.appendChild(foot);
+    });
+    return pages;
   }
 
   window.scFinanceCostingPdfV60=async function(id){
     if(!allowed())return toast('Finance access required');
     const g=grns().find(x=>String(x.id)===String(id));if(!g||!financeReady(g))return toast('GRN not ready for Finance');
     const r=jobFor(g),jbr=await loadJbrFor(r);
-    const report=financePdfPages(g,r,jbr);
-    const node=document.createElement('div');node.style='position:fixed;left:-12000px;top:0;z-index:-1';
-    node.innerHTML='<style>'+report.css+'</style>'+report.pages.join('');document.body.append(node);
+    const node=document.createElement('div');node.style='position:fixed;left:-12000px;top:0;z-index:-1';document.body.append(node);
     try{
+      const report=document.createElement('div');report.innerHTML=htmlReport(g,r,jbr);
+      const pages=paginateFinanceReportV60(report.firstElementChild,node);
       const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas);
       const okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);
       if(!okC||!okP)throw Error('PDF libraries unavailable');
-      const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',compress:true});
-      const pages=Array.from(node.querySelectorAll('.finance-pdf-page-v61'));
+      const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
       for(let i=0;i<pages.length;i++){
-        const el=pages[i];
-        // Reject overly long content rather than silently slicing through a table or tile.
-        if(el.scrollHeight>el.clientHeight+3)throw Error('Finance PDF page '+(i+1)+' exceeds A4 content area; please report this GRN');
-        const canvas=await html2canvas(el,{scale:1.65,backgroundColor:'#fff',useCORS:true,windowWidth:900});
-        if(i>0)pdf.addPage();
-        // Each page is rendered separately and fitted into A4, never offset/clipped across pages.
-        pdf.addImage(canvas.toDataURL('image/jpeg',0.94),'JPEG',0,0,210,297);
+        const canvas=await html2canvas(pages[i],{scale:1.8,backgroundColor:'#fff'});
+        if(i)pdf.addPage();
+        // Each 760x1060px page fits fully in the A4 printable area, without image offsets/cropping.
+        pdf.addImage(canvas.toDataURL('image/jpeg',0.93),'JPEG',10,10,190,265);
       }
       pdf.save('Finance_'+String(g.grnNo||g.id).replace(/[^a-z0-9_-]/gi,'-')+'.pdf');
     }catch(e){console.error('Finance PDF',e);toast('Finance PDF error: '+(e.message||e))}finally{node.remove()}
