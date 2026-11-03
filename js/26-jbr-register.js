@@ -937,7 +937,7 @@
           if(typeof window.updatePackingLiveV1057==='function')window.updatePackingLiveV1057();
           const notice=modal.querySelector('.notice');
           if(notice){
-            notice.insertAdjacentHTML('beforeend',`<br><b>JBR planned target:</b> ${money(stats.actualCut)} ${esc(g.unit||'Rolls')} • <b>physical maximum:</b> ${money(stats.theoretical)}. Enter the rolls actually received below; carton + loose count must match that received quantity.`);
+            notice.insertAdjacentHTML('beforeend',`<br><b>JBR planned target:</b> ${money(stats.actualCut)} ${esc(g.unit||'Rolls')} • <b>physical maximum:</b> ${money(stats.theoretical)}. Actual Rolls Received is calculated automatically from carton + loose rolls; compare it with JBR output.`);
           }
         },0);
         return r;
@@ -960,9 +960,9 @@
           const boxes=readBoxesV81('pack');
           const loose=Number($('packLoose')?.value||0);
           const total=boxesTotalV81(boxes)+loose;
-          const actualReceived=Math.max(0,Math.floor(Number($('packActualReceivedV1120')?.value||0)));
+          const actualReceived=typeof window.packingActualFromBoxesV20261103==='function' ? window.packingActualFromBoxesV20261103() : total;
           const physicalMax=Math.max(0,Math.floor(Number(stats.theoretical||0)));
-          if(!(actualReceived>0))return toast('Enter the Actual Rolls Received from production before saving packing.');
+          if(!(actualReceived>0))return toast('Add rolls to boxes or loose count before saving packing.');
           if(actualReceived>physicalMax)return toast(`Actual Rolls Received cannot exceed the combined JBR Max Full Rolls. Maximum ${money(physicalMax)}, entered ${money(actualReceived)}.`);
           if(total>actualReceived)return toast(`Packed count cannot exceed Actual Rolls Received. Received ${money(actualReceived)}, boxes + loose ${money(total)}.`);
         }

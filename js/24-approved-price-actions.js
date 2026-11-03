@@ -303,7 +303,7 @@
     const packModalV1120=$('packingModal');
     const plannedJbrRollsV1120=Math.max(0,Number(packModalV1120?.dataset.jbrPlannedRolls||0));
     const theoreticalMaxRollsV1120=Math.max(0,Number(packModalV1120?.dataset.jbrMaxRolls||plannedJbrRollsV1120));
-    const actualReceivedRollsV1120=Math.max(0,Number($('packActualReceivedV1120')?.value||total));
+    const actualReceivedRollsV1120=typeof window.packingActualFromBoxesV20261103==='function' ? window.packingActualFromBoxesV20261103() : total;
     const productionVarianceRollsV1120=actualReceivedRollsV1120-plannedJbrRollsV1120;
     const alloc=allocationsV1040(jobs,total);
     const snapshot={

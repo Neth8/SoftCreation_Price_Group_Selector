@@ -76,6 +76,18 @@
     return packGroupV1057(marker.slice('BATCHV1040::'.length));
   }
 
+  // Packing receipt is derived from physical carton counts, never the JBR target.
+  // Used by both preview and save paths so a stale DOM value cannot override the count.
+  window.packingActualFromBoxesV20261103=function(){
+    const boxes=readBoxesV81('pack');
+    const boxRolls=Math.max(0,Number(boxesTotalV81(boxes)||0));
+    const loose=Math.max(0,Number($('packLoose')?.value||0));
+    const actual=boxRolls+loose;
+    const field=$('packActualReceivedV1120');
+    if(field){field.value=String(actual);field.readOnly=true;field.setAttribute('aria-readonly','true');}
+    return actual;
+  };
+
   function updatePackingLiveV1057(){
     const modal=$('packingModal');
     if(!modal?.classList.contains('show'))return;
@@ -88,7 +100,7 @@
     const total=boxRolls+loose;
     const planned=Math.max(0,Number(modal.dataset.jbrPlannedRolls||0));
     const max=Math.max(0,Number(modal.dataset.jbrMaxRolls||planned||0));
-    const actualReceived=Math.max(0,Number($('packActualReceivedV1120')?.value||0));
+    const actualReceived=window.packingActualFromBoxesV20261103();
     const unpacked=Math.max(0,actualReceived-total);
     const overPacked=Math.max(0,total-actualReceived);
     const overPhysical=Math.max(0,actualReceived-max);
@@ -116,7 +128,7 @@
           <div><span>Boxes</span><b>${boxes.length}</b><small>${money(boxRolls)} rolls</small></div>
           <div><span>Loose</span><b>${money(loose)}</b><small>rolls</small></div>
           <div><span>Packed Total</span><b>${money(total)}</b><small>${unpacked>0?`${money(unpacked)} roll(s) not packed — count variance / potential waste`:overPacked>0?`OVER RECEIVED BY ${money(overPacked)}`:'matches received'}</small></div>
-          <div><span>Actual Received</span><b>${money(actualReceived)}</b><small>physically counted at Packing</small></div>
+          <div><span>Actual Received</span><b>${money(actualReceived)}</b><small>boxes + loose rolls (automatic)</small></div>
         </div>`;
     }
 
@@ -151,10 +163,10 @@
       let danger=false;
       if(overPhysical>0){danger=true;msg=`<b>Invalid received quantity:</b> Actual Received is ${money(overPhysical)} rolls above the combined JBR physical maximum.`;}
       else if(overPacked>0){danger=true;msg=`<b>Packing mismatch:</b> boxes + loose are ${money(overPacked)} rolls above Actual Received.`;}
-      else if(unpacked>0){msg=`<b>Packing waste / shortfall:</b> ${money(unpacked)} received roll(s) are not in Packed Total. This difference will be recorded for Finance as packing count variance (confirm physical scrap).`;}
+      else if(unpacked>0){msg=`<b>Packing variance:</b> ${money(unpacked)} roll(s) have not been assigned to boxes or loose count.`;}
       else if(variance<0){msg=`<b>Production shortage / waste:</b> received ${money(shortage)} rolls below the JBR planned target. This variance will be recorded when packing is saved.`;}
       else if(variance>0){msg=`<b>Production over target:</b> received ${money(overProduction)} rolls above the JBR planned target. This variance will be recorded when packing is saved.`;}
-      else{msg='<b>Production count matched:</b> Actual Received matches the JBR planned target and the packing count is reconciled.';}
+      else{msg='<b>Production count matched:</b> packed boxes and loose rolls match the JBR planned target.';}
       $('packLimitNoteV1057').innerHTML=msg;
       $('packLimitNoteV1057').classList.toggle('danger',danger);
     }
@@ -184,15 +196,13 @@
       const grand=$('packGrand');
       const wrap=document.createElement('div');
       wrap.id='packV1057Controls';
-      const savedReceivedV1120=Number(modal.dataset.savedActualReceivedV1120||0);
-      const plannedReceivedV1120=Number(modal.dataset.jbrPlannedRolls||0);
       wrap.innerHTML=`
         <div class="section">PRODUCTION RECEIPT / ACTUAL COUNT</div>
         <div class="pack-receipt-input-v1120">
           <div class="field">
             <label>Actual Rolls Received *</label>
-            <input id="packActualReceivedV1120" type="number" min="0" step="1" value="${savedReceivedV1120>0?savedReceivedV1120:plannedReceivedV1120}" oninput="updatePackingLiveV1057()">
-            <div class="hint">Packing user physically counts the rolls received from production. This final actual quantity records shortage, waste or over-production.</div>
+            <input id="packActualReceivedV1120" type="number" min="0" step="1" value="0" readonly aria-readonly="true">
+            <div class="hint">Automatically calculated from the rolls entered in boxes plus loose rolls. Edit box or loose quantities to update this value. The JBR difference is shown separately.</div>
           </div>
         </div>
         <div id="packReceiptSummaryV1120" class="pack-receipt-summary-v1120"></div>
@@ -223,10 +233,7 @@
     }else{
       const w=$('packRollWidthV1057');
       if(w && !(Number(w.value)>0))w.value=packProductWidthV1057(g)||'';
-      const actualInput=$('packActualReceivedV1120');
-      const savedActual=Number(modal.dataset.savedActualReceivedV1120||0);
-      const plannedActual=Number(modal.dataset.jbrPlannedRolls||0);
-      if(actualInput && !(Number(actualInput.value)>0))actualInput.value=String(savedActual>0?savedActual:plannedActual);
+      window.packingActualFromBoxesV20261103();
     }
 
     // Existing box row input handler only updated the old box total.
@@ -266,8 +273,8 @@
       return false;
     }
 
-    const actualReceived=Math.max(0,Math.floor(Number($('packActualReceivedV1120')?.value||0)));
-    if(!(actualReceived>0)){toast('Enter the Actual Rolls Received from production.');return false;}
+    const actualReceived=window.packingActualFromBoxesV20261103();
+    if(!(actualReceived>0)){toast('Add the rolls in boxes or loose rolls before saving packing.');return false;}
     if(actualReceived>jbrTheoretical){toast(`Actual Rolls Received cannot exceed combined JBR Max Full Rolls. Maximum ${money(jbrTheoretical)}, entered ${money(actualReceived)}.`);return false;}
     if(Number(total)>actualReceived){toast(`Packed total cannot exceed Actual Rolls Received. Received ${money(actualReceived)}, packed ${money(total)}.`);return false;}
     const productionVariance=actualReceived-jbrActual;
