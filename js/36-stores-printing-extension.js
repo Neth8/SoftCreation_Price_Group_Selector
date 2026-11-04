@@ -188,7 +188,7 @@
      APPROVED PRICES SALES ORDER PAYLOAD
      ------------------------------------------------------- */
   function buildSalesOrderPayloadV1072(so){
-    const lines=(so?.lines||[]).map((l,i)=>({
+    const lines=(so?.lines||[]).filter(l=>l?.use!==false && Number(l?.qty||0)>0).map((l,i)=>({
       line_index:i,
       source_item_id:String(l?.itemId||''),
 
@@ -522,7 +522,7 @@
      ------------------------------------------------------- */
 
   function buildSalesOrderTabPayloadV1076(so){
-    const lines=(so?.lines||[]).map((l,i)=>({
+    const lines=(so?.lines||[]).filter(l=>l?.use!==false && Number(l?.qty||0)>0).map((l,i)=>({
       line_index:i,
       source_item_id:String(l?.itemId||''),
 
