@@ -168,7 +168,9 @@
     );
   }
 
-  window.saveSystemUserV1080=function(){
+  let spgsUserSaveBusyV1132=false;
+  window.saveSystemUserV1080=async function(){
+    if(spgsUserSaveBusyV1132)return;
     if(
       typeof requirePerm==='function' &&
       !requirePerm(
@@ -304,79 +306,51 @@
       return;
     }
 
-    if(existing){
-      /*
-        Never rewrite username on edit.
-        Blank password keeps the existing password.
-      */
-      Object.assign(
-        existing,
-        {
-          display,
-          role,
-          permissions,
-          priceCategoryIds,
-          quoteHandler,
-          companyLinkType:
-            companyLinkId
-              ? companyLinkType
-              : '',
-          companyLinkId
+    const candidate=existing
+      ? {
+          ...existing,
+          display,role,permissions,priceCategoryIds,
+          quoteHandler,companyLinkType:companyLinkId?companyLinkType:'',companyLinkId,
+          ...(password?{password}:{})
         }
-      );
+      : {
+          id:uid('user'),username,password,display,role,active:true,
+          permissions,priceCategoryIds,quoteHandler,
+          companyLinkType:companyLinkId?companyLinkType:'',companyLinkId
+        };
 
-      if(password){
-        existing.password=password;
+    // Never clear the editor, mutate the live user list, or show success until
+    // Supabase has confirmed the write AND a read-back of the permissions.
+    if(typeof window.spgsSaveUserVerifiedV1132!=='function'){
+      toast('Cloud user save is unavailable. Reload SPGS and try again.');
+      return;
+    }
+    spgsUserSaveBusyV1132=true;
+    if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving to cloud...';}
+    try{
+      const confirmed=await window.spgsSaveUserVerifiedV1132(candidate,!!existing);
+      if(existing){
+        Object.assign(existing,confirmed);
+      }else{
+        state.users.push(confirmed);
       }
-
-      audit(
-        'UPDATE_USER_PRIVILEGES',
-        `${existing.username}: ${permissions.join(',')}`
-      );
-
-    }else{
-      const user={
-        id:uid('user'),
-        username,
-        password,
-        display,
-        role,
-        active:true,
-        permissions,
-        priceCategoryIds,
-        quoteHandler,
-        companyLinkType:
-          companyLinkId
-            ? companyLinkType
-            : '',
-        companyLinkId
-      };
-
-      state.users.push(user);
-
-      audit(
-        'ADD_USER',
-        `${username}: ${permissions.join(',')}`
-      );
+      audit(existing?'UPDATE_USER_PRIVILEGES':'ADD_USER',
+        `${confirmed.username}: ${(confirmed.permissions||[]).join(',')}`);
+      saveState();
+      try{renderUsers();}catch(e){console.warn('User list refresh',e)}
+      window.__scEditingUserIdV1080='';
+      try{renderUserPrivilegeEditor(null);}catch(e){console.warn('User editor refresh',e)}
+      toast(existing?'User permissions saved and verified in Supabase':'User created and verified in Supabase');
+    }catch(e){
+      console.error('SPGS user permissions cloud update failed',e);
+      toast('User NOT updated: '+String(e?.message||e).slice(0,180));
+      // Keep all edited fields and checkboxes so the admin can retry.
+    }finally{
+      spgsUserSaveBusyV1132=false;
+      if(saveBtn){saveBtn.disabled=false;
+        saveBtn.textContent=window.__scEditingUserIdV1080?'Update User':'Add User';}
     }
 
-    saveState();
-
-    try{
-      renderUsers();
-    }catch(_){}
-
-    window.__scEditingUserIdV1080='';
-
-    try{
-      renderUserPrivilegeEditor(null);
-    }catch(_){}
-
-    toast(
-      existing
-        ? 'User updated successfully'
-        : 'User added successfully'
-    );
   };
 
   /*

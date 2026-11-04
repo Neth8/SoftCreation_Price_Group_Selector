@@ -1002,16 +1002,81 @@ async function spgsStartProductionRealtime(){
     }
     return best||JSON.parse(JSON.stringify(state));
   }
+  // Track confirmed server values individually. Never re-upload every cached
+  // account from a stale browser when an unrelated document is saved.
+  const spgsConfirmedUserRows=new Map();
+  function spgsUserSignature(u){
+    const row=spgsUserToRow(u);
+    delete row.updated_at;
+    return JSON.stringify(row);
+  }
+  window.spgsSaveUserVerifiedV1132=async function(user,existing){
+    if(!spgsReady)throw new Error('Cloud connection is not ready. Reopen SPGS after it connects.');
+    if(!user?.id||!user?.username)throw new Error('User identity is missing.');
+    const id=String(user.id);
+    const row=spgsUserToRow(user);
+    const expectedPermissions=JSON.stringify(row.permissions);
+    const expectedCategories=JSON.stringify(row.price_category_ids);
+    let result;
+    if(existing){
+      result=await spgsFetch('/spgs_users?id=eq.'+encodeURIComponent(id)+'&select=*',{
+        method:'PATCH',
+        headers:{'Content-Type':'application/json','Prefer':'return=representation'},
+        body:JSON.stringify(row)
+      });
+    }else{
+      result=await spgsFetch('/spgs_users?on_conflict=id&select=*',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'},
+        body:JSON.stringify(row)
+      });
+    }
+    if(!Array.isArray(result)||result.length!==1||String(result[0].id)!==id){
+      throw new Error('Supabase did not confirm one saved user record. Check access policy and retry.');
+    }
+    // Independent read-back confirms the persisted permissions, not just HTTP 200.
+    const rows=await spgsFetch('/spgs_users?id=eq.'+encodeURIComponent(id)+'&select=*');
+    const saved=Array.isArray(rows)?rows[0]:null;
+    if(!saved||JSON.stringify(saved.permissions||[])!==expectedPermissions||
+        JSON.stringify(saved.price_category_ids||[])!==expectedCategories||
+        saved.role!==row.role||saved.display!==row.display||
+        (saved.quote_handler||null)!==(row.quote_handler||null)||
+        (saved.company_link_id||null)!==(row.company_link_id||null)||
+        (saved.company_link_type||null)!==(row.company_link_type||null)){
+      throw new Error('Cloud read-back does not match the submitted permissions. No success was reported.');
+    }
+    const confirmed=spgsUserFromRow(saved);
+    spgsConfirmedUserRows.set(id,spgsUserSignature(confirmed));
+    return confirmed;
+  };
   async function spgsLoadUsers(){
     const rows=await spgsFetch('/spgs_users?select=*&order=created_at.asc');
-    return (rows||[]).map(spgsUserFromRow);
+    const users=(rows||[]).map(spgsUserFromRow);
+    users.forEach(u=>spgsConfirmedUserRows.set(String(u.id),spgsUserSignature(u)));
+    return users;
   }
   async function spgsSyncUsers(force=false){
+    // Save only changed accounts. In particular, do not overwrite permissions
+    // changed by another administrator when saving unrelated business records.
     const users=(state.users||[]).filter(u=>u?.id&&u?.username&&u?.password!==undefined);
-    const sig=JSON.stringify(users);if(!force&&sig===spgsLastUsersJson)return;
-    if(!users.length)return;
-    await spgsFetch('/spgs_users?on_conflict=id',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(users.map(spgsUserToRow))});
-    spgsLastUsersJson=sig;
+    for(const u of users){
+      const id=String(u.id);
+      const sig=spgsUserSignature(u);
+      if(spgsConfirmedUserRows.get(id)===sig)continue;
+      const row=spgsUserToRow(u);
+      // Create only previously absent accounts; patch existing by exact ID.
+      const exists=spgsConfirmedUserRows.has(id);
+      const result=await spgsFetch(exists
+        ? '/spgs_users?id=eq.'+encodeURIComponent(id)+'&select=id'
+        : '/spgs_users?on_conflict=id&select=id',{
+          method:exists?'PATCH':'POST',
+          headers:{'Content-Type':'application/json','Prefer':exists?'return=representation':'resolution=merge-duplicates,return=representation'},
+          body:JSON.stringify(row)
+        });
+      if(!Array.isArray(result)||result.length!==1)throw new Error('User update was not confirmed: '+u.username);
+      spgsConfirmedUserRows.set(id,sig);
+    }
+    spgsLastUsersJson=JSON.stringify(users);
   }
   // READ-ONLY cross-user refresh, every 60 seconds while visible.
   // Local edits are never sent by this routine. Saves continue through existing functions.
@@ -1275,7 +1340,8 @@ spgsProductionJson=
     JSON.stringify(state.productionRequests||[]);
       if(!state.users.length)throw new Error('spgs_users is empty. Run the supplied SQL and refresh.');
       state.users.forEach(u=>{u.companyLinkType=u.companyLinkType||'';u.companyLinkId=u.companyLinkId||''});
-      await spgsSyncUsers(true);
+      // Cloud users were already loaded and registered as the authoritative baseline.
+      // Do not overwrite their permissions from a stale cached browser on login.
       spgsLastUsersJson=JSON.stringify(state.users);
       spgsReady=true;
       // Polling mode: no Supabase websocket subscriptions are opened.

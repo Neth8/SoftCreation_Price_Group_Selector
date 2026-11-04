@@ -20,6 +20,7 @@
   const SO_PAGE_SIZE=5;
   const SO_ITEM_PAGE_SIZE_V1032=5;
   const SO_PO_BUCKET_V1032='sales-order-po-files';
+  const SO_INVOICE_BUCKET_V20261104='sales-order-invoice-pdfs';
   const SO_PO_PROJECT_URL_V1032='https://qyxgamverzdmhtvezbft.supabase.co';
   const SO_PO_MAX_BYTES_V1032=10*1024*1024;
   const DIRECT='Direct delivery to dealer customers';
@@ -33,6 +34,7 @@
   let soPage=1;
   let soItemPageV1032=1;
   let soPOFilePendingV1032=null;
+  let soInvoiceFilePendingV20261104=null;
   let soRealtimeTimerV1032=0;
   let lastSOEligibleCustomerId='';
 
@@ -404,6 +406,19 @@
                 <button class="btn ghost sm" type="button" onclick="bpSoViewPendingPOV1032()">View Selected</button>
                 <button class="btn red sm" type="button" onclick="bpSoRemovePendingPOV1032()">Remove</button>
               </div>
+            </div>
+          </div>
+          <div class="field full">
+            <label>Customer Invoice PDF (optional)</label>
+            <div class="bp-so-po-attach-v1032">
+              <input id="bpSoInvoiceFileV20261104" type="file" hidden accept=".pdf,application/pdf" onchange="bpSoInvoiceFileChangedV20261104(this)">
+              <button class="btn ghost sm" type="button" onclick="$('bpSoInvoiceFileV20261104').click()">+ Attach Invoice PDF</button>
+              <div id="bpSoInvoiceFileStatusV20261104" class="bp-so-po-file-status-v1032">No invoice attached.</div>
+              <div id="bpSoInvoiceFileActionsV20261104" class="bp-so-po-file-actions-v1032" style="display:none">
+                <button class="btn ghost sm" type="button" onclick="bpSoViewPendingInvoiceV20261104()">Preview Selected</button>
+                <button class="btn red sm" type="button" onclick="bpSoRemovePendingInvoiceV20261104()">Remove</button>
+              </div>
+              <small class="muted">PDF only, maximum 10 MB. Invoice is optional and stored separately from the PO.</small>
             </div>
           </div>
           <div class="field full">
@@ -1058,6 +1073,83 @@
     actions.style.display='flex';
   }
 
+  function validateSOInvoiceV20261104(file){
+    if(!file)return;
+    if(file.size<=0||file.size>10*1024*1024)throw new Error('Invoice PDF must be between 1 byte and 10 MB.');
+    if(!/\.pdf$/i.test(String(file.name||'')))throw new Error('Only PDF invoice files are allowed.');
+    if(file.type && file.type!=='application/pdf')throw new Error('Invoice must be a PDF file.');
+  }
+
+  function renderPendingSOInvoiceV20261104(){
+    const status=$('bpSoInvoiceFileStatusV20261104');
+    const actions=$('bpSoInvoiceFileActionsV20261104');
+    if(!status||!actions)return;
+    if(!soInvoiceFilePendingV20261104){
+      status.textContent='No invoice attached.';
+      status.className='bp-so-po-file-status-v1032';
+      actions.style.display='none';
+      return;
+    }
+    status.textContent=`${soInvoiceFilePendingV20261104.name} • ${Math.max(1,Math.round(soInvoiceFilePendingV20261104.size/1024))} KB • Ready to upload`;
+    status.className='bp-so-po-file-status-v1032 ready';
+    actions.style.display='flex';
+  }
+
+  window.bpSoInvoiceFileChangedV20261104=function(input){
+    const file=input?.files?.[0]||null;
+    try{validateSOInvoiceV20261104(file);soInvoiceFilePendingV20261104=file;}
+    catch(err){if(input)input.value='';soInvoiceFilePendingV20261104=null;toast(err.message||'Invalid PDF');}
+    renderPendingSOInvoiceV20261104();
+  };
+  window.bpSoRemovePendingInvoiceV20261104=function(){
+    soInvoiceFilePendingV20261104=null;
+    if($('bpSoInvoiceFileV20261104'))$('bpSoInvoiceFileV20261104').value='';
+    renderPendingSOInvoiceV20261104();
+  };
+  window.bpSoViewPendingInvoiceV20261104=function(){
+    const file=soInvoiceFilePendingV20261104;
+    if(!file)return toast('No invoice selected');
+    const url=URL.createObjectURL(file);
+    window.open(url,'_blank','noopener');
+    setTimeout(()=>URL.revokeObjectURL(url),10*60*1000);
+  };
+
+  async function uploadSOInvoiceV20261104(soId,file){
+    validateSOInvoiceV20261104(file);
+    const nonce=(crypto?.randomUUID?.()||uid('invoice')).replace(/[^a-zA-Z0-9_-]/g,'');
+    const path=`sales-orders/${soPOSafePartV1032(soId)}/${nonce}.pdf`;
+    const url=`${SO_PO_PROJECT_URL_V1032}/storage/v1/object/${SO_INVOICE_BUCKET_V20261104}/${soPOEncodedPathV1032(path)}`;
+    const response=await fetch(url,{
+      method:'POST',
+      headers:soPOHeadersV1032({'Content-Type':'application/pdf','x-upsert':'false'}),
+      body:file
+    });
+    if(!response.ok){
+      const detail=await response.text().catch(()=>response.statusText);
+      throw new Error(`Invoice upload failed (${response.status}): ${String(detail).slice(0,250)}. Run CREATE_SALES_ORDER_INVOICE_BUCKET.sql first.`);
+    }
+    return {storage:'supabase',bucket:SO_INVOICE_BUCKET_V20261104,path,fileName:file.name||'Invoice.pdf',mime:'application/pdf',bytes:file.size,uploadedAt:new Date().toISOString(),uploadedBy:currentUser?.display||currentUser?.username||''};
+  }
+
+  window.bpSoViewInvoiceAttachmentV20261104=async function(soId){
+    const so=(state.salesOrders||[]).find(x=>x.id===soId);
+    if(!so)return toast('Sales Order not found');
+    if(currentUser?.role!=='admin' && so.ownerUser!==currentUser?.username)return toast('Not authorized to view this Sales Order');
+    const asset=so.invoiceAttachment;
+    if(!asset?.path)return toast('No invoice attached');
+    // Storage is deliberately private: no anonymous SELECT policy is created.
+    // An authorized download endpoint is required for production secure viewing.
+    try{
+      const url=`${SO_PO_PROJECT_URL_V1032}/storage/v1/object/${SO_INVOICE_BUCKET_V20261104}/${soPOEncodedPathV1032(asset.path)}`;
+      const response=await fetch(url,{headers:soPOHeadersV1032()});
+      if(!response.ok)throw new Error('Private invoice downloads require an authenticated server-side file service.');
+      const blob=await response.blob();
+      const objectUrl=URL.createObjectURL(blob);
+      window.open(objectUrl,'_blank','noopener');
+      setTimeout(()=>URL.revokeObjectURL(objectUrl),10*60*1000);
+    }catch(err){toast(err?.message||'Invoice could not be opened');}
+  };
+
   window.bpSoPOFileChangedV1032=function(input){
     const file=input?.files?.[0]||null;
 
@@ -1575,6 +1667,7 @@
       dealerPhone:so.customerPhone,
       poRef:so.customerRef||'',
       poAttachment:so.poAttachment||null,
+      invoiceAttachment:so.invoiceAttachment||null,
       method:so.method,
       instructions:so.note||'',
       ownerUser:so.ownerUser,
@@ -1672,8 +1765,8 @@
 
     if(submitBtn){
       submitBtn.disabled=true;
-      submitBtn.textContent=soPOFilePendingV1032
-        ? 'Uploading PO & Saving...'
+      submitBtn.textContent=(soPOFilePendingV1032||soInvoiceFilePendingV20261104)
+        ? 'Uploading attachments & saving...'
         : 'Saving Sales Order...';
     }
 
@@ -1743,6 +1836,13 @@
           );
       }
 
+      let invoiceAttachment=null;
+      if(soInvoiceFilePendingV20261104){
+        const invoiceStatus=$('bpSoInvoiceFileStatusV20261104');
+        if(invoiceStatus){invoiceStatus.textContent='Uploading invoice PDF...';invoiceStatus.className='bp-so-po-file-status-v1032 uploading';}
+        invoiceAttachment=await uploadSOInvoiceV20261104(soId,soInvoiceFilePendingV20261104);
+      }
+
       const so={
         id:soId,
         soNo:nextSONoV1030(),
@@ -1750,6 +1850,7 @@
         needDate:$('bpSoNeedDateV1030')?.value||'',
         customerRef:$('bpSoRefV1030')?.value.trim()||'',
         poAttachment,
+        invoiceAttachment,
 
         customerId:customer.id,
         customerName:customer.name,
@@ -1857,6 +1958,9 @@
         `${so.soNo} • ${so.customerName} • ${so.lines.length} item(s) • ${activeDeliveries.length} delivery customer(s)`
       );
 
+      if(invoiceAttachment){
+        audit('SALES_ORDER_INVOICE_ATTACHMENT',`${so.soNo} • ${invoiceAttachment.fileName}`);
+      }
       if(poAttachment){
         audit(
           'SALES_ORDER_PO_ATTACHMENT',
@@ -1871,6 +1975,7 @@
       soPage=1;
       soItemPageV1032=1;
       soPOFilePendingV1032=null;
+      soInvoiceFilePendingV20261104=null;
 
       [
         'bpSoNeedDateV1030',
@@ -1885,6 +1990,8 @@
       }
 
       renderPendingSOPOV1032();
+      if($('bpSoInvoiceFileV20261104'))$('bpSoInvoiceFileV20261104').value='';
+      renderPendingSOInvoiceV20261104();
 
       if($('bpSoDateV1030')){
         $('bpSoDateV1030').value=today();
@@ -1918,6 +2025,10 @@
           'bp-so-po-file-status-v1032 error';
       }
 
+      if($('bpSoInvoiceFileStatusV20261104')&&soInvoiceFilePendingV20261104){
+        $('bpSoInvoiceFileStatusV20261104').textContent=`Invoice upload/save failed: ${err?.message||'Unknown error'}`;
+        $('bpSoInvoiceFileStatusV20261104').className='bp-so-po-file-status-v1032 error';
+      }
       toast(
         err?.message||
         'Sales Order could not be submitted'
@@ -1932,12 +2043,13 @@
   };
 
   window.bpSoClearV1030=function(){
-    if((soCart.length||soPOFilePendingV1032) && !confirm('Clear the current Sales Order items, PO attachment and delivery allocations?'))return;
+    if((soCart.length||soPOFilePendingV1032||soInvoiceFilePendingV20261104) && !confirm('Clear the current Sales Order items, attachments and delivery allocations?'))return;
 
     soCart=[];
     soDeliveries=[];
     soItemPageV1032=1;
     soPOFilePendingV1032=null;
+    soInvoiceFilePendingV20261104=null;
 
     ['bpSoNeedDateV1030','bpSoRefV1030','bpSoNoteV1030'].forEach(id=>{
       if($(id))$(id).value='';
@@ -1948,6 +2060,8 @@
     }
 
     renderPendingSOPOV1032();
+    if($('bpSoInvoiceFileV20261104'))$('bpSoInvoiceFileV20261104').value='';
+    renderPendingSOInvoiceV20261104();
     ensureDeliveryBaseV1030();
     bpSoRefreshV1030();
   };
@@ -2144,6 +2258,7 @@
                         : ''
                     }
 
+                    ${so.invoiceAttachment ? `<div class="bp-so-po-saved-v1032">📄 Invoice PDF: ${esc(so.invoiceAttachment.fileName||'Invoice.pdf')}</div>` : ''}
                     ${
                       so.poAttachment
                         ? `
@@ -2156,6 +2271,7 @@
                   </div>
 
                   <div class="bp-so-history-actions-v1032">
+                    ${so.invoiceAttachment?`<button class="btn ghost sm" type="button" onclick="bpSoViewInvoiceAttachmentV20261104('${so.id}')">Invoice PDF</button>`:''}
                     ${
                       so.poAttachment
                         ? `<button class="btn ghost sm" type="button" onclick="bpSoViewPOAttachmentV1032('${so.id}')">PO File</button>`
@@ -2333,6 +2449,11 @@
           <span>ERP Status</span>
           <b>${esc(so.erpStatus||'-')}</b>
           ${so.erpSONo?`<small>ERP SO: ${esc(so.erpSONo)}</small>`:''}
+        </div>
+
+        <div>
+          <span>Invoice PDF</span>
+          ${so.invoiceAttachment ? `<b>${esc(so.invoiceAttachment.fileName||'Invoice.pdf')}</b><button class="btn ghost sm" type="button" onclick="bpSoViewInvoiceAttachmentV20261104('${so.id}')">Open Invoice</button>` : '<b>Not attached</b>'}
         </div>
 
         <div>
