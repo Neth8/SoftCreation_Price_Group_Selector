@@ -23,9 +23,45 @@ function pcEsc(v){return typeof esc==='function'?esc(v):String(v??'')}
 function pcNum(v){return Number(v||0)}
 function pcMoney(v){return pcNum(v).toLocaleString(undefined,{maximumFractionDigits:2})}
 function pcNorm(v){return String(v??'').trim().toUpperCase().replace(/\s+/g,' ')}
-function pcLineKey(l){if(l?.itemId)return 'ID:'+String(l.itemId);return ['SPEC',pcNorm(l?.desc),pcNorm(l?.size),pcNorm(l?.material),pcNorm(l?.layout),pcNum(l?.pcs),pcNorm(l?.unit||'Rolls')].join('|')}
+// A factory product is identified by its manufacturing specification, not by
+// which Sales Order / manually created Item Master ID introduced the demand.
+// Keep a stable existing Item Master ID where available: legacy policies,
+// downstream source_item_id and historical IDs must not be rewritten.
+function pcSpecKey(l){
+ const size=String(l?.size||l?.size_label||'').toUpperCase().replace(/\s*MM\s*/g,'').replace(/[×✕]/g,'X').replace(/\s*X\s*/g,'X').replace(/\s+/g,'');
+ const material=pcNorm(l?.material).replace(/^DT TOP$/,'ELP HYBRID');
+ const layout=pcNorm(l?.layout).replace(/\s+/g,'');
+ const pcs=pcNum(l?.pcs??l?.pcs_per_roll);
+ const unit=pcNorm(l?.unit||'Rolls');
+ const desc=pcNorm(l?.desc||l?.description||'ELP');
+ return ['SPEC',desc,size,material,layout,pcs,unit].join('|');
+}
+function pcCanonicalMaster(l){
+ const key=pcSpecKey(l);
+ const matches=(state.items||[]).filter(i=>pcSpecKey(i)===key);
+ if(!matches.length)return null;
+ // Stable primary identity for identical physical specifications.
+ return matches.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')))[0];
+}
+function pcLineKey(l){
+ const primary=pcCanonicalMaster(l);
+ if(primary?.id)return 'ID:'+String(primary.id);
+ return pcSpecKey(l);
+}
+function pcPolicy(k){
+ const direct=pcCloud.policies.find(x=>x.item_key===k);
+ if(direct)return direct;
+ // Preserve policies saved under another legacy Item Master ID.
+ const matching=(state.items||[]).find(i=>pcLineKey(i)===k);
+ if(matching){
+   const aliases=(state.items||[]).filter(i=>pcSpecKey(i)===pcSpecKey(matching)).map(i=>'ID:'+i.id);
+   const legacy=pcCloud.policies.find(x=>aliases.includes(x.item_key)||x.item_key===pcSpecKey(matching));
+   if(legacy)return legacy;
+ }
+ return {safety_stock_qty:0,available_stock_qty:0,cover_weeks:2};
+}
 function pcLineLabel(l){return [l?.desc,l?.size,l?.material,l?.layout,l?.pcs?`${l.pcs} pcs/roll`:null].filter(Boolean).join(' • ')}
-function pcPolicy(k){return pcCloud.policies.find(x=>x.item_key===k)||{safety_stock_qty:0,available_stock_qty:0,cover_weeks:2}}
+
 const pcOpenReqStatuses=()=>new Set(['Pending Approval','Approved']),pcOpenProdStatuses=()=>new Set(['Requested','Approved','Planned','In Production','QC Check']);
 function pcFulfilmentForSO(so){return (state.dealerFulfilments||[]).find(p=>p.sourceSOId===so.id||p.id===so.fulfilmentPlanId)||null}
 let pcOrdexaSent=new Map(),pcOrdexaReady=false,pcOrdexaConflicts=[];
@@ -107,7 +143,7 @@ function pcAllocatedToOpenRequests(soid,i){const ids=new Set(pcCloud.lines.filte
 function pcPipelineForItem(k){return (state.productionRequests||[]).filter(r=>pcOpenProdStatuses().has(String(r.status||''))&&pcLineKey(r)===k).reduce((n,r)=>n+pcNum(r.requestQty),0)}
 function pcDemandGroups(){
   const m=new Map();
-  (state.salesOrders||[]).forEach(so=>(so.lines||[]).forEach((l,i)=>{if(l.use===false)return;const k=pcLineKey(l);let g=m.get(k);if(!g){g={key:k,sourceItemId:l.itemId||'',desc:l.desc||'Item',size:l.size||'',material:l.material||'',layout:l.layout||'',pcs:pcNum(l.pcs),unit:l.unit||'Rolls',orders:[]};m.set(k,g)}
+  (state.salesOrders||[]).forEach(so=>(so.lines||[]).forEach((l,i)=>{if(l.use===false)return;const k=pcLineKey(l);let g=m.get(k);if(!g){g={key:k,sourceItemId:pcCanonicalMaster(l)?.id||l.itemId||'',desc:l.desc||'Item',size:l.size||'',material:l.material||'',layout:l.layout||'',pcs:pcNum(l.pcs),unit:l.unit||'Rolls',orders:[]};m.set(k,g)}
     const ordered=pcNum(l.qty),dispatched=Math.min(ordered,pcDispatchedForSOLine(so,i)),cancelled=pcNum(l.cancelledQty),grossOpen=Math.max(0,ordered-dispatched-cancelled),allocated=Math.min(grossOpen,pcAllocatedToOpenRequests(so.id,i)),available=Math.max(0,grossOpen-allocated);
     if(grossOpen>0)g.orders.push({sourceSoId:so.id,sourceSoNo:so.soNo||so.id,lineIndex:i,customer:so.customerName||'',requiredDate:so.needDate||'',ordered,dispatched,cancelled,grossOpen,allocated,available});
   }));
@@ -247,7 +283,7 @@ function pcRender(){
 }
 function pcPlannerHTML(){
   const groups=pcDemandGroups();if(!pcPlannerItemKey&&groups.length)pcPlannerItemKey=groups[0].key;const g=pcGroup(pcPlannerItemKey)||groups[0];
-  return `<div class="pc-grid"><div><div class="pc-card"><div class="pc-card-head"><div><h3>Build a production request</h3><p>Real Sales Orders are linked automatically by item.</p></div><span class="pc-pill">SC HO Stores</span></div><div class="field"><label>Item / SKU</label><select onchange="pcSelectItem(this.value)">${groups.map(x=>`<option value="${encodeURIComponent(x.key)}" ${g&&x.key===g.key?'selected':''}>${pcEsc(pcLineLabel(x))}</option>`).join('')}</select></div>${g?pcPlannerGroupHTML(g):'<div class="empty">No outstanding Sales Order demand found.</div>'}</div>${g?`<div class="pc-card"><div class="pc-card-head"><h3>4-week fulfilled movement</h3><span class="pc-pill blue">${pcMoney(g.avg)} avg / week</span></div><div class="pc-bars">${g.movement.map(n=>`<div class="pc-bar" style="height:${Math.max(4,(n/Math.max(1,...g.movement))*90)}%"><span>${pcMoney(n)}</span></div>`).join('')}</div><div class="pc-week-labels"><span>W-4</span><span>W-3</span><span>W-2</span><span>Last week</span></div></div>`:''}</div>
+  return `<div class="pc-grid"><div><div class="pc-card"><div class="pc-card-head"><div><h3>Build a production request</h3><p>Real Sales Orders are linked automatically by item.</p></div><span class="pc-pill">SC HO Stores</span></div><div class="field"><label>Item / SKU</label><select onchange="pcSelectItem(this.value)">${[...groups].sort((a,b)=>pcLineLabel(a).localeCompare(pcLineLabel(b),undefined,{numeric:true,sensitivity:'base'})).map((x,i)=>`<option value="${encodeURIComponent(x.key)}" ${g&&x.key===g.key?'selected':''}>${i+1}. ${pcEsc(pcLineLabel(x))}</option>`).join('')}</select></div>${g?pcPlannerGroupHTML(g):'<div class="empty">No outstanding Sales Order demand found.</div>'}</div>${g?`<div class="pc-card"><div class="pc-card-head"><h3>4-week fulfilled movement</h3><span class="pc-pill blue">${pcMoney(g.avg)} avg / week</span></div><div class="pc-bars">${g.movement.map(n=>`<div class="pc-bar" style="height:${Math.max(4,(n/Math.max(1,...g.movement))*90)}%"><span>${pcMoney(n)}</span></div>`).join('')}</div><div class="pc-week-labels"><span>W-4</span><span>W-3</span><span>W-2</span><span>Last week</span></div></div>`:''}</div>
   <div>${g?pcIntelligenceHTML(g):''}<div class="pc-card pc-request-submission-v1143"><div class="pc-card-head"><h3>Submit production request</h3></div><p class="pc-muted">Requests with additional production go to Manager Approval. Sales Order-only requests are eligible for automatic approval by the server.</p><div class="pc-submission-counter-v1143">Prepared items: <b>${pcBasket.length}</b> · Route: <b>${pcBasket.some(x=>pcNum(x.additionalQty)>0)?'Manager approval required':'Automatic approval eligible (server controlled)'}</b></div><div class="field"><label>Required at HO</label><input id="pcDue" type="date" value="${today()}"></div><div class="field"><label>Material arrangement</label><select id="pcMaterial"><option>Factory to arrange material</option><option>HO material issued</option><option>HO material pending issue</option></select></div><div class="field"><label>Request note</label><textarea id="pcRequestReason"></textarea></div><div class="actions"><button class="btn primary" onclick="pcSubmitRequest()" ${!pcHas('production_control_create')||!pcBasket.length?'disabled':''}>Submit Production Request →</button><button class="btn ghost sm" type="button" onclick="pcBasket=[];pcRender()" ${!pcBasket.length?'disabled':''}>Clear prepared items</button></div></div></div></div>`;
 }
 function pcPlannerGroupHTML(g){return `<div class="pc-demand-title"><div><b>${pcEsc(pcLineLabel(g))}</b><small>${pcEsc(g.key)}</small></div><span class="pc-pill blue">${pcMoney(g.demand)} rolls to plan</span></div><div class="pc-scroll"><table class="pc-table"><thead><tr><th>SO / Customer</th><th>Required</th><th class="num">Ordered</th><th class="num">Dispatched</th><th class="num">Open</th><th class="num">Already PR</th><th class="num">To Plan</th></tr></thead><tbody>${g.orders.map(o=>`<tr><td><b>${pcEsc(o.sourceSoNo)}</b><small>${pcEsc(o.customer)}</small></td><td>${pcEsc(o.requiredDate||'-')}</td><td class="num">${pcMoney(o.ordered)}</td><td class="num">${pcMoney(o.dispatched)}</td><td class="num">${pcMoney(o.grossOpen)}</td><td class="num">${pcMoney(o.allocated)}</td><td class="num"><b>${pcMoney(o.available)}</b></td></tr>`).join('')||'<tr><td colspan="7">No outstanding SO demand. Stock replenishment can still be planned.</td></tr>'}</tbody></table></div>`}

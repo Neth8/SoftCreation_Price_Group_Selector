@@ -185,7 +185,7 @@
       return;
     }
 
-    const items=scCustomerItemsV1021(customer);
+    const items=scCustomerItemsV1021(customer).sort((a,b)=>[a.size,a.material,a.layout,a.pcs].join(' ').localeCompare([b.size,b.material,b.layout,b.pcs].join(' '),undefined,{numeric:true,sensitivity:'base'}));
     const changes=(customer.priceHistory||[]).length;
     text.textContent=`${items.length} saved item${items.length===1?'':'s'} • ${changes} price histor${changes===1?'y':'ies'} • ${(customer.paymentMode||$('payMode')?.value||'credit').toUpperCase()} mode`;
     allBtn.disabled=changes===0&&items.length===0;
@@ -218,11 +218,11 @@
     }
 
     const mode=$('payMode')?.value||customer.paymentMode||'credit';
-    mp.innerHTML='<option value="">-- Customer Item Master --</option>'+items.map(item=>{
+    mp.innerHTML='<option value="">-- Customer Item Master --</option>'+items.map((item,index)=>{
       const price=currentPricingForItem(item,customer.id,mode);
       const count=scHistoryForItemV1021(customer,item,'').length;
       const label=[item.size,item.material,item.layout,item.pcs?item.pcs+'pcs':''].filter(Boolean).join(' ');
-      return `<option value="${item.id}">${esc(label)} — LKR ${money(price)}${count?` • ${count} change${count===1?'':'s'}`:''}</option>`;
+      return `<option value="${item.id}">${index+1}. ${esc(label)} — LKR ${money(price)}${count?` • ${count} change${count===1?'':'s'}`:''}</option>`;
     }).join('');
 
     if(items.some(i=>i.id===previous))mp.value=previous;
