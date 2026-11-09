@@ -356,6 +356,13 @@
   const scBaseRenderCurrentV1019=renderCurrent;
   renderCurrent=function(){
     const target=$('paper');
+    if(state.current?.category==='device' && window.spgsDevicePreviewPausedV20261109){
+      if(target && !target.querySelector('#spgsDevicePreviewRefreshV20261109')){
+        target.className='paper';
+        target.innerHTML='<div style="padding:32px;line-height:1.7;color:#1a434b"><b>Device items updated.</b><p>The large quotation preview is paused while adding devices to keep this screen responsive.</p><button id="spgsDevicePreviewRefreshV20261109" class="btn primary" type="button" onclick="window.spgsDevicePreviewPausedV20261109=false;renderCurrent()">Refresh Quotation Preview</button></div>';
+      }
+      return;
+    }
     scResetPaperTargetV1019(target);
     const result=scBaseRenderCurrentV1019.apply(this,arguments);
     try{
