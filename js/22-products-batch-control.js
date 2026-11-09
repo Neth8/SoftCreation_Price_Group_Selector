@@ -149,9 +149,7 @@
         return n+Math.max(0,produced-dispatched);
       },0);
       const latest=g.latestUpdatedAt?new Date(g.latestUpdatedAt).toLocaleString():'-';
-      const stageLabel=dispatchBalance>0 && productionQty>0
-        ? 'Production active • Partial dispatch ready'
-        : finishedQty>0||dispatchBalance>0
+      const stageLabel=finishedQty>0||dispatchBalance>0
         ? 'Finished — Dispatch Ready'
         : productionQty>0
           ? 'In Production'
@@ -195,7 +193,6 @@
           <div class="pp-flow-stage logistics ${logisticsQty>0?'active':''}"><span>5. Logistics</span><b>${money(logisticsQty)}</b><small>dispatched / received</small></div>
         </div>
         <div class="pp-cut-strip-v1128"><span>Total requested across jobs <b>${money(totalRequested)}</b></span><span>${cutNote}</span>${dispatchBalance>0?`<span>Dispatch balance <b>${money(dispatchBalance)}</b></span>`:''}</div>
-        <div class="pp-source-jobs-v20261109" style="margin:9px 0;padding:10px;border-radius:9px;background:rgba(10,100,120,.06)"><b style="font-size:12px">Production Orders (${g.jobs.length})</b><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:7px">${g.jobs.map(r=>`<span class="tag" style="font-size:11px"><b>${esc(r.orderNo||'Unnumbered')}</b> · ${esc(r.status||'Unknown')} · ${money(r.requestQty||0)} ${esc(r.unit||g.unit||'rolls')}</span>`).join('')}</div>${productionQty>0&&dispatchBalance>0?'<div class="small" style="margin-top:6px">Other jobs remain in production; dispatch is available only for completed, QC-approved packed stock.</div>':''}</div>
         <div class="pp-card-foot"><div class="pp-mini">Each job is counted in one current stage only • ${g.totalJobs} total job${g.totalJobs===1?'':'s'} • Latest: ${esc(latest)}</div>${actions.join('')}</div>
       </div>`;
     }).join(''):'<div class="empty" style="grid-column:1/-1">No matching production products.</div>';
