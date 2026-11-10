@@ -79,7 +79,7 @@
     // Routing uses the first eligible finished job; other jobs remain visible for traceability.
     const dispatchTarget = jobs[0];
     $('productDispatchBodyV1124').innerHTML=`
-      <div class="notice"><b>Dispatch ready packing batch.</b> Contributing production jobs are listed below for reference. Physical cartons are selected in the existing Dispatch Packing Batch screen. Dispatch accounting is still tied to a production job.</div>
+      <div class="notice"><b>Dispatch ready packing batch.</b> Contributing production jobs are listed below for reference. Physical cartons are selected in the existing Dispatch Packing Batch screen. Shared cartons are allocated across the contributing production jobs when the dispatch is locked.</div>
       <div class="dispatch-ready-list-v1124">
         ${jobs.map(r=>`
           <div class="dispatch-ready-job-v1124">
@@ -92,7 +92,7 @@
       <div class="actions" style="margin-top:16px">
         <button class="btn navy" type="button" id="dispatchSingleActionV1131">Open Dispatch Packing Batch</button>
       </div>
-      ${jobs.length>1?'<div class="small" style="margin-top:8px">Current dispatch records are allocated by production job. This action opens the first eligible job; it does not combine multiple job balances into one dispatch note.</div>':''}`;
+      ${jobs.length>1?'<div class="small" style="margin-top:8px">Shared physical packing batches can be dispatched together. The original job allocations remain individually tracked.</div>':''}`;
     const dispatchButton=$('dispatchSingleActionV1131');
     if(dispatchButton){
       dispatchButton.addEventListener('click',()=>{

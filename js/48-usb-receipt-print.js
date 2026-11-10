@@ -20,7 +20,7 @@
       [0x1B,0x61,0x00],
       lineV1126(),
       kvV1126('Dispatch',d?.dispatchNo||'-'),
-      kvV1126('Production',r?.orderNo||d?.orderNo||'-'),
+      kvV1126('Production',(d?.sharedBatchJobs||[]).map(j=>j.orderNo).join(', ')||r?.orderNo||d?.orderNo||'-'),
       kvV1126('PI',r?.piSerial||d?.piSerial||'-'),
       kvV1126('Date',d?.date||'-'),
       lineV1126(),
@@ -47,16 +47,16 @@
     }
 
     parts.push(lineV1126(),[0x1B,0x45,0x01],'PACKING / LOADING\n',[0x1B,0x45,0x00]);
-    const boxes=Array.isArray(d?.boxes)?d.boxes:[];
+    const boxes=Array.isArray(d?.sharedBatchBoxes)?d.sharedBatchBoxes:(Array.isArray(d?.boxes)?d.boxes:[]);
     boxes.forEach((b,i)=>{
       parts.push(kvV1126(`Box ${asciiV1126(b?.boxNo||String(i+1).padStart(2,'0'))}`,`${Number(b?.qty||0)} rolls`));
     });
-    const loose=Math.max(0,Number(d?.loose||0));
+    const loose=Math.max(0,Number(d?.sharedBatchLoose??d?.loose??0));
     if(loose>0)parts.push(kvV1126('Loose',`${loose} rolls`));
 
     parts.push(
       lineV1126(),
-      [0x1B,0x45,0x01],kvV1126('TOTAL',`${Number(d?.qty||0)} rolls`),[0x1B,0x45,0x00]
+      [0x1B,0x45,0x01],kvV1126('TOTAL',`${Number(d?.sharedBatchTotal??d?.qty??0)} rolls`),[0x1B,0x45,0x00]
     );
     if(d?.note)parts.push(lineV1126(),'NOTE\n',wrapV1126(d.note));
 

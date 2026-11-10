@@ -74,7 +74,7 @@
       return toast('Only a Finished production job can be dispatched');
     }
 
-    const available=productionAvailableV81(r);
+    const available=spgsBatchAvailableV1142(r);
     if(!(available>0))return toast('No finished balance remains');
 
     const batch=dispatchBatchSummaryV1067(r);
@@ -114,9 +114,10 @@
       const packed=Math.max(0,Number(b?.rolls||0));
       const already=Math.max(0,Number(used[boxNo]||0));
       const remaining=Math.max(0,packed-already);
-      const disabled=remaining<=0||remaining>available+.001;
+      const insufficientAllocation=remaining>available+.001;
+      const disabled=remaining<=0||insufficientAllocation;
       const shared=spgsPhysicalPackingV1141(r);
-      const allocationWarning=shared&&remaining>available+.001?'Whole box exceeds this source job allocation; reconcile batch allocation before dispatch.':'';
+      const allocationWarning=shared&&insufficientAllocation?'Box exceeds the remaining shared batch balance; reconcile source allocations before dispatch.':'';
 
       return `
         <label class="dispatch-pack-box-v1067 ${disabled?'done':''}">
@@ -144,7 +145,7 @@
           </div>
           <div class="dispatch-pack-kpi-v1067 available">
             <span>${disabled?'Status':'Dispatch Qty'}</span>
-            <b>${disabled?'Dispatched':money(remaining)}</b>
+            <b>${remaining<=0?'Dispatched':insufficientAllocation?'Balance blocked':money(remaining)}</b>
           </div>
           <input
             class="dispatch-box-qty"

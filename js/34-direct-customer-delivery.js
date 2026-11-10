@@ -190,6 +190,27 @@
       return toast('This production job is locked or no longer available');
     }
 
+    // Shared physical packing must be allocated against ALL source jobs, not
+    // silently routed to the first job. Preserve direct-customer fields.
+    const physicalShared=spgsPhysicalPackingV1141(r);
+    if(physicalShared){
+      const directInfo=directPayloadV1068();
+      if(directInfo.directToCustomer){
+        const distinctCustomers=new Set(physicalShared.jobs.map(j=>String(j.customerName||'').trim().toLowerCase()).filter(Boolean));
+        if(distinctCustomers.size>1)return toast('Shared cartons contain multiple customers. Use Stores dispatch; direct-to-customer delivery requires a separately verified customer-specific batch.');
+        const x=directInfo.directDelivery;
+        if(!x.customerName||!x.customerPhone||!x.address||!x.vehicleNo||!x.driverName||!x.driverPhone){
+          return toast('Complete customer, address, vehicle and driver details for direct delivery');
+        }
+      }else if(!String($('dispatchLoadCarrier').value||'').trim()){
+        return toast('Enter driver / vehicle / courier');
+      }
+      if(typeof window.spgsSharedDispatchCoreV1142!=='function'){
+        return toast('Shared batch dispatch engine unavailable. Dispatch not created.');
+      }
+      return window.spgsSharedDispatchCoreV1142({directInfo});
+    }
+
     const boxes=selectedDispatchBoxesV81();
     const loose=Number($('dispatchLoose').value||0);
     const qty=boxes.reduce((n,b)=>n+b.qty,0)+loose;
@@ -340,7 +361,7 @@
     if(!x)return;
 
     const {r,d}=x;
-    const rows=d.boxes.map(b=>`
+    const rows=(d.sharedBatchBoxes||d.boxes).map(b=>`
       <tr>
         <td>Box ${esc(b.boxNo)}</td>
         <td>${money(b.packedRolls)}</td>
@@ -370,7 +391,7 @@
       </div>
 
       <table class="table" style="margin-top:20px">
-        <tr><th>Production Request</th><td>${esc(r.orderNo)}</td><th>PI</th><td>${esc(r.piSerial)}</td></tr>
+        <tr><th>Production Request</th><td>${esc((d.sharedBatchJobs||[]).map(x=>x.orderNo).join(', ')||r.orderNo)}</td><th>PI</th><td>${esc(r.piSerial)}</td></tr>
         <tr><th>Order Customer</th><td colspan="3">${esc(r.customerName)}</td></tr>
         <tr><th>Item</th><td colspan="3">${esc(r.size)} / ${esc(r.material)} / ${esc(r.layout)} / ${money(r.pcs)} pcs per roll</td></tr>
         <tr><th>Dispatch Date</th><td colspan="3">${esc(d.date)}</td></tr>
@@ -382,12 +403,12 @@
         <thead><tr><th>Carton</th><th>Packed Rolls</th><th>Dispatched Rolls</th><th>Note</th></tr></thead>
         <tbody>
           ${rows}
-          ${d.loose?`<tr><td>Loose</td><td>-</td><td><b>${money(d.loose)}</b></td><td></td></tr>`:''}
+          ${(d.sharedBatchLoose||d.loose)?`<tr><td>Loose</td><td>-</td><td><b>${money(d.sharedBatchLoose||d.loose)}</b></td><td></td></tr>`:''}
         </tbody>
       </table>
 
       <div class="dn-status">
-        <b>Total Dispatched: ${money(d.qty)} Rolls • ${d.boxes.length} Cartons</b><br>
+        <b>Total Dispatched: ${money(d.sharedBatchTotal||d.qty)} Rolls • ${(d.sharedBatchBoxes||d.boxes).length} Cartons</b><br>
         ${esc(d.note||'')}
       </div>
 

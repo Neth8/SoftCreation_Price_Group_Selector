@@ -3173,7 +3173,7 @@ function updateDispatchTotalV81(){
  $('dispatchLoadTotal').innerHTML=`Loading: <b>${boxes.length}</b> boxes + <b>${money(loose)}</b> loose rolls • Total: <b>${money(qty)}</b> • Available: <b>${money(avail)}</b>${qty>avail+.001?' <span class="grn-bad">EXCEEDS AVAILABLE BALANCE</span>':''}`;
 }
 function nextDispatchNoV81(){state.counters.dispatch=Number(state.counters.dispatch||0)+1;return `SC/DN/${today().replaceAll('-','')}/${String(state.counters.dispatch).padStart(3,'0')}`}
-function confirmDispatchLoadingV81(){
+function confirmDispatchLoadingV81(options={}){
  const r=state.productionRequests.find(x=>x.id===$('dispatchLoadReqId').value);
  if(!r||flowIndexV81(r.status)<flowIndexV81('Finished'))return toast('Production is not dispatch ready');
  const shared=spgsPhysicalPackingV1141(r);
@@ -3188,7 +3188,8 @@ function confirmDispatchLoadingV81(){
   if(loose>Math.max(0,Number(shared.snap.loose||0)-shared.looseUsed)+.001)return toast('Shared loose rolls exceed their remaining balance');
  }
  if(qty>avail+.001)return toast(`Dispatch cannot exceed available ${money(avail)} rolls`);
- const carrier=String($('dispatchLoadCarrier').value||'').trim();
+ const directInfo=options?.directInfo||{directToCustomer:false};
+ const carrier=directInfo.directToCustomer?`${directInfo.directDelivery.vehicleNo} • ${directInfo.directDelivery.driverName}`:String($('dispatchLoadCarrier').value||'').trim();
  if(!carrier)return toast('Enter driver / vehicle / courier');
  const jobs=shared?[...shared.jobs].sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''))):[r];
  let outstanding=qty;
@@ -3214,7 +3215,7 @@ function confirmDispatchLoadingV81(){
  const dispatchNo=nextDispatchNoV81(),at=new Date().toISOString();
  const groupId=uid('batchdispatch');
  const primaryId=uid('dispatch');
- const common={dispatchNo,date:$('dispatchLoadDate').value||today(),carrier,note:$('dispatchLoadNote').value.trim(),by:currentUser.display,byUser:currentUser.username,at,locked:true,sharedBatchDispatchId:groupId,sharedBatchTotal:qty,sharedBatchBoxes:boxes,sharedBatchLoose:loose,sharedBatchJobs:slices.map(s=>({requestId:s.job.id,orderNo:s.job.orderNo,customerName:s.job.customerName,qty:s.qty}))};
+ const common={dispatchNo,date:$('dispatchLoadDate').value||today(),carrier,note:$('dispatchLoadNote').value.trim(),by:currentUser.display,byUser:currentUser.username,at,locked:true,sharedBatchDispatchId:groupId,sharedBatchTotal:qty,sharedBatchBoxes:boxes,sharedBatchLoose:loose,sharedBatchJobs:slices.map(s=>({requestId:s.job.id,orderNo:s.job.orderNo,customerName:s.job.customerName,qty:s.qty})),directToCustomer:!!directInfo.directToCustomer,directDelivery:directInfo.directToCustomer?directInfo.directDelivery:null,destinationType:directInfo.directToCustomer?'Customer':'Stores'};
  slices.forEach((a,i)=>{const job=a.job,prior=productionAvailableV81(job);
   const d={...common,id:i===0?primaryId:uid('dispatch'),requestId:job.id,orderNo:job.orderNo,piId:job.piId,piSerial:job.piSerial,customerName:job.customerName,boxes:a.boxes,loose:a.loose,qty:a.qty,sharedBatchPrimaryId:primaryId};
   job.dispatches=job.dispatches||[];job.dispatches.push(d);job.dispatch=d;
@@ -3227,6 +3228,7 @@ function confirmDispatchLoadingV81(){
  downloadDispatchPDFV81(primaryId);
  toast(`Dispatch locked: ${money(qty)} rolls across ${slices.length} production job(s).`);
 }
+window.spgsSharedDispatchCoreV1142=confirmDispatchLoadingV81;
 function findDispatchV81(id){for(const r of state.productionRequests||[]){const d=(r.dispatches||[]).find(x=>x.id===id);if(d)return {r,d}}return null}
 async function pdfFromLetterheadV81(html,name){const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas),okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);if(!okC||!okP)return toast('PDF libraries unavailable');const h=document.createElement('div');h.className='paper';h.style='position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;padding:180px 52px 88px;box-sizing:border-box;background-size:100% 100%;color:#172f36;font-size:11px';h.innerHTML=html;document.body.appendChild(h);try{const c=await html2canvas(h,{scale:2,backgroundColor:'#fff',useCORS:true}),{jsPDF}=window.jspdf,p=new jsPDF({unit:'mm',format:'a4'});p.addImage(c.toDataURL('image/jpeg',.94),'JPEG',0,0,210,297);p.save(name)}finally{h.remove()}}
 async function downloadDispatchPDFV81(id){const x=findDispatchV81(id);if(!x)return;const {r,d}=x,rows=(d.sharedBatchBoxes||d.boxes).map(b=>`<tr><td>Box ${esc(b.boxNo)}</td><td>${money(b.packedRolls)}</td><td><b>${money(b.qty)}</b></td><td>${esc(b.note||'')}</td></tr>`).join('');await pdfFromLetterheadV81(`<div style="border-left:7px solid #078f92;padding-left:14px"><h1 style="margin:0;color:#078f92">FACTORY DISPATCH NOTE</h1><b>${esc(d.dispatchNo)}</b></div><table class="table" style="margin-top:20px"><tr><th>Production Request</th><td>${esc((d.sharedBatchJobs||[]).map(j=>j.orderNo).join(", ")||r.orderNo)}</td><th>PI</th><td>${esc(r.piSerial)}</td></tr><tr><th>Customer</th><td colspan="3">${esc((d.sharedBatchJobs||[]).map(j=>j.customerName).filter((v,i,a)=>a.indexOf(v)===i).join(", ")||r.customerName)}</td></tr><tr><th>Item</th><td colspan="3">${esc(r.size)} / ${esc(r.material)} / ${esc(r.layout)} / ${money(r.pcs)} pcs per roll</td></tr><tr><th>Dispatch Date</th><td>${esc(d.date)}</td><th>Driver / Vehicle</th><td>${esc(d.carrier||'-')}</td></tr></table><h3 style="color:#078f92">LOADING COUNT</h3><table class="table"><thead><tr><th>Carton</th><th>Packed Rolls</th><th>Loaded Rolls</th><th>Note</th></tr></thead><tbody>${rows}${(d.sharedBatchLoose||d.loose)?`<tr><td>Loose</td><td>-</td><td><b>${money(d.sharedBatchLoose||d.loose)}</b></td><td></td></tr>`:''}</tbody></table><div class="dn-status"><b>Total Loaded: ${money(d.sharedBatchTotal||d.qty)} Rolls • ${(d.sharedBatchBoxes||d.boxes).length} Cartons</b><br>${esc(d.note||'')}</div><div style="margin-top:45px;display:flex;justify-content:space-between"><span>Factory Released By: ${esc(d.by)}</span><span>Driver Signature: __________________</span><span>Stores Received: __________________</span></div>`,`Dispatch_${d.dispatchNo.replaceAll('/','-')}_${r.customerName}.pdf`);audit('DOWNLOAD_DISPATCH_NOTE',d.dispatchNo);saveState()}
