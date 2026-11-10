@@ -342,6 +342,7 @@
           <div class="field full">
             <label>Customer / Company</label>
             <select id="bpSoCustomerV1030" onchange="bpSoCustomerChangedV1030()"></select>
+            <div id="bpSoErpLinkV20261109" style="margin-top:7px;display:none"><div class="actions"><input id="bpSoErpSearchV20261109" placeholder="Search ERP customer by name or phone" autocomplete="off" style="flex:1;min-width:150px"><button class="btn ghost sm" type="button" onclick="bpSoSearchERPCustomersV20261109()">Search ERP</button></div><div id="bpSoErpMatchesV20261109" style="max-height:220px;overflow:auto"></div><small>ERP lookup matches existing approved-PI customers. It does not replace the PI/customer price relationship.</small></div>
           </div>
           <div class="field full">
             <label>Search Previous Items</label>
