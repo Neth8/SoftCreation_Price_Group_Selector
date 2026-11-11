@@ -974,7 +974,7 @@ async function downloadCurrentPDF(){
 }
 async function downloadSavedPDF(id){
   const d=state.docs.find(x=>x.id===id);if(!d)return;
-  await downloadDocPDF(JSON.parse(JSON.stringify(d)));
+  await downloadDocPDF(d);
 }
 function printSavedDocument(doc){
   if(!doc)return;

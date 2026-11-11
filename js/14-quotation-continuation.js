@@ -396,65 +396,94 @@
   };
   window.viewDocument=viewDocument;
 
-  /* PDF: one canvas per real A4 quotation page; no text scaling. */
+  /* Saved quotation PDF: memory-bounded A4 capture.
+     Capture one page at a time at an adaptive resolution.  Avoid keeping
+     all the A4 canvases or their encoded copies in browser memory. */
   const scBaseDownloadDocPDFV1019=downloadDocPDF;
+  let scQuoteDownloadBusyNov11=false;
+  const scQuoteYieldNov11=()=>new Promise(resolve=>setTimeout(resolve,0));
   downloadDocPDF=async function(doc){
     if(!scQuoteIsPagedDocument(doc))return scBaseDownloadDocPDFV1019.apply(this,arguments);
-
-    const okCanvas=await loadScript(
-      'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-      ()=>window.html2canvas
-    );
-    const okPdf=await loadScript(
-      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-      ()=>window.jspdf
-    );
-
-    if(!okCanvas||!okPdf){
-      toast('PDF libraries unavailable - opening browser Print / Save as PDF');
-      return printSavedDocument(doc);
-    }
-
-    const capture=document.createElement('div');
-    capture.className='sc-quote-capture-host';
-    const pages=scBuildQuotationPagesV1019(doc);
-    pages.forEach(page=>capture.appendChild(page));
-    document.body.appendChild(capture);
-
+    if(scQuoteDownloadBusyNov11){toast('Quotation PDF is already generating.');return;}
+    scQuoteDownloadBusyNov11=true;
+    let capture=null;
+    let pages=[];
     try{
-      toast(`Generating ${pages.length}-page A4 quotation PDF...`);
-      await scWaitForQuoteImagesV1019(capture);
+      // Yield BEFORE expensive pagination so the clicked button can repaint.
+      toast('Preparing saved quotation PDF...');
+      await scQuoteYieldNov11();
+      const okCanvas=await loadScript(
+        'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+        ()=>window.html2canvas
+      );
+      const okPdf=await loadScript(
+        'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+        ()=>window.jspdf
+      );
+      if(!okCanvas||!okPdf)throw new Error('PDF libraries unavailable');
+
+      pages=scBuildQuotationPagesV1019(doc);
+      if(!pages.length)throw new Error('No quotation pages were created');
+      // A very long, image-heavy document can overwhelm browser raster memory.
+      // Prefer the browser's PDF engine in that situation.
+      if(pages.length>18)throw new Error('Quotation has too many pages for safe image capture');
 
       const {jsPDF}=window.jspdf;
       const pdf=new jsPDF({orientation:'p',unit:'mm',format:'a4',compress:true});
-      try{pdf.setDisplayMode(1.0,'continuous','UseNone')}catch(e){}
+      try{pdf.setDisplayMode(1.0,'continuous','UseNone')}catch(_){ }
+      capture=document.createElement('div');
+      capture.className='sc-quote-capture-host';
+      document.body.appendChild(capture);
+      // Lower peak canvas memory for device quotations and mobile/Ubuntu browsers.
+      // Pages retain the exact original A4 proportions and text layout.
+      const lowerMemory=doc.category==='device' || (typeof navigator.deviceMemory==='number' && navigator.deviceMemory<=4);
+      const resolution=lowerMemory?1:1.25;
 
       for(let i=0;i<pages.length;i++){
-        const canvas=await html2canvas(pages[i],{
-          scale:2,
-          backgroundColor:'#ffffff',
-          useCORS:true,
-          allowTaint:true,
-          logging:false,
-          width:SC_QUOTE_PAGE_WIDTH,
-          height:SC_QUOTE_PAGE_HEIGHT,
-          windowWidth:SC_QUOTE_PAGE_WIDTH,
-          windowHeight:SC_QUOTE_PAGE_HEIGHT
-        });
-
-        if(i>0)pdf.addPage('a4','p');
-        const img=canvas.toDataURL('image/jpeg',0.83);
-        pdf.addImage(img,'JPEG',0,0,210,297,`quotePage${i+1}`,'FAST');
+        capture.appendChild(pages[i]);
+        await scWaitForQuoteImagesV1019(pages[i]);
+        await scQuoteYieldNov11();
+        toast(`Preparing quotation PDF: page ${i+1} of ${pages.length}`);
+        let canvas=null;
+        try{
+          canvas=await html2canvas(pages[i],{
+            scale:resolution,
+            backgroundColor:'#ffffff',
+            useCORS:true,
+            allowTaint:false,
+            logging:false,
+            width:SC_QUOTE_PAGE_WIDTH,
+            height:SC_QUOTE_PAGE_HEIGHT,
+            windowWidth:SC_QUOTE_PAGE_WIDTH,
+            windowHeight:SC_QUOTE_PAGE_HEIGHT,
+            imageTimeout:2500,
+            removeContainer:true
+          });
+          // JPEG needs much less memory than lossless full-page canvases.
+          const img=canvas.toDataURL('image/jpeg',0.74);
+          if(i>0)pdf.addPage('a4','p');
+          pdf.addImage(img,'JPEG',0,0,210,297,`quoteSafePage${i+1}`,'FAST');
+        }finally{
+          if(canvas){canvas.width=0;canvas.height=0;canvas=null;}
+          pages[i].remove();
+        }
+        await scQuoteYieldNov11();
       }
-
+      await scQuoteYieldNov11();
       pdf.save((doc.serial||'quotation').replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
       toast(`Quotation PDF generated • ${pages.length} page${pages.length===1?'':'s'}`);
     }catch(err){
-      console.error('Multi-page quotation PDF failed',err);
-      toast('Direct PDF failed - opening Print / Save as PDF');
-      printSavedDocument(doc);
+      console.error('Saved quotation PDF capture failed',err);
+      toast('PDF capture was interrupted. Opening browser Print / Save as PDF instead.');
+      // Call the same built-in print view, preserving the saved document.
+      try{await scQuoteYieldNov11();printSavedDocument(doc);}catch(printErr){
+        console.error('Quotation print fallback failed',printErr);
+        toast('PDF export failed. Please retry using View → Print.');
+      }
     }finally{
-      capture.remove();
+      if(capture)capture.remove();
+      pages.forEach(page=>{if(page.parentNode)page.remove();});
+      scQuoteDownloadBusyNov11=false;
     }
   };
   window.downloadDocPDF=downloadDocPDF;
