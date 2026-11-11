@@ -101,7 +101,7 @@
       if(!r||!d)return result;
       if(typeof window.printDispatchReceiptV1127==='function'){
         window.printDispatchReceiptV1127(r,d)
-          .then(info=>toast(`Dispatch ${d.dispatchNo} locked and ${info?.label||'receipt'} printed — 2 copies.`))
+          .then(info=>toast(info?.dialogOpened ? `Dispatch ${d.dispatchNo} locked. Browser print dialog opened for 2 copies; confirm printing there.` : `Dispatch ${d.dispatchNo} locked and ${info?.label||'receipt'} sent — 2 copies.`))
           .catch(e=>{console.error('Dispatch receipt print',e);toast(`Dispatch locked, but receipt print failed: ${e?.message||e}`)});
         return result;
       }

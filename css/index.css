@@ -7590,3 +7590,50 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
     print-color-adjust:exact!important;
   }
 }
+
+/* 2026-11-11: visually map Production Control planner cards to SO columns.
+   Keep production pipeline separate from SO allocations; do not imply their values are equal. */
+.pc-simple-stats-v1142>div.pc-kpi-open-nov11{background:#e7f5ff;border:1px solid #73b9e9;border-left:5px solid #187cb6}
+.pc-simple-stats-v1142>div.pc-kpi-open-nov11 strong{color:#125b91}
+.pc-simple-stats-v1142>div.pc-kpi-assigned-nov11{background:#f2eaff;border:1px solid #b99bed;border-left:5px solid #8554b9}
+.pc-simple-stats-v1142>div.pc-kpi-assigned-nov11 strong{color:#663597}
+.pc-simple-stats-v1142>div.pc-kpi-to-plan-nov11{background:#e7f8ef;border:1px solid #81ce9d;border-left:5px solid #24824f}
+.pc-simple-stats-v1142>div.pc-kpi-to-plan-nov11 strong{color:#14673b}
+.pc-simple-stats-v1142>div.pc-kpi-pipeline-nov11{background:#fff2d8;border:1px solid #f1c276;border-left:5px solid #cb850c}
+.pc-simple-stats-v1142>div.pc-kpi-pipeline-nov11 strong{color:#955800}
+.pc-simple-stats-v1142>div>span{font-size:10px;font-weight:600;opacity:.8;line-height:1.45}
+/* Ubuntu CUPS manual-print panel inside existing Printer Connections UI. */
+#spgsCupsPanelNov11{margin-top:15px;padding:15px;border:1px solid #9edce1;border-radius:14px;background:#f3fbfc;color:#17434c}
+#spgsCupsPanelNov11 .spgs-cups-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:12px 0}
+#spgsCupsPanelNov11 select{max-width:100%;min-width:220px;padding:9px;border:1px solid #aacbd0;border-radius:8px}
+#spgsCupsPanelNov11 .spgs-cups-note{font-size:12px;line-height:1.5;color:#385d67}
+
+/* Matching subtle column signals between planner and SO demand detail. */
+.pc-demand-title+.pc-scroll .pc-table thead th:nth-child(5){background:#e7f5ff;color:#125b91}
+.pc-demand-title+.pc-scroll .pc-table thead th:nth-child(6){background:#f2eaff;color:#663597}
+.pc-demand-title+.pc-scroll .pc-table thead th:nth-child(7){background:#e7f8ef;color:#14673b}
+.pc-demand-title+.pc-scroll .pc-table tbody td:nth-child(5){color:#125b91}
+.pc-demand-title+.pc-scroll .pc-table tbody td:nth-child(6){color:#663597}
+.pc-demand-title+.pc-scroll .pc-table tbody td:nth-child(7){color:#14673b}
+
+
+/* Production Control: color the entire SO line by its current allocation stage. */
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-nov11 td{transition:background-color .18s ease;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-toplan td{background:#e7f8ef!important;color:#14673b!important;border-bottom:1px solid #b8e3c9;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-assigned td{background:#f2eaff!important;color:#663597!important;border-bottom:1px solid #d9c6f6;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-open td{background:#e7f5ff!important;color:#125b91!important;border-bottom:1px solid #c4e2f5;}
+/* Both an existing PR allocation and new production are present: preserve both statuses visibly. */
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-mixed td{background:linear-gradient(90deg,#f2eaff 0%,#f2eaff 48%,#e7f8ef 52%,#e7f8ef 100%)!important;color:#334155!important;border-bottom:1px solid #d2ddd8;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-nov11 td:first-child{border-left:5px solid transparent;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-toplan td:first-child{border-left-color:#24824f;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-assigned td:first-child{border-left-color:#8554b9;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-open td:first-child{border-left-color:#187cb6;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-mixed td:first-child{border-left-color:#8554b9;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-nov11 td b{color:inherit;}
+.pc-demand-title+.pc-scroll .pc-table tbody tr.pc-so-row-nov11 td small{color:inherit;opacity:.75;}
+/* New Document: suspended preview must not show the embedded letterhead/watermark. */
+#paper.paper.sc-device-preview-paused-nov11{background:#fff!important;background-image:none!important;overflow:hidden;}
+#paper.paper.sc-device-preview-paused-nov11::before,#paper.paper.sc-device-preview-paused-nov11::after{content:none!important;display:none!important;}
+#paper .sc-device-preview-notice-nov11{box-sizing:border-box;position:relative;z-index:2;margin:24px;max-width:570px;padding:24px 26px;border:1px solid #b9dedc;border-radius:16px;background:#f4fbfb;color:#19454b;font-size:14px;line-height:1.6;box-shadow:0 5px 20px rgba(0,80,85,.08);}
+#paper .sc-device-preview-notice-nov11 b{font-size:17px;}
+#paper .sc-device-preview-notice-nov11 p{margin:8px 0 18px;}
