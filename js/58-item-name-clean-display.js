@@ -10,20 +10,30 @@
     return v.replace(/ {2,}/g,' ');
   };
   const skip=new Set(['SCRIPT','STYLE','NOSCRIPT','CODE','PRE','TEXTAREA','INPUT','SVG']);
+  const skipSelector='script,style,noscript,code,pre,textarea,input,svg';
+  const hasDirtyToken=val=>!!val&&(/\s\|\s/.test(val)||/mm\s*\//i.test(val)||/\bUP\s*\//i.test(val));
+  function cleanTextNode(node){
+    const cur=node.nodeValue;
+    if(!hasDirtyToken(cur))return;
+    const next=replacement(cur);
+    if(next!==cur)node.nodeValue=next;
+  }
   function clean(root){
     if(!root||root.nodeType===8)return;
     if(root.nodeType===3){
       const parent=root.parentElement;
-      if(parent&&skip.has(parent.tagName))return;
-      if(root.nodeValue&&(/\s\|\s/.test(root.nodeValue)||/mm\s*\//i.test(root.nodeValue)||/\bUP\s*\//i.test(root.nodeValue)))root.nodeValue=replacement(root.nodeValue);
+      if(parent&&(skip.has(parent.tagName)||parent.closest(skipSelector)))return;
+      cleanTextNode(root);
       return;
     }
     if(root.nodeType!==1&&root.nodeType!==9&&root.nodeType!==11)return;
     if(root.nodeType===1&&skip.has(root.tagName))return;
     const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     const list=[];while(walk.nextNode())list.push(walk.currentNode);
-    for(const node of list){const parent=node.parentElement;if(parent&&parent.closest('script,style,noscript,code,pre,textarea,svg'))continue;
-      if(node.nodeValue&&(/\s\|\s/.test(node.nodeValue)||/mm\s*\//i.test(node.nodeValue)||/\bUP\s*\//i.test(node.nodeValue)))node.nodeValue=replacement(node.nodeValue);
+    for(const node of list){
+      const parent=node.parentElement;
+      if(parent&&parent.closest(skipSelector))continue;
+      cleanTextNode(node);
     }
   }
   function start(){

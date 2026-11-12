@@ -329,6 +329,9 @@
     return detached;
   }
 
+  // Reuse exactly the same A4 pages for the lightweight PDF exporter.
+  window.scBuildQuotationPagesV1019 = scBuildQuotationPagesV1019;
+
   function scRenderQuotationV1019(target,doc){
     if(!target)return;
     const pages=scBuildQuotationPagesV1019(doc);

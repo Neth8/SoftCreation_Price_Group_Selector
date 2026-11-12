@@ -7552,3 +7552,7 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .pack-waste-sqm-live-v2026 span{font-weight:800;color:#80551c}
 .pack-waste-sqm-live-v2026 b{display:block;font-size:22px!important;color:#8d5215!important;margin:4px 0}
 .pack-waste-sqm-live-v2026 small{display:block;line-height:1.5;color:#856a3d}
+/* 2026-11-12 saved quote: show full document without repeated synchronous pagination. */
+#viewerPaper.sc-saved-quote-light{height:auto!important;min-height:1123px!important;max-height:none!important;width:794px!important;overflow:visible!important;position:relative!important;background-size:794px 1123px!important;background-position:top center!important;box-shadow:0 8px 28px rgba(20,50,60,.18)!important;}
+#viewerPaper.sc-saved-quote-light>.docbody{position:relative!important;top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;padding:238px 58px 140px!important;box-sizing:border-box!important;overflow:visible!important;}
+#viewerPaper.sc-saved-quote-light>.docfoot{position:absolute!important;left:58px!important;right:58px!important;bottom:98px!important;}

@@ -677,7 +677,6 @@ body.mobile-nav-open .nav-shell {
 /* =====================================================================
    SYSTEM-WIDE TABLES (TOUCH-FRIENDLY & SCROLLABLE)
 ===================================================================== */
-.doctable,
 .factory-table,
 .jbr-table-v1050,
 .jbr-table-v1055,
@@ -696,7 +695,6 @@ body.mobile-nav-open .nav-shell {
   color: var(--sc-text-main) !important;
 }
 
-.doctable th,
 .factory-table th,
 .jbr-table-v1050 th,
 .jbr-table-v1055 th,
@@ -721,7 +719,6 @@ body.mobile-nav-open .nav-shell {
   padding: 10px 14px !important;
 }
 
-.doctable td,
 .factory-table td,
 .jbr-table-v1050 td,
 .jbr-table-v1055 td,
@@ -742,7 +739,6 @@ body.mobile-nav-open .nav-shell {
   transition: background-color 0.15s ease;
 }
 
-.doctable tr:hover td,
 .factory-table tr:hover td,
 .jbr-table-v1050 tr:hover td,
 .finance-table-v1059 tr:hover td,
@@ -1149,23 +1145,13 @@ textarea:focus {
 ===================================================================== */
 .paper {
   background-color: #ffffff !important;
-  color: #111827 !important;
+  color: #19252d !important;
   box-shadow: 0 20px 45px rgba(0, 0, 0, 0.16), 0 5px 15px rgba(0, 0, 0, 0.06) !important;
   border-radius: 4px !important;
 }
 
 [data-theme="dark"] .paper {
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
-}
-
-.paper table,
-.paper th,
-.paper td,
-.paper div,
-.paper span,
-.paper b,
-.paper p {
-  color: #111827 !important;
 }
 
 /* =====================================================================
