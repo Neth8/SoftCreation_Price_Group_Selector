@@ -7637,3 +7637,38 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 #paper .sc-device-preview-notice-nov11{box-sizing:border-box;position:relative;z-index:2;margin:24px;max-width:570px;padding:24px 26px;border:1px solid #b9dedc;border-radius:16px;background:#f4fbfb;color:#19454b;font-size:14px;line-height:1.6;box-shadow:0 5px 20px rgba(0,80,85,.08);}
 #paper .sc-device-preview-notice-nov11 b{font-size:17px;}
 #paper .sc-device-preview-notice-nov11 p{margin:8px 0 18px;}
+
+/* 2026-11-12: preserve actual quotation .paper letterhead when using browser PDF. */
+@media print {
+  #printHost > .sc-native-quotation-print-stack {display:block!important;width:210mm!important;margin:0!important;padding:0!important;}
+  #printHost .sc-native-quote-page {
+    display:block!important;
+    position:relative!important;
+    box-sizing:border-box!important;
+    width:210mm!important;
+    height:297mm!important;
+    min-height:297mm!important;
+    max-height:297mm!important;
+    padding:0!important;
+    margin:0!important;
+    overflow:hidden!important;
+    transform:none!important;
+    box-shadow:none!important;
+    background-size:100% 100%!important;
+    break-after:page;
+    page-break-after:always;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+  #printHost .sc-native-quote-page:last-child{break-after:auto;page-break-after:auto;}
+  #printHost .sc-native-quote-page .docbody{
+    position:absolute!important;top:63mm!important;bottom:32mm!important;
+    left:15.4mm!important;right:15.4mm!important;height:auto!important;
+    overflow:hidden!important;
+  }
+  #printHost .sc-native-quote-page .docfoot{
+    position:absolute!important;left:15.4mm!important;right:15.4mm!important;
+    bottom:26mm!important;
+  }
+  #printHost .sc-native-page-count{font-size:7px;color:#607781;margin-left:8px;white-space:nowrap;}
+}
