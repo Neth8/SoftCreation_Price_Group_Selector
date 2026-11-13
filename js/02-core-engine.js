@@ -958,7 +958,9 @@ async function downloadDocPDF(doc){
     const pdf=new jsPDF({orientation:'p',unit:'mm',format:'a4',compress:true});
     try{pdf.setDisplayMode(1.0,'continuous','UseNone')}catch(e){}
     pdf.addImage(img,'JPEG',0,0,210,297,'previewExact','FAST');
-    pdf.save((doc.serial||'document').replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
+    const custName = String(doc.customer?.name || doc.customer_name || doc.customerName || (typeof doc.customer==='string'?doc.customer:'') || '').trim();
+    const docName = custName ? `${doc.serial||'document'} - ${custName}` : (doc.serial||'document');
+    pdf.save(docName.replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
     toast('PDF generated exactly from preview');
   }catch(err){
     console.error('Preview PDF failed',err);

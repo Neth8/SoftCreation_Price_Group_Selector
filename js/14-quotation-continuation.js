@@ -473,7 +473,9 @@
         await scQuoteYieldNov11();
       }
       await scQuoteYieldNov11();
-      pdf.save((doc.serial||'quotation').replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
+      const custName = String(doc.customer?.name || doc.customer_name || doc.customerName || (typeof doc.customer==='string'?doc.customer:'') || '').trim();
+      const docName = custName ? `${doc.serial||'quotation'} - ${custName}` : (doc.serial||'quotation');
+      pdf.save(docName.replace(/[\\/:*?"<>|]/g,'-')+'.pdf');
       toast(`Quotation PDF generated • ${pages.length} page${pages.length===1?'':'s'}`);
     }catch(err){
       console.error('Saved quotation PDF capture failed',err);

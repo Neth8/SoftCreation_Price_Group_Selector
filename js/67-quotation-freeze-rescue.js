@@ -93,10 +93,13 @@
    if(!win){notify('Allow popups for SPGS to open the quotation PDF page.');return;}
    try{
      const serial=escSafe(doc.serial||'Quotation');
+    const custRaw=String(doc.customer?.name || doc.customer_name || doc.customerName || (typeof doc.customer==='string'?doc.customer:'') || '').trim();
+    const titleName=custRaw?`${doc.serial||'Quotation'} - ${custRaw}`:(doc.serial||'Quotation');
+    const safeTitle=escSafe(titleName);
      const stylesheet=new URL('index.css',document.baseURI).href;
      const base=new URL('.',document.baseURI).href;
      const pages=assemblePages(doc);
-     const html=`<!doctype html><html><head><meta charset="utf-8"><base href="${escSafe(base)}"><title>${serial} — Save as PDF</title><link rel="stylesheet" href="${escSafe(stylesheet)}">
+     const html=`<!doctype html><html><head><meta charset="utf-8"><base href="${escSafe(base)}"><title>${safeTitle}</title><link rel="stylesheet" href="${escSafe(stylesheet)}">
  <style>
  html,body{margin:0!important;background:#d9e5e7!important;overflow:auto!important}
  .sc-pdf-actions{position:sticky;top:0;z-index:9999;display:flex;align-items:center;gap:14px;padding:10px 16px;font:14px Arial;background:#18343b;color:white}
@@ -108,7 +111,7 @@
  .sc-page-stack>.paper>.docfoot{position:absolute!important;left:58px!important;right:58px!important;bottom:101px!important}
  @page{size:A4;margin:0}
  @media print{html,body{width:210mm!important;background:#fff!important;margin:0!important}.sc-pdf-actions{display:none!important}.sc-page-stack{display:block!important;padding:0!important;margin:0!important;width:210mm!important}.sc-page-stack>.paper{width:210mm!important;height:297mm!important;min-height:297mm!important;max-height:297mm!important;margin:0!important;box-shadow:none!important;break-after:page!important;page-break-after:always!important;print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}.sc-page-stack>.paper:last-child{break-after:auto!important;page-break-after:auto!important}.sc-page-stack>.paper>.docbody{top:63mm!important;left:15.4mm!important;right:15.4mm!important;bottom:32mm!important}.sc-page-stack>.paper>.docfoot{left:15.4mm!important;right:15.4mm!important;bottom:26mm!important}}
- </style></head><body><header class="sc-pdf-actions"><strong>${serial}</strong><button type="button" onclick="window.print()">Save PDF / Print</button><small>Choose “Save as PDF” and enable background graphics. No external PDF libraries are needed.</small></header><main class="sc-page-stack">${pages}</main></body></html>`;
+ </style></head><body><header class="sc-pdf-actions"><strong>${safeTitle}</strong><button type="button" onclick="window.print()">Save PDF / Print</button><small>Choose “Save as PDF” and enable background graphics. No external PDF libraries are needed.</small></header><main class="sc-page-stack">${pages}</main></body></html>`;
      win.document.open();win.document.write(html);win.document.close();win.focus();
      notify('A4 quotation opened. Select Save PDF / Print.');
    }catch(e){console.error('Quotation print preparation failed',e);win.document.body.textContent='Could not build quotation: '+e.message;notify('Quotation page error; check console.');}

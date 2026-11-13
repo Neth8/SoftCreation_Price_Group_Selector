@@ -10,7 +10,12 @@
   let busy = false;
   const pause = () => new Promise(resolve => setTimeout(resolve, 20));
   const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const fileName = doc => String(doc.serial||'quotation').replace(/[\\/:*?"<>|]/g,'-')+'.pdf';
+  const docCustName = doc => String(doc?.customer?.name || doc?.customer_name || doc?.customerName || (typeof doc?.customer==='string'?doc.customer:'') || '').trim();
+  const fileName = doc => {
+    const c = docCustName(doc);
+    const base = c ? `${doc.serial||'quotation'} - ${c}` : (doc.serial||'quotation');
+    return base.replace(/[\\/:*?"<>|]/g,'-')+'.pdf';
+  };
   const notify = message => {if(typeof toast==='function')toast(message);};
 
   function loadScriptSafe(url,ready,timeoutMs=8000){
@@ -38,8 +43,9 @@
     const base=new URL('./',document.baseURI).href;
     const css=new URL('css/index.css',document.baseURI).href;
     const logo=new URL('assets/images/paper-bg.png',document.baseURI).href;
-    const title=escapeHtml(doc.serial||'Quotation');
-    const html=`<!doctype html><html><head><meta charset="utf-8"><base href="${escapeHtml(base)}"><title>${title} - Print A4 PDF</title>
+    const cName = docCustName(doc);
+    const title=escapeHtml(cName ? `${doc.serial||'Quotation'} - ${cName}` : (doc.serial||'Quotation'));
+    const html=`<!doctype html><html><head><meta charset="utf-8"><base href="${escapeHtml(base)}"><title>${title}</title>
 <link rel="stylesheet" href="${css}"><style>
   html,body{margin:0!important;padding:0!important;background:#e8eff1!important;overflow:auto!important}
   .sc-pdf-tools{position:sticky;top:0;z-index:50;padding:12px;background:#dff3f3;font:14px Arial,sans-serif;text-align:center}

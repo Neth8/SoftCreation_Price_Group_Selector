@@ -693,7 +693,7 @@ function pcIntelligenceHTML(g){
  const scAvailable=chosen.filter(pcIsSoftcreationOrder).reduce((n,o)=>n+pcNum(o.available),0);
  const totalScAvailable=g.orders.filter(pcIsSoftcreationOrder).reduce((n,o)=>n+pcNum(o.available),0);
 
- const defaultExtra=Math.max(0,selectedRecommended-selectedDemand);
+ const defaultExtra=0;
  const extraVal=pcSavedExtraQty!==null?pcSavedExtraQty:defaultExtra;
  const reasonVal=pcSavedOverrideReason!==null?pcSavedOverrideReason:'';
  pcSavedExtraQty=null;
@@ -731,7 +731,7 @@ window.pcUpdateSimpleQtyV1142=function(){
  const reasonWrap=document.getElementById('pcOverrideWrapV20261109');if(reasonWrap)reasonWrap.style.display=extra>0?'':'none';
  const reason=document.getElementById('pcOverride');if(reason)reason.required=extra>0;
 }
-window.pcSelectItem=function(v){pcPlannerItemKey=decodeURIComponent(v);pcRender()}
+window.pcSelectItem=function(v){pcSavedExtraQty=null;pcSavedOverrideReason=null;pcPlannerItemKey=decodeURIComponent(v);pcRender()}
 window.pcRemoveBasket=function(i){pcBasket.splice(i,1);pcRender()}
 window.pcAddToBasket=function(){
   const g=pcGroup(pcPlannerItemKey);if(!g)return;
@@ -928,6 +928,7 @@ window.pcApproveRequest=async function(id){
     if(unprocessed.length){toast('Approved; '+unprocessed.length+' production release(s) still pending sync. Use Refresh Live Data.');return;}
     try{renderProductionBoard?.()}catch(_){}
     try{renderProductionProducts?.()}catch(_){}
+    pcCloseDetailModalV20261030();
     toast('Approved and production release(s) processed. Check Production / Products.');
   }catch(e){
     console.error(e);
@@ -950,6 +951,7 @@ window.pcConfirmReturn=async function(){
       p_display_name:currentUser?.display||currentUser?.username||''
     });
     closeModal('pcReturnModal');
+    pcCloseDetailModalV20261030();
     await pcRefresh(false);
     toast('Request returned to Sales with reason');
   }catch(e){

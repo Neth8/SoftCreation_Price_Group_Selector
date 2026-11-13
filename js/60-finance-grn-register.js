@@ -199,58 +199,69 @@
     return pages;
   }
 
-  let activeFinancePdfBlobUrl = null;
   function ensureFinancePdfModalV60(){
     if(byId('scFinancePdfModalV60'))return;
     document.body.insertAdjacentHTML('beforeend',`
-      <div id="scFinancePdfModalV60" class="modal">
-        <div class="modal-card" style="max-width:960px;width:95vw;height:90vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
-          <div class="modal-head" style="padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+      <div id="scFinancePdfModalV60" class="modal" role="dialog" aria-modal="true" aria-label="Finance Costing Report Preview">
+        <div class="modal-card" style="max-width:880px;width:95vw;height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.25)">
+          <div class="modal-head" style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
             <div>
-              <b id="scFinancePdfModalTitleV60" style="font-size:15px;color:#0f172a">Finance Costing PDF Preview</b>
-              <div id="scFinancePdfModalMetaV60" class="small" style="color:#64748b"></div>
+              <b id="scFinancePdfModalTitleV60" style="font-size:15px;color:#0f172a">Finance Costing Report</b>
+              <div id="scFinancePdfModalMetaV60" class="small" style="color:#64748b;margin-top:2px"></div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <button id="scFinancePdfDownloadBtnV60" type="button" class="btn green sm">Download</button>
-              <button id="scFinancePdfNewTabBtnV60" type="button" class="btn ghost sm">Open in New Tab</button>
-              <button class="closex" type="button" onclick="closeFinancePdfModalV60()">×</button>
+            <div style="display:flex;gap:10px;align-items:center">
+              <button id="scFinancePdfDownloadBtnV60" type="button" class="btn green sm" style="font-weight:700;display:inline-flex;align-items:center;gap:6px">
+                <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                Download PDF
+              </button>
+              <button class="closex" type="button" onclick="closeFinancePdfModalV60()" title="Close Preview">✕</button>
             </div>
           </div>
-          <div class="modal-body" style="flex:1;padding:0;overflow:hidden;background:#525659">
-            <iframe id="scFinancePdfIframeV60" style="width:100%;height:100%;border:none;" title="Finance Costing PDF Preview"></iframe>
+          <div id="scFinancePdfPagesContainerV60" style="flex:1;padding:24px 16px;overflow-y:auto;background:#eef2f6;display:flex;flex-direction:column;align-items:center;gap:24px">
           </div>
         </div>
       </div>
     `);
-  }
-  function openFinancePdfModalV60(grnNo, blobUrl, filename){
-    ensureFinancePdfModalV60();
-    if(activeFinancePdfBlobUrl && activeFinancePdfBlobUrl !== blobUrl){
-      try{URL.revokeObjectURL(activeFinancePdfBlobUrl)}catch(_){}
+    const modal = byId('scFinancePdfModalV60');
+    if(modal){
+      modal.addEventListener('click', e => {
+        if(e.target === modal) closeFinancePdfModalV60();
+      });
     }
-    activeFinancePdfBlobUrl = blobUrl;
+  }
+  function openFinancePdfModalV60(grnNo, pages, filename, onDownload){
+    ensureFinancePdfModalV60();
     const titleEl = byId('scFinancePdfModalTitleV60');
     if(titleEl) titleEl.textContent = 'Costing Report · ' + String(grnNo);
     const metaEl = byId('scFinancePdfModalMetaV60');
-    if(metaEl) metaEl.textContent = filename;
-    const iframe = byId('scFinancePdfIframeV60');
-    if(iframe) iframe.src = blobUrl;
+    if(metaEl) metaEl.textContent = `${filename} · ${pages.length} page${pages.length===1?'':'s'}`;
+    const container = byId('scFinancePdfPagesContainerV60');
+    if(container){
+      container.innerHTML = '';
+      pages.forEach(p => {
+        const clone = p.cloneNode(true);
+        clone.style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
+        clone.style.margin = '0 auto';
+        clone.style.borderRadius = '4px';
+        clone.style.background = '#fff';
+        clone.style.flexShrink = '0';
+        container.appendChild(clone);
+      });
+      container.scrollTop = 0;
+    }
     const dlBtn = byId('scFinancePdfDownloadBtnV60');
-    if(dlBtn) dlBtn.onclick = () => {
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      a.click();
-    };
-    const tabBtn = byId('scFinancePdfNewTabBtnV60');
-    if(tabBtn) tabBtn.onclick = () => window.open(blobUrl, '_blank');
+    if(dlBtn){
+      dlBtn.onclick = () => {
+        if(typeof onDownload === 'function') onDownload();
+      };
+    }
     byId('scFinancePdfModalV60').classList.add('show');
   }
   window.closeFinancePdfModalV60 = function(){
     const modal = byId('scFinancePdfModalV60');
     if(modal) modal.classList.remove('show');
-    const iframe = byId('scFinancePdfIframeV60');
-    if(iframe) iframe.src = 'about:blank';
+    const container = byId('scFinancePdfPagesContainerV60');
+    if(container) container.innerHTML = '';
   };
 
   window.scFinanceCostingPdfV60=async function(id, mode='download'){
@@ -258,10 +269,20 @@
     const g=grns().find(x=>String(x.id)===String(id));if(!g||!financeReady(g))return toast('GRN not ready for Finance');
     const r=jobFor(g),jbr=await loadJbrFor(r);
     const node=document.createElement('div');node.style='position:fixed;left:-12000px;top:0;z-index:-1';document.body.append(node);
-    toast(mode==='view'?'Preparing PDF preview...':'Generating PDF download...');
     try{
       const report=document.createElement('div');report.innerHTML=htmlReport(g,r,jbr);
       const pages=paginateFinanceReportV60(report.firstElementChild,node);
+      const filename='Finance_'+String(g.grnNo||g.id).replace(/[^a-z0-9_-]/gi,'-')+'.pdf';
+
+      if(mode==='view'){
+        openFinancePdfModalV60(g.grnNo||g.id, pages, filename, () => {
+          scFinanceCostingPdfV60(id, 'download');
+        });
+        toast('Costing report opened in clean view');
+        return;
+      }
+
+      toast('Generating PDF download...');
       const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas);
       const okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);
       if(!okC||!okP)throw Error('PDF libraries unavailable');
@@ -269,17 +290,10 @@
       for(let i=0;i<pages.length;i++){
         const canvas=await html2canvas(pages[i],{scale:1.8,backgroundColor:'#fff'});
         if(i)pdf.addPage();
-        // Each 760x1060px page fits fully in the A4 printable area, without image offsets/cropping.
         pdf.addImage(canvas.toDataURL('image/jpeg',0.93),'JPEG',10,10,190,265);
       }
-      const filename='Finance_'+String(g.grnNo||g.id).replace(/[^a-z0-9_-]/gi,'-')+'.pdf';
-      if(mode==='view'){
-        const blob=pdf.output('blob');
-        const blobUrl=URL.createObjectURL(blob);
-        openFinancePdfModalV60(g.grnNo||g.id, blobUrl, filename);
-      } else {
-        pdf.save(filename);
-      }
+      pdf.save(filename);
+      toast('Costing PDF downloaded: '+filename);
     }catch(e){console.error('Finance PDF',e);toast('Finance PDF error: '+(e.message||e))}finally{node.remove()}
   };
   function replaceStoresButtons(){
