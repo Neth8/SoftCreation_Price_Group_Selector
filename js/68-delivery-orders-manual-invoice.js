@@ -21,10 +21,11 @@
   }
 
   function doCanView(){
-    if (!window.currentUser) return false;
-    if (currentUser.role === 'admin') return true;
+    const u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : (window.currentUser || null);
+    if (!u) return false;
+    if (u.role === 'admin') return true;
     if (typeof hasPerm === 'function') return hasPerm('delivery_orders_view');
-    return true;
+    return false;
   }
 
   function nextDoNumber(){
@@ -36,18 +37,22 @@
 
   // 2. Navigation & View Injection
   function ensureDoUI(){
-    if (byId('deliveryorders')) return;
-
     const nav = document.querySelector('.nav');
-    const settingsBtn = nav?.querySelector('[data-view="settings"]');
-    if (nav && !nav.querySelector('[data-view="deliveryorders"]')) {
-      const btn = document.createElement('button');
+    let btn = nav?.querySelector('[data-view="deliveryorders"]');
+    if (nav && !btn) {
+      btn = document.createElement('button');
       btn.className = 'navbtn';
       btn.dataset.view = 'deliveryorders';
       btn.textContent = 'Delivery Orders';
-      btn.onclick = () => window.showView('deliveryorders');
-      nav.insertBefore(btn, settingsBtn || null);
+      const customersBtn = nav.querySelector('[data-view="customers"]');
+      const settingsBtn = nav.querySelector('[data-view="settings"]');
+      nav.insertBefore(btn, customersBtn || settingsBtn || null);
     }
+    if (btn) {
+      btn.onclick = () => window.showView('deliveryorders');
+    }
+
+    if (byId('deliveryorders')) return;
 
     const section = document.createElement('section');
     section.id = 'deliveryorders';
