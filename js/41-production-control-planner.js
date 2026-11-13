@@ -4,11 +4,10 @@
 'use strict';
 const PC_REST='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1',PC_WORKSPACE='softcreation_main',PC_KEY_STORE='spgs_supabase_browser_key_v1';
 let pcSearchTermNov3='';
-let pcSelectedScOrderKey='';
-let pcScInnerSelections=new Map();
-let pcModalScOrder=null;
-let pcModalCandidateOrders=[];
-let pcModalTempCheckedKeys=new Set();
+let pcSelectedOrderKeys=new Set();
+let pcCurrentGroupKey='';
+let pcSavedExtraQty=null;
+let pcSavedOverrideReason=null;
 let pcView='planner',pcCloud={requests:[],lines:[],allocations:[],messages:[],audit:[],policies:[],releases:[]},pcBasket=[],pcSelectedRequest='',pcReturnTarget='',pcPlannerItemKey='';
 function pcKey(){const k=(localStorage.getItem(PC_KEY_STORE)||'').trim();if(!k)throw new Error('SoftCreation cloud key is not configured on this device.');return k}
 function pcHeaders(extra={}){const k=pcKey(),h={apikey:k,...extra};if(k.startsWith('eyJ'))h.Authorization='Bearer '+k;return h}
@@ -148,34 +147,85 @@ function pcAllocatedToOpenRequests(soid,i){const ids=new Set(pcCloud.lines.filte
 function pcPipelineForItem(k){return (state.productionRequests||[]).filter(r=>pcOpenProdStatuses().has(String(r.status||''))&&pcLineKey(r)===k).reduce((n,r)=>n+pcNum(r.requestQty),0)}
 function pcDemandGroups(){
   const m=new Map();
-  (state.salesOrders||[]).forEach(so=>(so.lines||[]).forEach((l,i)=>{if(l.use===false)return;const k=pcLineKey(l);let g=m.get(k);if(!g){g={key:k,sourceItemId:pcCanonicalMaster(l)?.id||l.itemId||'',desc:l.desc||'Item',size:l.size||'',material:l.material||'',layout:l.layout||'',pcs:pcNum(l.pcs),unit:l.unit||'Rolls',orders:[]};m.set(k,g)}
-    const ordered=pcNum(l.qty),dispatched=Math.min(ordered,pcDispatchedForSOLine(so,i)),cancelled=pcNum(l.cancelledQty),grossOpen=Math.max(0,ordered-dispatched-cancelled),allocated=Math.min(grossOpen,pcAllocatedToOpenRequests(so.id,i)),available=Math.max(0,grossOpen-allocated);
-    if(grossOpen>0)g.orders.push({sourceSoId:so.id,sourceSoNo:so.soNo||so.id,lineIndex:i,customer:so.customerName||'',requiredDate:so.needDate||'',ordered,dispatched,cancelled,grossOpen,allocated,available});
-  }));
-  return [...m.values()].map(g=>{const p=pcPolicy(g.key),movement=pcDeliveredMovementWeeks(g.key),avg=movement.reduce((a,b)=>a+b,0)/4,coverWeeks=Math.max(.25,pcNum(p.cover_weeks)||2),demand=g.orders.reduce((n,o)=>n+o.available,0),cover=Math.ceil(avg*coverWeeks),safety=Math.max(0,pcNum(p.safety_stock_qty)),stock=Math.max(0,pcNum(p.available_stock_qty)),pipeline=Math.max(0,pcPipelineForItem(g.key)),recommended=Math.max(0,Math.ceil(demand+cover+safety-stock-pipeline));return {...g,movement,avg,coverWeeks,demand,cover,safety,stock,pipeline,recommended}}).filter(g=>g.orders.length>0).sort((a,b)=>b.recommended-a.recommended||a.size.localeCompare(b.size,undefined,{numeric:true}))
+  (state.salesOrders||[]).forEach(so=>{
+    if(String(so.status).toLowerCase()==='cancelled')return;
+    (so.lines||[]).forEach((l,i)=>{
+      if(l.use===false)return;
+      const k=pcLineKey(l);
+      let g=m.get(k);
+      if(!g){
+        g={key:k,sourceItemId:pcCanonicalMaster(l)?.id||l.itemId||'',desc:l.desc||'Item',size:l.size||'',material:l.material||'',layout:l.layout||'',pcs:pcNum(l.pcs),unit:l.unit||'Rolls',orders:[]};
+        m.set(k,g);
+      }
+      const ordered=pcNum(l.qty),
+            dispatched=Math.min(ordered,pcDispatchedForSOLine(so,i)),
+            cancelled=pcNum(l.cancelledQty),
+            grossOpen=Math.max(0,ordered-dispatched-cancelled),
+            allocated=Math.min(grossOpen,pcAllocatedToOpenRequests(so.id,i)),
+            available=Math.max(0,grossOpen-allocated);
+      const coveredBySoftCreationSoNo=l.coveredBySoftCreationSoNo||'';
+      const coveredBySoftCreationSoId=l.coveredBySoftCreationSoId||'';
+      const alreadyAddedQty=pcNum(l.alreadyAddedQty);
+
+      if(grossOpen>0 || coveredBySoftCreationSoNo){
+        g.orders.push({
+          sourceSoId:so.id,
+          sourceSoNo:so.soNo||so.id,
+          lineIndex:i,
+          customer:so.customerName||'',
+          requiredDate:so.needDate||'',
+          ordered,
+          dispatched,
+          cancelled,
+          grossOpen,
+          allocated,
+          available,
+          coveredBySoftCreationSoNo,
+          coveredBySoftCreationSoId,
+          alreadyAddedQty
+        });
+      }
+    });
+  });
+  return [...m.values()].map(g=>{
+    const p=pcPolicy(g.key),movement=pcDeliveredMovementWeeks(g.key),avg=movement.reduce((a,b)=>a+b,0)/4,coverWeeks=Math.max(.25,pcNum(p.cover_weeks)||2),demand=g.orders.reduce((n,o)=>n+o.available,0),cover=Math.ceil(avg*coverWeeks),safety=Math.max(0,pcNum(p.safety_stock_qty)),stock=Math.max(0,pcNum(p.available_stock_qty)),pipeline=Math.max(0,pcPipelineForItem(g.key)),recommended=Math.max(0,Math.ceil(demand+cover+safety-stock-pipeline));
+    return {...g,movement,avg,coverWeeks,demand,cover,safety,stock,pipeline,recommended};
+  }).filter(g=>g.orders.length>0).sort((a,b)=>b.recommended-a.recommended||a.size.localeCompare(b.size,undefined,{numeric:true}));
 }
 // Customer matching is exact after case and whitespace normalization; never use a substring.
-function pcIsSoftcreationOrder(o){return pcNorm(o?.customer).replace(/\s*\(\s*/g,' (').replace(/\s*\)\s*/g,')').replace(/\s+/g,' ').trim()==='SOFTCREATION (PVT) LTD'}
+function pcIsSoftcreationOrder(o){
+  const c=pcNorm(o?.customer).replace(/[.,]/g,'').replace(/\s*\(\s*/g,' (').replace(/\s*\)\s*/g,')').replace(/\s+/g,' ').trim();
+  return c==='SOFTCREATION (PVT) LTD'||c==='SOFTCREATION'||c.startsWith('SOFTCREATION');
+}
 function pcOrderSelectionKey(o){return String(o.sourceSoId)+'|'+Number(o.lineIndex)}
+
+function pcSyncSelectedOrderKeys(g){
+  if(!g){
+    pcSelectedOrderKeys.clear();
+    pcCurrentGroupKey='';
+    return;
+  }
+  if(pcCurrentGroupKey!==g.key){
+    pcCurrentGroupKey=g.key;
+    pcSelectedOrderKeys.clear();
+    (g.orders||[]).forEach(o=>{
+      if(o.available>0)pcSelectedOrderKeys.add(pcOrderSelectionKey(o));
+    });
+  }else{
+    const valid=new Set((g.orders||[]).filter(o=>o.available>0).map(pcOrderSelectionKey));
+    for(const k of pcSelectedOrderKeys){
+      if(!valid.has(k))pcSelectedOrderKeys.delete(k);
+    }
+  }
+}
 
 function pcSelectedOrders(g){
   if(!g)return [];
-  const scOrders=(g.orders||[]).filter(pcIsSoftcreationOrder);
-  const activeSc=scOrders.find(o=>pcOrderSelectionKey(o)===pcSelectedScOrderKey);
-  if(!activeSc)return [];
-  const innerKeys=pcScInnerSelections.get(pcOrderSelectionKey(activeSc))||new Set();
-  const innerOrders=(g.orders||[]).filter(o=>!pcIsSoftcreationOrder(o)&&innerKeys.has(pcOrderSelectionKey(o))&&o.available>0);
-  return [activeSc,...innerOrders];
+  return (g.orders||[]).filter(o=>o.available>0&&pcSelectedOrderKeys.has(pcOrderSelectionKey(o)));
 }
 
 function pcSelectedDemand(g){
-  const orders=pcSelectedOrders(g);
-  if(!orders.length)return 0;
-  const scOrder=orders[0];
-  const innerOrders=orders.slice(1);
-  const scQty=pcNum(scOrder?.available);
-  const innerQty=innerOrders.reduce((n,o)=>n+pcNum(o.available),0);
-  return Math.max(scQty,innerQty);
+  return pcSelectedOrders(g).reduce((sum,o)=>sum+pcNum(o.available),0);
 }
 
 function pcSelectedRecommended(g){
@@ -183,200 +233,63 @@ function pcSelectedRecommended(g){
 }
 
 function pcSelectionSummary(g){
-  const orders=pcSelectedOrders(g);
-  if(!orders.length)return 'No SoftCreation order selected · 0 rolls';
-  const scOrder=orders[0];
-  const innerOrders=orders.slice(1);
-  return `${scOrder.sourceSoNo} (SoftCreation) · ${innerOrders.length} customer order(s) inside · ${pcMoney(pcSelectedDemand(g))} rolls`;
+  const chosen=pcSelectedOrders(g);
+  if(!chosen.length)return 'No Sales Orders selected · 0 rolls';
+  const names=chosen.map(o=>o.sourceSoNo).slice(0,3).join(', ');
+  const more=chosen.length>3?` +${chosen.length-3} more`:'';
+  return `${chosen.length} Sales Order line(s) selected · ${pcMoney(pcSelectedDemand(g))} rolls (${names}${more})`;
 }
 
-window.pcToggleScOrder=function(soId,lineIndex,checked){
+window.pcToggleOrderSelection=function(soId,lineIndex,checked){
   const g=pcGroup(pcPlannerItemKey);
   if(!g)return;
   const key=String(soId)+'|'+Number(lineIndex);
   if(checked){
-    pcSelectedScOrderKey=key;
-    pcOpenScOrdersModal(soId,lineIndex);
+    pcSelectedOrderKeys.add(key);
   }else{
-    if(pcSelectedScOrderKey===key){
-      pcSelectedScOrderKey='';
-      pcScInnerSelections.delete(key);
-    }
-    pcRender();
+    pcSelectedOrderKeys.delete(key);
   }
-};
-
-window.pcOpenScOrdersModal=function(soId,lineIndex){
-  const g=pcGroup(pcPlannerItemKey);
-  if(!g)return;
-  const key=String(soId)+'|'+Number(lineIndex);
-  const scOrder=(g.orders||[]).find(o=>pcOrderSelectionKey(o)===key);
-  if(!scOrder)return;
-  pcModalScOrder=scOrder;
-  pcSelectedScOrderKey=key;
-  pcEnsureScOrdersModal();
-
-  pcModalCandidateOrders=(g.orders||[]).filter(o=>!pcIsSoftcreationOrder(o)&&o.available>0);
-  const existing=pcScInnerSelections.get(key);
-  if(existing){
-    pcModalTempCheckedKeys=new Set(existing);
-  }else{
-    pcModalTempCheckedKeys=new Set(pcModalCandidateOrders.map(pcOrderSelectionKey));
-  }
-
-  const titleEl=document.getElementById('pcScModalTitle');
-  if(titleEl)titleEl.textContent=`Select Orders Inside SoftCreation SO (${scOrder.sourceSoNo})`;
-  const subEl=document.getElementById('pcScModalSubtitle');
-  if(subEl)subEl.textContent=`${pcLineLabel(g)} · SoftCreation Order Qty: ${pcMoney(scOrder.available)} rolls`;
-
-  pcRenderModalOrdersList();
-  const modal=document.getElementById('pcScOrdersModal');
-  if(modal)modal.classList.add('show');
-};
-
-function pcEnsureScOrdersModal(){
-  if(document.getElementById('pcScOrdersModal'))return;
-  document.body.insertAdjacentHTML('beforeend',`
-    <div id="pcScOrdersModal" class="modal" role="dialog" aria-modal="true">
-      <div class="modal-card" style="max-width:760px;width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
-        <div class="modal-head" style="padding:14px 20px;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <b id="pcScModalTitle" style="font-size:16px;color:#0f172a">Orders Inside SoftCreation Order</b>
-            <div id="pcScModalSubtitle" class="small" style="color:#64748b"></div>
-          </div>
-          <button class="closex" type="button" onclick="pcCloseScOrdersModal()">×</button>
-        </div>
-        <div class="modal-body" style="flex:1;overflow-y:auto;padding:16px 20px">
-          <div class="notice" style="margin-bottom:14px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534">
-            <b>SoftCreation Order Packaging:</b> Select the customer Sales Orders in this size that are being produced / fulfilled inside this SoftCreation production order.
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-            <span id="pcScModalSelectionCount" style="font-weight:700;font-size:13px;color:#334155"></span>
-            <div style="display:flex;gap:6px">
-              <button type="button" class="btn ghost sm" onclick="pcModalSelectAll(true)">Select all</button>
-              <button type="button" class="btn ghost sm" onclick="pcModalSelectAll(false)">Clear selection</button>
-            </div>
-          </div>
-          <div id="pcScModalOrdersList" class="pc-scroll" style="max-height:300px;border:1px solid #e2e8f0;border-radius:8px"></div>
-          <div id="pcScModalFooterInfo" style="margin-top:14px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;font-size:13px"></div>
-          <div class="actions" style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px">
-            <button type="button" class="btn ghost" onclick="pcCloseScOrdersModal()">Cancel</button>
-            <button type="button" class="btn primary" onclick="pcConfirmScOrdersModal()">OK / Confirm Selection</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `);
-}
-
-function pcRenderModalOrdersList(){
-  const host=document.getElementById('pcScModalOrdersList');
-  if(!host)return;
-  if(!pcModalCandidateOrders.length){
-    host.innerHTML='<div class="empty" style="padding:24px">No other open customer Sales Orders found for this size. SoftCreation order will be requested directly.</div>';
-    const countEl=document.getElementById('pcScModalSelectionCount');
-    if(countEl)countEl.textContent='0 customer orders';
-    const footEl=document.getElementById('pcScModalFooterInfo');
-    if(footEl)footEl.innerHTML=`SoftCreation planned target: <b>${pcMoney(pcModalScOrder?.available)} rolls</b>`;
-    return;
-  }
-
-  const selected=pcModalCandidateOrders.filter(o=>pcModalTempCheckedKeys.has(pcOrderSelectionKey(o)));
-  const sum=selected.reduce((s,o)=>s+pcNum(o.available),0);
-  const scTarget=pcNum(pcModalScOrder?.available);
-
-  const countEl=document.getElementById('pcScModalSelectionCount');
-  if(countEl)countEl.textContent=`${selected.length} of ${pcModalCandidateOrders.length} customer order(s) selected`;
-
-  const footEl=document.getElementById('pcScModalFooterInfo');
-  if(footEl)footEl.innerHTML=`
-    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <span>Customer Orders Demand: <b style="color:#0369a1">${pcMoney(sum)} rolls</b></span>
-      <span>SoftCreation Order Qty: <b style="color:#c2410c">${pcMoney(scTarget)} rolls</b></span>
-      <span>${scTarget>=sum?`Surplus / Extra: <b style="color:#15803d">+${pcMoney(scTarget-sum)} rolls</b>`:`Shortfall: <b style="color:#b91c1c">${pcMoney(sum-scTarget)} rolls more needed</b>`}</span>
-    </div>
-  `;
-
-  host.innerHTML=`<table class="pc-table">
-    <thead>
-      <tr>
-        <th style="width:44px;text-align:center">Select</th>
-        <th>SO / Customer</th>
-        <th>Need Date</th>
-        <th class="num">Ordered</th>
-        <th class="num">Open</th>
-        <th class="num">To Plan</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${pcModalCandidateOrders.map(o=>{
-        const k=pcOrderSelectionKey(o);
-        const checked=pcModalTempCheckedKeys.has(k);
-        return `<tr style="${checked?'background:#f0f9ff;':''}">
-          <td style="text-align:center">
-            <input type="checkbox" ${checked?'checked':''} onchange="pcModalItemToggle('${k}',this.checked)">
-          </td>
-          <td><b>${pcEsc(o.sourceSoNo)}</b><small>${pcEsc(o.customer)}</small></td>
-          <td>${pcEsc(o.requiredDate||'-')}</td>
-          <td class="num">${pcMoney(o.ordered)}</td>
-          <td class="num">${pcMoney(o.grossOpen)}</td>
-          <td class="num"><b>${pcMoney(o.available)}</b></td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>`;
-}
-
-window.pcModalItemToggle=function(key,checked){
-  if(checked)pcModalTempCheckedKeys.add(key);else pcModalTempCheckedKeys.delete(key);
-  pcRenderModalOrdersList();
-};
-
-window.pcModalSelectAll=function(checked){
-  if(checked){
-    pcModalCandidateOrders.forEach(o=>pcModalTempCheckedKeys.add(pcOrderSelectionKey(o)));
-  }else{
-    pcModalTempCheckedKeys.clear();
-  }
-  pcRenderModalOrdersList();
-};
-
-window.pcConfirmScOrdersModal=function(){
-  if(!pcModalScOrder)return;
-  const scKey=pcOrderSelectionKey(pcModalScOrder);
-  pcSelectedScOrderKey=scKey;
-  pcScInnerSelections.set(scKey,new Set(pcModalTempCheckedKeys));
-  pcCloseScOrdersModal();
   pcRender();
-  toast(`Linked ${pcModalTempCheckedKeys.size} customer order(s) inside SoftCreation order`);
 };
 
-window.pcCloseScOrdersModal=function(){
-  const modal=document.getElementById('pcScOrdersModal');
-  if(modal)modal.classList.remove('show');
+window.pcToggleSelectAllOrders=function(checked){
+  const g=pcGroup(pcPlannerItemKey);
+  if(!g)return;
+  if(checked){
+    (g.orders||[]).forEach(o=>{
+      if(o.available>0)pcSelectedOrderKeys.add(pcOrderSelectionKey(o));
+    });
+  }else{
+    pcSelectedOrderKeys.clear();
+  }
+  pcRender();
 };
 
-function pcEnsureCancelDemandModal(){
-  if(document.getElementById('pcCancelDemandModal'))return;
+function pcEnsureAlreadyAddedModal(){
+  if(document.getElementById('pcAlreadyAddedModal'))return;
   document.body.insertAdjacentHTML('beforeend',`
-    <div id="pcCancelDemandModal" class="modal">
+    <div id="pcAlreadyAddedModal" class="modal" role="dialog" aria-modal="true">
       <div class="modal-card" style="max-width:560px">
-        <div class="modal-head">
-          <b>Cancel Production Demand Line</b>
-          <button class="closex" type="button" onclick="pcCloseCancelDemandModal()">×</button>
+        <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center">
+          <b>Mark Demand as Already Added</b>
+          <button class="closex" type="button" onclick="pcCloseAlreadyAddedModal()">×</button>
         </div>
         <div class="modal-body" style="padding:16px 20px">
-          <input type="hidden" id="pcCancelSoId">
-          <input type="hidden" id="pcCancelLineIndex">
-          <div id="pcCancelDemandMeta" class="notice" style="background:#fff1f2;border:1px solid #fecdd3;color:#9f1239"></div>
+          <input type="hidden" id="pcAlreadyAddedSoId">
+          <input type="hidden" id="pcAlreadyAddedLineIndex">
+          <div id="pcAlreadyAddedMeta" class="notice" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;line-height:1.6"></div>
+          <div class="field" style="margin-top:14px">
+            <label><b>Covering SoftCreation Order *</b></label>
+            <select id="pcAlreadyAddedScOrder" style="width:100%"></select>
+            <div class="hint" style="color:#64748b;font-size:11px;margin-top:4px">Select the SoftCreation order that includes this customer requirement to prevent duplicate production.</div>
+          </div>
           <div class="field" style="margin-top:12px">
-            <label><b>Reason for Cancellation * (Mandatory)</b></label>
-            <textarea id="pcCancelDemandReason" placeholder="Enter non-empty reason why this demand line is cancelled..." style="width:100%;height:80px;box-sizing:border-box" required></textarea>
-            <div class="hint" style="color:#64748b;font-size:11px;margin-top:4px">Empty or whitespace-only cancellation reasons are strictly prohibited.</div>
+            <label><b>Remarks / Note</b></label>
+            <textarea id="pcAlreadyAddedReason" placeholder="Optional explanation (e.g. Qty included in SoftCreation batch)..." style="width:100%;height:70px;box-sizing:border-box"></textarea>
           </div>
           <div class="actions" style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px">
-            <button type="button" class="btn ghost" onclick="pcCloseCancelDemandModal()">Keep Demand</button>
-            <button type="button" class="btn red" onclick="pcConfirmCancelDemand()">Confirm Cancellation</button>
+            <button type="button" class="btn ghost" onclick="pcCloseAlreadyAddedModal()">Keep Open Demand</button>
+            <button type="button" class="btn amber" style="background:#d97706;border-color:#b45309;color:#fff" onclick="pcConfirmAlreadyAdded()">Confirm Already Added</button>
           </div>
         </div>
       </div>
@@ -384,8 +297,8 @@ function pcEnsureCancelDemandModal(){
   `);
 }
 
-window.pcOpenCancelDemandModal=function(soId,lineIndex){
-  pcEnsureCancelDemandModal();
+window.pcOpenAlreadyAddedModal=function(soId,lineIndex){
+  pcEnsureAlreadyAddedModal();
   const so=(state.salesOrders||[]).find(s=>String(s.id)===String(soId));
   if(!so)return toast('Sales order not found');
   const l=so.lines?.[lineIndex];
@@ -398,30 +311,53 @@ window.pcOpenCancelDemandModal=function(soId,lineIndex){
   const allocated=Math.min(grossOpen,pcAllocatedToOpenRequests(so.id,lineIndex));
   const available=Math.max(0,grossOpen-allocated);
 
-  if(available<=0)return toast('No open demand remains to cancel on this line.');
+  if(available<=0)return toast('No open demand remains to mark on this line.');
 
-  document.getElementById('pcCancelSoId').value=soId;
-  document.getElementById('pcCancelLineIndex').value=lineIndex;
-  document.getElementById('pcCancelDemandReason').value='';
-  document.getElementById('pcCancelDemandMeta').innerHTML=`
+  const g=pcGroup(pcPlannerItemKey);
+  const scSelect=document.getElementById('pcAlreadyAddedScOrder');
+  if(scSelect && g){
+    const scOrders=(g.orders||[]).filter(o=>pcIsSoftcreationOrder(o) && String(o.sourceSoId)!==String(soId));
+    let options='';
+    if(scOrders.length>0){
+      options=scOrders.map(o=>`<option value="${pcEsc(o.sourceSoId)}|${pcEsc(o.sourceSoNo)}">${pcEsc(o.sourceSoNo)} — SoftCreation (Pvt) Ltd (${pcMoney(o.available)} rolls open / ${pcMoney(o.ordered)} ordered)</option>`).join('');
+      options+=`<option value="NONE">-- Direct Cancellation (Not inside SoftCreation) --</option>`;
+    }else{
+      options=`<option value="NONE">-- Direct Cancellation (No open SoftCreation order found for this item) --</option>`;
+    }
+    scSelect.innerHTML=options;
+  }
+
+  document.getElementById('pcAlreadyAddedSoId').value=soId;
+  document.getElementById('pcAlreadyAddedLineIndex').value=lineIndex;
+  document.getElementById('pcAlreadyAddedReason').value='';
+  document.getElementById('pcAlreadyAddedMeta').innerHTML=`
     <b>Sales Order: ${pcEsc(so.soNo||so.id)}</b> • Customer: <b>${pcEsc(so.customerName||'')}</b><br>
     Item: <b>${pcEsc(l.desc||'Item')} ${pcEsc(l.size||'')} ${pcEsc(l.material||'')}</b><br>
-    Ordered: <b>${pcMoney(ordered)}</b> • Open Demand to Cancel: <b>${pcMoney(available)} ${pcEsc(l.unit||'Rolls')}</b>
+    Ordered: <b>${pcMoney(ordered)}</b> • Open Demand: <b>${pcMoney(available)} ${pcEsc(l.unit||'Rolls')}</b>
   `;
-  document.getElementById('pcCancelDemandModal')?.classList.add('show');
+  document.getElementById('pcAlreadyAddedModal')?.classList.add('show');
 };
 
-window.pcCloseCancelDemandModal=function(){
-  document.getElementById('pcCancelDemandModal')?.classList.remove('show');
+window.pcCloseAlreadyAddedModal=function(){
+  document.getElementById('pcAlreadyAddedModal')?.classList.remove('show');
 };
 
-window.pcConfirmCancelDemand=function(){
-  const soId=document.getElementById('pcCancelSoId')?.value;
-  const lineIndex=Number(document.getElementById('pcCancelLineIndex')?.value);
-  const reason=String(document.getElementById('pcCancelDemandReason')?.value||'').trim();
+window.pcConfirmAlreadyAdded=function(){
+  const soId=document.getElementById('pcAlreadyAddedSoId')?.value;
+  const lineIndex=Number(document.getElementById('pcAlreadyAddedLineIndex')?.value);
+  const scVal=String(document.getElementById('pcAlreadyAddedScOrder')?.value||'');
+  let note=String(document.getElementById('pcAlreadyAddedReason')?.value||'').trim();
 
-  if(!reason){
-    return toast('Cancellation reason is mandatory. Cannot cancel demand without a valid explanation.');
+  const isNone=scVal==='NONE'||!scVal;
+  let scSoId='',scSoNo='';
+  if(!isNone){
+    const parts=scVal.split('|');
+    scSoId=parts[0];
+    scSoNo=parts[1]||parts[0];
+  }else{
+    if(!note){
+      return toast('Please enter a reason for cancellation when not linked to a SoftCreation order.');
+    }
   }
 
   const so=(state.salesOrders||[]).find(s=>String(s.id)===String(soId));
@@ -437,34 +373,97 @@ window.pcConfirmCancelDemand=function(){
   const available=Math.max(0,grossOpen-allocated);
 
   if(available<=0){
-    pcCloseCancelDemandModal();
-    return toast('No open demand available to cancel on this line.');
+    pcCloseAlreadyAddedModal();
+    return toast('No open demand available to mark on this line.');
   }
 
   const now=new Date().toISOString();
   const userName=currentUser?.display||currentUser?.username||'User';
+
+  if(!note && scSoNo){
+    note=`Demand covered under SoftCreation order ${scSoNo} (Already Added)`;
+  }
+
   l.cancelledQty=cancelled+available;
+  if(scSoNo){
+    l.coveredBySoftCreationSoId=scSoId;
+    l.coveredBySoftCreationSoNo=scSoNo;
+    l.alreadyAddedQty=available;
+  }
   l.cancellationHistory=l.cancellationHistory||[];
   l.cancellationHistory.push({
-    reason,
+    reason:note,
+    coveredBySoftCreationSoNo:scSoNo||'',
     cancelledQty:available,
+    user:userName,
+    username:currentUser?.username||'user',
+    at:now
+  });
+
+  so.history=so.history||[];
+  so.history.push({
+    action:scSoNo?'Demand Already Added':'Demand Cancelled',
+    by:userName,
+    at:now,
+    note:`Line ${lineIndex+1} (${l.desc} ${l.size}): ${available} rolls demand ${scSoNo?'covered in '+scSoNo:'cancelled'}. Note: ${note}`
+  });
+
+  pcSelectedOrderKeys.delete(String(soId)+'|'+lineIndex);
+
+  saveState();
+  pcCloseAlreadyAddedModal();
+  pcRender();
+  toast(scSoNo
+    ? `Marked ${so.soNo}: ${available} rolls covered under SoftCreation ${scSoNo}`
+    : `Cancelled demand for ${so.soNo}: ${available} rolls removed from planning.`
+  );
+};
+
+window.pcRevertAlreadyAdded=function(soId,lineIndex){
+  const so=(state.salesOrders||[]).find(s=>String(s.id)===String(soId));
+  if(!so)return toast('Sales order not found');
+  const l=so.lines?.[lineIndex];
+  if(!l)return toast('Order line not found');
+
+  const coveredQty=pcNum(l.alreadyAddedQty||l.cancelledQty);
+  if(coveredQty<=0)return toast('No already added demand to revert.');
+
+  const scSoNo=l.coveredBySoftCreationSoNo||'';
+  l.cancelledQty=Math.max(0,pcNum(l.cancelledQty)-coveredQty);
+  l.alreadyAddedQty=0;
+  l.coveredBySoftCreationSoId='';
+  l.coveredBySoftCreationSoNo='';
+
+  const now=new Date().toISOString();
+  const userName=currentUser?.display||currentUser?.username||'User';
+  l.cancellationHistory=l.cancellationHistory||[];
+  l.cancellationHistory.push({
+    action:'Already Added Reverted',
+    revertedQty:coveredQty,
     user:userName,
     username:currentUser?.username||'user',
     at:now
   });
   so.history=so.history||[];
   so.history.push({
-    action:'Demand Cancelled',
+    action:'Demand Restored',
     by:userName,
     at:now,
-    note:`Line ${lineIndex+1} (${l.desc} ${l.size}): cancelled ${available} rolls demand. Reason: ${reason}`
+    note:`Line ${lineIndex+1}: Reverted Already Added status (restored ${coveredQty} rolls to Production Control)`
   });
 
+  pcSelectedOrderKeys.add(String(soId)+'|'+lineIndex);
+
   saveState();
-  pcCloseCancelDemandModal();
   pcRender();
-  toast(`Cancelled demand for ${so.soNo}: ${available} rolls removed from planning.`);
+  toast(`Restored ${coveredQty} rolls demand for ${so.soNo}`);
 };
+
+// Backwards compatibility aliases
+window.pcOpenCancelDemandModal=window.pcOpenAlreadyAddedModal;
+window.pcCloseCancelDemandModal=window.pcCloseAlreadyAddedModal;
+window.pcConfirmCancelDemand=window.pcConfirmAlreadyAdded;
+window.pcCloseScOrdersModal=function(){};
 function pcGroup(k){return pcDemandGroups().find(x=>x.key===k)||null}
 async function pcLoadCloud(){const q='?select=*&order=created_at.desc';const [requests,lines,allocations,messages,audit,policies,releases]=await Promise.all([
 pcFetch('/spgs_prod_control_requests?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*&order=created_at.desc'),pcFetch('/spgs_prod_control_request_lines'+q),pcFetch('/spgs_prod_control_so_allocations'+q),pcFetch('/spgs_prod_control_messages'+q),pcFetch('/spgs_prod_control_audit'+q),pcFetch('/spgs_prod_control_item_policy?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*'),pcFetch('/spgs_prod_control_releases?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*&order=created_at.asc')]);pcCloud={requests:requests||[],lines:lines||[],allocations:allocations||[],messages:messages||[],audit:audit||[],policies:policies||[],releases:releases||[]}}
@@ -561,6 +560,15 @@ function pcRender(){
   const role=String(currentUser?.role||'').toLowerCase();
   const isManager=role==='manager';
 
+  const extraInput=document.getElementById('pcExtraQty');
+  const overrideInput=document.getElementById('pcOverride');
+  if(extraInput){
+    pcSavedExtraQty=extraInput.value;
+  }
+  if(overrideInput){
+    pcSavedOverrideReason=overrideInput.value;
+  }
+
   const plannerBtn=document.querySelector('[data-pc-view="planner"]');
   if(plannerBtn)plannerBtn.style.display=isManager?'none':'';
 
@@ -607,35 +615,56 @@ function pcPlannerHTML(){
   <div>${g?pcIntelligenceHTML(g):''}<div class="pc-card pc-request-submission-v1143"><div class="pc-card-head"><h3>Submit production request</h3></div><p class="pc-muted">Requests with additional production go to Manager Approval. Sales Order-only requests are eligible for automatic approval by the server.</p><div class="pc-submission-counter-v1143">Prepared items: <b>${pcBasket.length}</b> · Route: <b>${pcBasket.some(x=>pcNum(x.additionalQty)>0)?'Manager approval required':'Automatic approval eligible (server controlled)'}</b></div><div class="field"><label>Required at HO</label><input id="pcDue" type="date" value="${today()}"></div><div class="field"><label>Material arrangement</label><select id="pcMaterial"><option>Factory to arrange material</option><option>HO material issued</option><option>HO material pending issue</option></select></div><div class="field"><label>Request note</label><textarea id="pcRequestReason"></textarea></div><div class="actions"><button class="btn primary" onclick="pcSubmitRequest()" ${!pcHas('production_control_create')||!pcBasket.length?'disabled':''}>Submit Production Request →</button><button class="btn ghost sm" type="button" onclick="pcBasket=[];pcRender()" ${!pcBasket.length?'disabled':''}>Clear prepared items</button></div></div></div></div>`;
 }
 function pcPlannerGroupHTML(g){
-  const scOrders=g.orders.filter(pcIsSoftcreationOrder);
-  const hasScOrder=scOrders.length>0;
-  const selectedSc=scOrders.find(o=>pcOrderSelectionKey(o)===pcSelectedScOrderKey);
-  const innerKeys=selectedSc?(pcScInnerSelections.get(pcOrderSelectionKey(selectedSc))||new Set()):new Set();
-  const innerOrders=g.orders.filter(o=>innerKeys.has(pcOrderSelectionKey(o)));
+  pcSyncSelectedOrderKeys(g);
+  const availOrders=(g.orders||[]).filter(o=>o.available>0);
+  const allChecked=availOrders.length>0&&availOrders.every(o=>pcSelectedOrderKeys.has(pcOrderSelectionKey(o)));
 
   return `<div class="pc-demand-title"><div><b>${pcEsc(pcLineLabel(g))}</b><small>${pcEsc(g.key)}</small></div><span class="pc-pill blue">${pcMoney(g.demand)} rolls open demand</span></div>
-  ${!hasScOrder?`<div class="notice" style="margin:10px 0;background:#fff8ee;border:1px solid #f6cf9c;color:#87470d;"><b>Note:</b> Only SoftCreation orders can be sent from Production Control. No open Sales Order for <b>SoftCreation (Pvt) Ltd</b> was found for this item. Please have Sales create a SoftCreation SO first.</div>`:''}
-  <div class="pc-scroll"><table class="pc-table"><thead><tr><th style="width:70px;text-align:center">Select</th><th>SO / Customer</th><th>Required</th><th class="num">Ordered</th><th class="num">Dispatched</th><th class="num">Open</th><th class="num">Already PR</th><th class="num">To Plan</th><th style="text-align:center">Action</th></tr></thead><tbody>${g.orders.map(o=>{
+  <div class="pc-scroll"><table class="pc-table"><thead><tr>
+    <th style="width:70px;text-align:center">
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-size:12px;margin:0" title="Toggle Select All">
+        <input type="checkbox" id="pcSelectAllTick" ${allChecked?'checked':''} ${availOrders.length===0?'disabled':''} onchange="pcToggleSelectAllOrders(this.checked)"> Select
+      </label>
+    </th>
+    <th>SO / Customer</th>
+    <th>Required</th>
+    <th class="num">Ordered</th>
+    <th class="num">Dispatched</th>
+    <th class="num">Open</th>
+    <th class="num">Already PR</th>
+    <th class="num">To Plan</th>
+    <th style="text-align:center">Action</th>
+  </tr></thead><tbody>${g.orders.map(o=>{
     const open=pcNum(o.grossOpen),assigned=pcNum(o.allocated),toPlan=pcNum(o.available);
     const isSC=pcIsSoftcreationOrder(o);
-    const scKey=pcOrderSelectionKey(o);
-    const isScChecked=isSC&&pcSelectedScOrderKey===scKey;
-    const isInnerSelected=!isSC&&innerKeys.has(scKey);
+    const rowKey=pcOrderSelectionKey(o);
+    const isChecked=toPlan>0&&pcSelectedOrderKeys.has(rowKey);
     const rowState=assigned>0&&toPlan>0?'mixed':assigned>0?'assigned':toPlan>0?'toplan':'open';
 
     let checkCell='';
-    if(isSC){
-      checkCell=`<input type="checkbox" class="pc-sc-tick" aria-label="Select SoftCreation order ${pcEsc(o.sourceSoNo)}" ${isScChecked?'checked':''} ${toPlan<=0?'disabled':''} onchange="pcToggleScOrder(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)},this.checked)">`;
+    if(toPlan>0){
+      checkCell=`<input type="checkbox" class="pc-order-tick pc-sc-tick" aria-label="Select order ${pcEsc(o.sourceSoNo)}" ${isChecked?'checked':''} onchange="pcToggleOrderSelection(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)},this.checked)">`;
+    }else if(o.coveredBySoftCreationSoNo){
+      checkCell=`<span class="tag amber sm" style="font-size:10px;padding:2px 5px">Covered</span>`;
     }else{
-      checkCell=isInnerSelected?`<span class="tag green sm" style="font-size:10px;padding:2px 5px">Inside SC</span>`:`<span style="color:#94a3b8;font-size:12px">—</span>`;
+      checkCell=`<span style="color:#94a3b8;font-size:12px">—</span>`;
     }
 
-    return `<tr class="pc-so-row-nov11 pc-so-row-${rowState} ${isSC?'pc-so-softcreation':''} ${isScChecked||isInnerSelected?'pc-so-selected':''}">
+    let actionCell='';
+    if(toPlan>0){
+      actionCell=`<button type="button" class="btn amber sm" style="font-size:11px;padding:2px 8px;white-space:nowrap;background:#d97706;border-color:#b45309;color:#fff" onclick="pcOpenAlreadyAddedModal(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)})">Already Added</button>`;
+    }else if(o.coveredBySoftCreationSoNo){
+      actionCell=`<div style="display:flex;align-items:center;gap:4px;justify-content:center"><span class="tag amber sm" style="font-size:10px;padding:2px 6px">Already Added in ${pcEsc(o.coveredBySoftCreationSoNo)}</span><button type="button" class="btn ghost sm" style="padding:1px 5px;font-size:10px" onclick="pcRevertAlreadyAdded(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)})" title="Restore demand to planner">Undo</button></div>`;
+    }else{
+      actionCell=`<span style="color:#94a3b8;font-size:11px">—</span>`;
+    }
+
+    return `<tr class="pc-so-row-nov11 pc-so-row-${rowState} ${isSC?'pc-so-softcreation':''} ${isChecked?'pc-so-selected':''}">
       <td style="text-align:center">${checkCell}</td>
       <td>
         <b>${pcEsc(o.sourceSoNo)}</b>
         <small>${pcEsc(o.customer)} ${isSC?'<span class="pc-softcreation-label">Softcreation order</span>':''}</small>
-        ${isSC&&isScChecked?`<div class="small" style="color:#a44913;font-weight:700;margin-top:3px">✓ ${innerOrders.length} customer order(s) selected inside (${pcMoney(innerOrders.reduce((s,x)=>s+x.available,0))} rolls) <button type="button" class="btn ghost sm" style="padding:1px 6px;font-size:11px;margin-left:6px" onclick="pcOpenScOrdersModal(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)})">Edit inside orders</button></div>`:''}
+        ${o.coveredBySoftCreationSoNo?`<div class="small" style="color:#b45309;font-weight:600;margin-top:2px">Covered in SoftCreation order: <b>${pcEsc(o.coveredBySoftCreationSoNo)}</b></div>`:''}
       </td>
       <td>${pcEsc(o.requiredDate||'-')}</td>
       <td class="num">${pcMoney(o.ordered)}</td>
@@ -643,9 +672,7 @@ function pcPlannerGroupHTML(g){
       <td class="num">${pcMoney(o.grossOpen)}</td>
       <td class="num">${pcMoney(o.allocated)}</td>
       <td class="num"><b>${pcMoney(o.available)}</b></td>
-      <td style="text-align:center">
-        ${toPlan>0?`<button type="button" class="btn red sm" style="font-size:11px;padding:2px 8px;white-space:nowrap" onclick="pcOpenCancelDemandModal(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)})">Cancel Demand</button>`:`<span style="color:#94a3b8;font-size:11px">—</span>`}
-      </td>
+      <td style="text-align:center">${actionCell}</td>
     </tr>`;
   }).join('')||'<tr><td colspan="9">No outstanding SO demand. Stock replenishment can still be planned.</td></tr>'}</tbody></table></div>`;
 }
@@ -653,6 +680,14 @@ function pcIntelligenceHTML(g){
  const soOpen=g.orders.reduce((n,o)=>n+o.grossOpen,0);
  const allocated=g.orders.reduce((n,o)=>n+o.allocated,0);
  const selectedDemand=pcSelectedDemand(g),selectedRecommended=pcSelectedRecommended(g),scAvailable=g.orders.filter(pcIsSoftcreationOrder).reduce((n,o)=>n+pcNum(o.available),0);
+ const defaultExtra=Math.max(0,selectedRecommended-selectedDemand);
+ const extraVal=pcSavedExtraQty!==null?pcSavedExtraQty:defaultExtra;
+ const reasonVal=pcSavedOverrideReason!==null?pcSavedOverrideReason:'';
+ pcSavedExtraQty=null;
+ pcSavedOverrideReason=null;
+ const numExtra=Math.max(0,Number(extraVal)||0);
+ const totalQty=selectedDemand+numExtra;
+
  return `<div class="pc-card pc-simple-v1142"><h3>Production quantity planner</h3>
  <p class="pc-muted">See the current Sales Order requirement, then add extra production only if needed.</p>
  ${g.pipeline>0||allocated>0?`<div class="pc-live-production-alert-v20261030" role="alert"><strong>⚠ PRODUCTION ALREADY ASSIGNED / IN PROGRESS</strong><span>${pcMoney(g.pipeline)} rolls in existing production pipeline · ${pcMoney(allocated)} rolls assigned to Sales Orders. Check outstanding demand before requesting more.</span></div>`:''}
@@ -667,10 +702,10 @@ function pcIntelligenceHTML(g){
  ${g.orders.length?`<details class="pc-order-details-v1142"><summary>View ${g.orders.length} current Sales Order line(s)</summary><div>${g.orders.map(o=>`<div><b>${pcEsc(o.sourceSoNo)}</b> • ${pcEsc(o.customer)} <span>Open ${pcMoney(o.grossOpen)} • Already assigned ${pcMoney(o.allocated)} • To plan ${pcMoney(o.available)}</span></div>`).join('')}</div></details>`:''}
  <div class="pc-simple-entry-v1142">
  <div class="field"><label>Sales Order quantity to include (rolls)</label><input id="pcSalesQty" type="number" readonly value="${selectedDemand}"></div>
- <div class="field"><label>Additional production required (rolls)</label><input id="pcExtraQty" type="number" min="0" step="1" value="${Math.max(0,selectedRecommended-selectedDemand)}" oninput="pcUpdateSimpleQtyV1142()"></div>
+ <div class="field"><label>Additional production required (rolls)</label><input id="pcExtraQty" type="number" min="0" step="1" value="${extraVal}" oninput="pcUpdateSimpleQtyV1142()"></div>
  </div>
- <div class="field"><label>Total requested production (rolls)</label><input id="pcQty" type="number" readonly value="${Math.max(selectedDemand,selectedRecommended)}"></div>
- <div class="field" id="pcOverrideWrapV20261109" style="${Math.max(0,selectedRecommended-selectedDemand)>0?'':'display:none'}"><label>Reason for additional production *</label><textarea id="pcOverride" placeholder="Required only when additional production quantity is greater than zero"></textarea></div>
+ <div class="field"><label>Total requested production (rolls)</label><input id="pcQty" type="number" readonly value="${totalQty}"></div>
+ <div class="field" id="pcOverrideWrapV20261109" style="${numExtra>0?'':'display:none'}"><label>Reason for additional production *</label><textarea id="pcOverride" placeholder="Required only when additional production quantity is greater than zero">${pcEsc(reasonVal)}</textarea></div>
  
  <div class="actions"><button class="btn primary" onclick="pcAddToBasket()" ${!pcHas('production_control_create')?'disabled':''}>Add item to request</button></div></div>`
 }
@@ -689,16 +724,9 @@ window.pcAddToBasket=function(){
   if(!Number.isInteger(extra)||extra<0)return toast('Additional production must be zero or a positive whole number.');
   if(!Number.isInteger(qty)||qty<=0)return toast('Enter a positive whole quantity.');
 
-  const scOrders=(g.orders||[]).filter(pcIsSoftcreationOrder);
-  if(!scOrders.length)return toast('Only SoftCreation orders can be sent from Production Control.');
-  if(!pcSelectedScOrderKey)return toast('Please tick the SoftCreation order in the table to select it.');
-
-  const sc=scOrders.find(o=>pcOrderSelectionKey(o)===pcSelectedScOrderKey);
-  if(!sc)return toast('Selected SoftCreation order not found.');
-
   const chosen=pcSelectedOrders(g),chosenDemand=pcSelectedDemand(g);
-  if(!chosen.length)return toast('Select at least one Sales Order line in the table.');
-  if(qty<chosenDemand)return toast('Quantity must cover selected SO demand ('+money(chosenDemand)+' rolls).');
+  if(!chosen.length&&extra<=0)return toast('Select at least one Sales Order with the tick box, or enter additional production quantity.');
+  if(qty<chosenDemand)return toast('Quantity must cover selected SO demand ('+pcMoney(chosenDemand)+' rolls).');
   if(qty!==chosenDemand+extra)return toast('Requested quantity must equal selected SO demand plus additional production.');
   if(extra>0&&!reason)return toast('Enter a reason for additional production quantity.');
   if(pcBasket.some(x=>x.itemKey===g.key))return toast('This item is already in the basket.');
@@ -774,8 +802,8 @@ window.pcSubmitRequest=async function(){
     }
 
     pcBasket=[];
-    pcSelectedScOrderKey='';
-    pcScInnerSelections.clear();
+    pcSelectedOrderKeys.clear();
+    pcCurrentGroupKey='';
     pcView='register';
     pcSelectedRequest=r?.id||'';
     await pcRefresh(false);
