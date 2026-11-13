@@ -14,7 +14,7 @@
     document.querySelector('#settings').insertAdjacentHTML('beforebegin',`
     <section id="purchaseorders" class="view">
       <div class="panel">
-        <div class="panel-title"><span>Purchase Orders — Supplier Procurement</span><div class="actions" style="margin:0"><button class="btn sm" style="background:#fff;color:#087f83" onclick="renderPurchaseOrders()">Refresh</button><button class="btn sm" style="background:#fff;color:#087f83" onclick="openPurchaseOrder()">+ New PO</button></div></div>
+        <div class="panel-title"><span>Purchase Orders — Supplier Procurement</span><div class="actions" style="margin:0"><button class="btn sm" style="background:#fff;color:#087f83" onclick="renderPurchaseOrders()">Refresh</button><button class="btn sm" style="background:#fff;color:#087f83" onclick="openRawMaterialStockLedgerModal()">Stock Ledger</button><button class="btn sm" style="background:#fff;color:#087f83" onclick="openPurchaseOrder()">+ New PO</button></div></div>
         <div class="panel-body">
           <div class="notice" style="margin-bottom:12px">Create supplier purchase orders, issue them to suppliers, and track ordered, received and outstanding quantities. Purchase Order data is stored separately from quotations and production.</div>
           <div id="poKpis" class="po-kpis"></div>
@@ -34,6 +34,7 @@
         <div class="field"><label>Status</label><select id="poStatus"><option>Draft</option><option>Approved</option><option>Sent</option><option>Supplier Confirmed</option><option>Partially Received</option><option>Received</option><option>Cancelled</option></select></div>
         <div class="field"><label>PO Date</label><input id="poDate" type="date"></div>
         <div class="field"><label>Expected Delivery Date</label><input id="poExpectedDate" type="date"></div>
+        <div class="field"><label>Destination Location *</label><select id="poDestinationLocation"><option value="Rathmalana">Rathmalana</option><option value="HO Stores">HO Stores</option><option value="Kurunegala">Kurunegala</option></select></div>
         <div class="section">Supplier</div>
         <div class="field"><label>Supplier Name *</label><input id="poSupplier" list="poSupplierOptions" autocomplete="off" placeholder="Type supplier / company name" oninput="poSupplierInputChanged()" onchange="poSupplierInputChanged(true)"><datalist id="poSupplierOptions"></datalist><div class="hint">Saved suppliers are suggested automatically. Select one to fill contact details.</div></div>
         <div class="field"><label>Contact Person</label><input id="poSupplierContact"></div>
@@ -58,7 +59,8 @@
       <div class="section" style="margin-top:14px">Activity</div><div id="poHistory" class="po-history"></div>
       <div class="actions"><button class="btn primary" onclick="savePurchaseOrder()">Save PO</button><button class="btn navy" onclick="saveAndDownloadPurchaseOrder()">Save & PDF</button><button id="poMarkSentBtn" class="btn amber" onclick="markCurrentPurchaseOrderSent()">Mark Sent</button><button id="poReceiveBtn" class="btn green" onclick="openCurrentPOReceipt()">Receive Goods</button></div>
     </div></div></div>
-    <div id="poReceiptModal" class="modal"><div class="modal-card" style="width:min(900px,95vw)"><div class="modal-head"><b>Receive Goods Against Purchase Order</b><button class="closex" onclick="closeModal('poReceiptModal')">×</button></div><div class="modal-body"><input id="poReceiptId" type="hidden"><div id="poReceiptInfo" class="notice"></div><div id="poReceiptRows" style="margin-top:10px"></div><div class="field" style="margin-top:10px"><label>Receipt / Shipment Note</label><input id="poReceiptNote" placeholder="GRN, shipment, courier or receiving note"></div><div class="actions"><button class="btn green" onclick="savePurchaseOrderReceipt()">Post Receipt</button></div></div></div></div>`);
+    <div id="poReceiptModal" class="modal"><div class="modal-card" style="width:min(900px,95vw)"><div class="modal-head"><b>Receive Goods Against Purchase Order</b><button class="closex" onclick="closeModal('poReceiptModal')">×</button></div><div class="modal-body"><input id="poReceiptId" type="hidden"><div id="poReceiptInfo" class="notice"></div><div id="poReceiptRows" style="margin-top:10px"></div><div class="grid" style="margin-top:10px"><div class="field"><label>Supplier Invoice Number *</label><input id="poSupplierInvoiceNo" placeholder="Mandatory supplier invoice no" required></div><div class="field"><label>Receipt / Shipment Note</label><input id="poReceiptNote" placeholder="GRN, shipment, courier or receiving note"></div></div><div class="actions"><button class="btn green" onclick="savePurchaseOrderReceipt()">Post Receipt</button></div></div></div></div>
+    <div id="rawMaterialStockLedgerModal" class="modal"><div class="modal-card" style="width:min(1150px,96vw)"><div class="modal-head"><b>Multi-Location Raw Material Stock Ledger</b><button class="closex" onclick="closeModal('rawMaterialStockLedgerModal')">×</button></div><div class="modal-body"><div class="listbar" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><select id="rmStockLocationFilter" onchange="renderRawMaterialStockLedger()"><option value="">All Locations</option><option value="Rathmalana">Rathmalana</option><option value="HO Stores">HO Stores</option><option value="Kurunegala">Kurunegala</option></select><select id="rmStockViewMode" onchange="renderRawMaterialStockLedger()"><option value="summary">Location Balances Summary</option><option value="history">Transaction Ledger History</option></select><input id="rmStockSearch" class="search" placeholder="Search material / spec / reference" style="flex:1" oninput="renderRawMaterialStockLedger()"></div><div id="rmStockLedgerContent" style="max-height:65vh;overflow:auto"></div></div></div></div>`);
   }
 
   function poStatusClass(s=''){return String(s).toLowerCase().replace(/\s+/g,'-')}
@@ -106,7 +108,7 @@
     const a=state.purchaseOrders||[],q=($('poSearch')?.value||'').trim().toLowerCase(),sf=$('poStatusFilter')?.value||'',filtered=a.filter(po=>(!sf||po.status===sf)&&(!q||[po.poNo,po.supplier?.name,po.supplierRef,...(po.lines||[]).map(l=>l.description+' '+l.spec)].join(' ').toLowerCase().includes(q))).sort((x,y)=>String(y.updatedAt||y.createdAt||'').localeCompare(String(x.updatedAt||x.createdAt||'')));
     const counts={draft:0,sent:0,partial:0,received:0,cancelled:0};a.forEach(p=>{if(p.status==='Draft'||p.status==='Approved')counts.draft++;if(p.status==='Sent'||p.status==='Supplier Confirmed')counts.sent++;if(p.status==='Partially Received')counts.partial++;if(p.status==='Received')counts.received++;if(p.status==='Cancelled')counts.cancelled++});
     $('poKpis').innerHTML=`<div class="po-kpi"><span>Total POs</span><b>${a.length}</b></div><div class="po-kpi"><span>Draft / Approved</span><b>${counts.draft}</b></div><div class="po-kpi sent"><span>Sent / Confirmed</span><b>${counts.sent}</b></div><div class="po-kpi partial"><span>Partial</span><b>${counts.partial}</b></div><div class="po-kpi received"><span>Received</span><b>${counts.received}</b></div>`;
-    $('poList').innerHTML=filtered.length?`<div style="overflow:auto"><table class="table"><thead><tr><th>PO / Date</th><th>Supplier</th><th>Value</th><th>Receiving</th><th>Status</th><th>Owner</th><th></th></tr></thead><tbody>${filtered.map(po=>{const t=poTotals(po),p=poProgress(po);return `<tr><td><b>${esc(po.poNo||'')}</b><div class="small">${esc(po.date||'')} ${po.expectedDate?'• Expected '+esc(po.expectedDate):''}</div></td><td><b>${esc(po.supplier?.name||'-')}</b><div class="small">${esc(po.supplierRef||po.supplier?.country||'')}</div></td><td><b>${esc(poMoney(t.total,po.currency))}</b><div class="small">${(po.lines||[]).length} item(s)${po.vatMode==='vat18'?` • VAT ${money(Number(state.settings.vat||18))}% incl.`:''}</div></td><td><div class="po-receiving-list">${(po.lines||[]).map(l=>{const ordered=Number(l.qty||0),received=Math.min(ordered,Number(l.receivedQty||0)),balance=Math.max(0,ordered-received),pct=ordered?Math.min(100,received/ordered*100):0;return `<div class="po-receive-mini"><div class="po-receive-mini-head"><b>${esc(l.description||'Item')}</b><span>${money(received)} / ${money(ordered)} ${esc(l.unit||'')}</span></div>${l.spec?`<div class="po-receive-mini-spec">${esc(l.spec)}</div>`:''}<div class="po-progress mini"><span style="width:${pct}%"></span></div><div class="po-receive-mini-balance ${balance>0?'po-balance-bad':'po-balance-ok'}">Balance ${money(balance)} ${esc(l.unit||'')}</div></div>`}).join('')||'<div class="small">No items</div>'}</div><div class="po-receive-total"><b>Total:</b> ${money(p.received)} / ${money(p.ordered)} <span class="${p.balance>0?'po-balance-bad':'po-balance-ok'}">• Balance ${money(p.balance)}</span></div></td><td><span class="po-status ${poStatusClass(po.status)}">${esc(po.status||'Draft')}</span></td><td>${esc(po.createdByDisplay||po.createdBy||'-')}</td><td><div class="actions" style="margin:0"><button class="btn ghost sm" onclick="openPurchaseOrder('${po.id}')">Open</button><button class="btn navy sm" onclick="downloadPurchaseOrderPDF('${po.id}')">PDF</button>${!['Draft','Cancelled','Received'].includes(po.status)?`<button class="btn green sm" onclick="openPurchaseOrderReceipt('${po.id}')">Receive</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">No purchase orders found.</div>'
+    $('poList').innerHTML=filtered.length?`<div style="overflow:auto"><table class="table"><thead><tr><th>PO / Date</th><th>Supplier</th><th>Value</th><th>Receiving</th><th>Status</th><th>Owner</th><th></th></tr></thead><tbody>${filtered.map(po=>{const t=poTotals(po),p=poProgress(po);return `<tr><td><b>${esc(po.poNo||'')}</b><div class="small">${esc(po.date||'')} ${po.expectedDate?'• Expected '+esc(po.expectedDate):''}</div><div class="small"><span class="tag" style="background:#e0f2fe;color:#0369a1;font-weight:700">${esc(po.destinationLocation||'Rathmalana')}</span></div></td><td><b>${esc(po.supplier?.name||'-')}</b><div class="small">${esc(po.supplierRef||po.supplier?.country||'')}</div></td><td><b>${esc(poMoney(t.total,po.currency))}</b><div class="small">${(po.lines||[]).length} item(s)${po.vatMode==='vat18'?` • VAT ${money(Number(state.settings.vat||18))}% incl.`:''}</div></td><td><div class="po-receiving-list">${(po.lines||[]).map(l=>{const ordered=Number(l.qty||0),received=Math.min(ordered,Number(l.receivedQty||0)),balance=Math.max(0,ordered-received),pct=ordered?Math.min(100,received/ordered*100):0;return `<div class="po-receive-mini"><div class="po-receive-mini-head"><b>${esc(l.description||'Item')}</b><span>${money(received)} / ${money(ordered)} ${esc(l.unit||'')}</span></div>${l.spec?`<div class="po-receive-mini-spec">${esc(l.spec)}</div>`:''}<div class="po-progress mini"><span style="width:${pct}%"></span></div><div class="po-receive-mini-balance ${balance>0?'po-balance-bad':'po-balance-ok'}">Balance ${money(balance)} ${esc(l.unit||'')}</div></div>`}).join('')||'<div class="small">No items</div>'}</div><div class="po-receive-total"><b>Total:</b> ${money(p.received)} / ${money(p.ordered)} <span class="${p.balance>0?'po-balance-bad':'po-balance-ok'}">• Balance ${money(p.balance)}</span></div></td><td><span class="po-status ${poStatusClass(po.status)}">${esc(po.status||'Draft')}</span></td><td>${esc(po.createdByDisplay||po.createdBy||'-')}</td><td><div class="actions" style="margin:0"><button class="btn ghost sm" onclick="openPurchaseOrder('${po.id}')">Open</button><button class="btn navy sm" onclick="downloadPurchaseOrderPDF('${po.id}')">PDF</button>${!['Draft','Cancelled','Received'].includes(po.status)?`<button class="btn green sm" onclick="openPurchaseOrderReceipt('${po.id}')">Receive</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">No purchase orders found.</div>'
   };
 
   function poNorm(v=''){return String(v||'').trim().toLowerCase().replace(/\s+/g,' ')}
@@ -159,8 +161,8 @@
   };
 
   window.openPurchaseOrder=function(id=''){
-    if(!requirePerm('purchase_orders_view','use purchase orders'))return;const po=state.purchaseOrders.find(x=>x.id===id)||{id:'',poNo:poNumberNext(),date:today(),expectedDate:'',status:'Draft',currency:'USD',vatMode:'none',supplier:{},lines:[],shippingCharge:0,otherCharge:0,discount:0,history:[]};
-    $('poId').value=po.id||'';$('poNumber').value=po.poNo||poNumberNext();$('poStatus').value=po.status||'Draft';$('poDate').value=po.date||today();$('poExpectedDate').value=po.expectedDate||'';$('poSupplier').value=po.supplier?.name||'';$('poSupplierContact').value=po.supplier?.contact||'';$('poSupplierPhone').value=po.supplier?.phone||'';$('poSupplierEmail').value=po.supplier?.email||'';$('poSupplierCountry').value=po.supplier?.country||'';$('poSupplierAddress').value=po.supplier?.address||'';$('poCurrency').value=po.currency||'USD';$('poVatMode').value=po.vatMode||'none';$('poPaymentTerms').value=po.paymentTerms||'';$('poShippingMethod').value=po.shippingMethod||'';$('poSupplierRef').value=po.supplierRef||'';$('poShippingCharge').value=po.shippingCharge||'';$('poOtherCharge').value=po.otherCharge||'';$('poDiscount').value=po.discount||'';$('poNotes').value=po.notes||'';$('poLineRows').innerHTML='';(po.lines?.length?po.lines:[{}]).forEach(l=>{addPurchaseOrderLine(l);const tr=$('poLineRows').lastElementChild;if(tr)tr.dataset.lineId=l.id||uid('pol')});$('poHistory').innerHTML=poHistoryHtml(po);$('poModalTitle').textContent=po.id?`Purchase Order — ${po.poNo}`:'New Supplier Purchase Order';$('poMarkSentBtn').style.display=po.id&&!['Sent','Supplier Confirmed','Partially Received','Received','Cancelled'].includes(po.status)?'inline-block':'none';$('poReceiveBtn').style.display=po.id&&!['Draft','Cancelled','Received'].includes(po.status)?'inline-block':'none';refreshPOAutoCompleteLists();renderPOEditorTotals();$('purchaseOrderModal').classList.add('show')
+    if(!requirePerm('purchase_orders_view','use purchase orders'))return;const po=state.purchaseOrders.find(x=>x.id===id)||{id:'',poNo:poNumberNext(),date:today(),expectedDate:'',destinationLocation:'Rathmalana',status:'Draft',currency:'USD',vatMode:'none',supplier:{},lines:[],shippingCharge:0,otherCharge:0,discount:0,history:[]};
+    $('poId').value=po.id||'';$('poNumber').value=po.poNo||poNumberNext();$('poStatus').value=po.status||'Draft';$('poDate').value=po.date||today();$('poExpectedDate').value=po.expectedDate||'';if($('poDestinationLocation'))$('poDestinationLocation').value=po.destinationLocation||'Rathmalana';$('poSupplier').value=po.supplier?.name||'';$('poSupplierContact').value=po.supplier?.contact||'';$('poSupplierPhone').value=po.supplier?.phone||'';$('poSupplierEmail').value=po.supplier?.email||'';$('poSupplierCountry').value=po.supplier?.country||'';$('poSupplierAddress').value=po.supplier?.address||'';$('poCurrency').value=po.currency||'USD';$('poVatMode').value=po.vatMode||'none';$('poPaymentTerms').value=po.paymentTerms||'';$('poShippingMethod').value=po.shippingMethod||'';$('poSupplierRef').value=po.supplierRef||'';$('poShippingCharge').value=po.shippingCharge||'';$('poOtherCharge').value=po.otherCharge||'';$('poDiscount').value=po.discount||'';$('poNotes').value=po.notes||'';$('poLineRows').innerHTML='';(po.lines?.length?po.lines:[{}]).forEach(l=>{addPurchaseOrderLine(l);const tr=$('poLineRows').lastElementChild;if(tr)tr.dataset.lineId=l.id||uid('pol')});$('poHistory').innerHTML=poHistoryHtml(po);$('poModalTitle').textContent=po.id?`Purchase Order — ${po.poNo}`:'New Supplier Purchase Order';$('poMarkSentBtn').style.display=po.id&&!['Sent','Supplier Confirmed','Partially Received','Received','Cancelled'].includes(po.status)?'inline-block':'none';$('poReceiveBtn').style.display=po.id&&!['Draft','Cancelled','Received'].includes(po.status)?'inline-block':'none';refreshPOAutoCompleteLists();renderPOEditorTotals();$('purchaseOrderModal').classList.add('show')
   };
 
   window.savePurchaseOrder=function(keepOpen=false){
@@ -169,28 +171,51 @@
     if(!$('poSupplier').value.trim())return toast('Supplier name is required');
     if(!lines.length||lines.some(l=>!l.description||!(l.qty>0)))return toast('Add at least one item with description and ordered quantity');
     if(!poAdminPasswordOK(`save ${old.poNo||$('poNumber').value||'this Purchase Order'}`))return null;
-    const now=new Date().toISOString(),selected=$('poStatus').value,po={...old,id,poNo:$('poNumber').value||poNumberNext(),date:$('poDate').value||today(),expectedDate:$('poExpectedDate').value||'',supplier:{name:$('poSupplier').value.trim(),contact:$('poSupplierContact').value.trim(),phone:$('poSupplierPhone').value.trim(),email:$('poSupplierEmail').value.trim(),country:$('poSupplierCountry').value.trim(),address:$('poSupplierAddress').value.trim()},currency:$('poCurrency').value,vatMode:$('poVatMode').value||'none',paymentTerms:$('poPaymentTerms').value.trim(),shippingMethod:$('poShippingMethod').value.trim(),supplierRef:$('poSupplierRef').value.trim(),lines,shippingCharge:Number($('poShippingCharge').value||0),otherCharge:Number($('poOtherCharge').value||0),discount:Number($('poDiscount').value||0),notes:$('poNotes').value.trim(),createdAt:old.createdAt||now,createdBy:old.createdBy||currentUser?.username||'',createdByDisplay:old.createdByDisplay||currentUser?.display||currentUser?.username||'',updatedAt:now,updatedBy:currentUser?.username||'',history:Array.isArray(old.history)?[...old.history]:[]};po.status=poDerivedStatus(po,selected);if(!old.id)po.history.push({status:'Draft',note:'Purchase order created',by:currentUser?.display||currentUser?.username||'',at:now});else if(old.status!==po.status)po.history.push({status:po.status,note:`Status changed from ${old.status||'Draft'} to ${po.status}`,by:currentUser?.display||currentUser?.username||'',at:now});const i=state.purchaseOrders.findIndex(x=>x.id===id);if(i>=0)state.purchaseOrders[i]=po;else state.purchaseOrders.unshift(po);audit('SAVE_PURCHASE_ORDER',`${po.poNo} ${po.supplier.name} ${po.status}`);saveState();refreshPOAutoCompleteLists();renderPurchaseOrders();if(keepOpen){$('poId').value=id;$('poHistory').innerHTML=poHistoryHtml(po)}else closeModal('purchaseOrderModal');toast(`Purchase Order ${po.poNo} saved`);return po
+    const now=new Date().toISOString(),selected=$('poStatus').value,po={...old,id,poNo:$('poNumber').value||poNumberNext(),date:$('poDate').value||today(),expectedDate:$('poExpectedDate').value||'',destinationLocation:$('poDestinationLocation')?.value||'Rathmalana',supplier:{name:$('poSupplier').value.trim(),contact:$('poSupplierContact').value.trim(),phone:$('poSupplierPhone').value.trim(),email:$('poSupplierEmail').value.trim(),country:$('poSupplierCountry').value.trim(),address:$('poSupplierAddress').value.trim()},currency:$('poCurrency').value,vatMode:$('poVatMode').value||'none',paymentTerms:$('poPaymentTerms').value.trim(),shippingMethod:$('poShippingMethod').value.trim(),supplierRef:$('poSupplierRef').value.trim(),lines,shippingCharge:Number($('poShippingCharge').value||0),otherCharge:Number($('poOtherCharge').value||0),discount:Number($('poDiscount').value||0),notes:$('poNotes').value.trim(),createdAt:old.createdAt||now,createdBy:old.createdBy||currentUser?.username||'',createdByDisplay:old.createdByDisplay||currentUser?.display||currentUser?.username||'',updatedAt:now,updatedBy:currentUser?.username||'',history:Array.isArray(old.history)?[...old.history]:[]};po.status=poDerivedStatus(po,selected);if(!old.id)po.history.push({status:'Draft',note:'Purchase order created',by:currentUser?.display||currentUser?.username||'',at:now});else if(old.status!==po.status)po.history.push({status:po.status,note:`Status changed from ${old.status||'Draft'} to ${po.status}`,by:currentUser?.display||currentUser?.username||'',at:now});const i=state.purchaseOrders.findIndex(x=>x.id===id);if(i>=0)state.purchaseOrders[i]=po;else state.purchaseOrders.unshift(po);audit('SAVE_PURCHASE_ORDER',`${po.poNo} ${po.supplier.name} ${po.status}`);saveState();refreshPOAutoCompleteLists();renderPurchaseOrders();if(keepOpen){$('poId').value=id;$('poHistory').innerHTML=poHistoryHtml(po)}else closeModal('purchaseOrderModal');toast(`Purchase Order ${po.poNo} saved`);return po
   };
   window.markCurrentPurchaseOrderSent=function(){const po=savePurchaseOrder(true);if(po)markPurchaseOrderSent(po.id)};
   window.markPurchaseOrderSent=function(id){const po=state.purchaseOrders.find(x=>x.id===id);if(!po)return;po.status='Sent';po.updatedAt=new Date().toISOString();po.updatedBy=currentUser?.username||'';po.history=po.history||[];po.history.push({status:'Sent',note:'Purchase order marked as sent to supplier',by:currentUser?.display||currentUser?.username||'',at:po.updatedAt});saveState();renderPurchaseOrders();openPurchaseOrder(id);toast('PO marked as Sent')};
   window.openCurrentPOReceipt=function(){const id=$('poId').value;if(id)openPurchaseOrderReceipt(id)};
-  window.openPurchaseOrderReceipt=function(id){const po=state.purchaseOrders.find(x=>x.id===id);if(!po)return;$('poReceiptId').value=id;$('poReceiptInfo').innerHTML=`<b>${esc(po.poNo)}</b> • ${esc(po.supplier?.name||'')} • ${esc(po.status||'')}`;$('poReceiptRows').innerHTML=(po.lines||[]).map((l,i)=>{const bal=Math.max(0,Number(l.qty||0)-Number(l.receivedQty||0));return `<div class="po-receive-row" data-index="${i}"><div><b>${esc(l.description)}</b><div class="small">${esc(l.spec||'')} • ${esc(l.unit||'')}</div></div><div><span class="small">Ordered</span><br><b>${money(l.qty)}</b></div><div><span class="small">Received</span><br><b>${money(l.receivedQty||0)}</b></div><div><span class="small">Balance</span><br><b>${money(bal)}</b></div><div><label class="small">Receive now</label><input class="po-receive-now" type="number" min="0" max="${bal}" step="0.01" value="0" ${bal<=0?'disabled':''}></div></div>`}).join('');$('poReceiptNote').value='';$('poReceiptModal').classList.add('show')};
+  window.openPurchaseOrderReceipt=function(id){const po=state.purchaseOrders.find(x=>x.id===id);if(!po)return;$('poReceiptId').value=id;$('poReceiptInfo').innerHTML=`<b>${esc(po.poNo)}</b> • ${esc(po.supplier?.name||'')} • Destination: <b>${esc(po.destinationLocation||'Rathmalana')}</b> • ${esc(po.status||'')}`;$('poReceiptRows').innerHTML=(po.lines||[]).map((l,i)=>{const bal=Math.max(0,Number(l.qty||0)-Number(l.receivedQty||0));return `<div class="po-receive-row" data-index="${i}"><div><b>${esc(l.description)}</b><div class="small">${esc(l.spec||'')} • ${esc(l.unit||'')}</div></div><div><span class="small">Ordered</span><br><b>${money(l.qty)}</b></div><div><span class="small">Received</span><br><b>${money(l.receivedQty||0)}</b></div><div><span class="small">Balance</span><br><b>${money(bal)}</b></div><div><label class="small">Receive now</label><input class="po-receive-now" type="number" min="0" max="${bal}" step="0.01" value="0" ${bal<=0?'disabled':''}></div></div>`}).join('');$('poReceiptNote').value='';if($('poSupplierInvoiceNo'))$('poSupplierInvoiceNo').value='';$('poReceiptModal').classList.add('show')};
   window.savePurchaseOrderReceipt=function(){
     const id=$('poReceiptId').value,po=state.purchaseOrders.find(x=>x.id===id);if(!po)return;
+    const invoiceNo=($('poSupplierInvoiceNo')?.value||'').trim();
+    if(!invoiceNo)return toast('Supplier Invoice Number is mandatory for receiving goods.');
     let total=0;const receivedParts=[];
+    state.rawMaterialStockLedger=state.rawMaterialStockLedger||[];
+    const receiptNote=$('poReceiptNote').value.trim();
     document.querySelectorAll('#poReceiptRows .po-receive-row').forEach(row=>{
       const i=Number(row.dataset.index),l=po.lines[i],bal=Math.max(0,Number(l.qty||0)-Number(l.receivedQty||0)),n=Math.max(0,Math.min(bal,Number(row.querySelector('.po-receive-now').value||0)));
       if(n>0){
         l.receivedQty=Number(l.receivedQty||0)+n;
         total+=n;
-        receivedParts.push(`${l.description||'Item'}: ${money(n)} ${l.unit||'Units'}`)
+        receivedParts.push(`${l.description||'Item'}: ${money(n)} ${l.unit||'Units'}`);
+        state.rawMaterialStockLedger.push({
+          id:uid('rm_stock'),
+          type:'IN',
+          date:today(),
+          sourceType:'PO_RECEIPT',
+          sourceId:po.id,
+          sourceNo:po.poNo,
+          supplierInvoiceNo:invoiceNo,
+          supplierName:po.supplier?.name||'',
+          location:po.destinationLocation||'Rathmalana',
+          item:l.description,
+          spec:l.spec||'',
+          unit:l.unit||'Units',
+          qty:n,
+          unitPrice:Number(l.unitPrice||0),
+          createdBy:currentUser?.display||currentUser?.username||'',
+          createdAt:new Date().toISOString(),
+          note:receiptNote
+        });
       }
     });
     if(!(total>0))return toast('Enter a received quantity');
     po.status=poDerivedStatus(po,po.status);po.updatedAt=new Date().toISOString();po.updatedBy=currentUser?.username||'';po.history=po.history||[];
-    const receiptNote=$('poReceiptNote').value.trim();
-    po.history.push({status:po.status,note:`Received ${receivedParts.join(' • ')}${receiptNote?' • '+receiptNote:''}`,by:currentUser?.display||currentUser?.username||'',at:po.updatedAt});
-    audit('RECEIVE_PURCHASE_ORDER',`${po.poNo} ${receivedParts.join(' | ')}`);saveState();closeModal('poReceiptModal');renderPurchaseOrders();if($('purchaseOrderModal').classList.contains('show'))openPurchaseOrder(id);toast(`Receipt posted — ${po.status}`)
+    po.history.push({status:po.status,note:`Received (Inv: ${invoiceNo}) ${receivedParts.join(' • ')}${receiptNote?' • '+receiptNote:''}`,by:currentUser?.display||currentUser?.username||'',at:po.updatedAt});
+    audit('RECEIVE_PURCHASE_ORDER',`${po.poNo} Inv:${invoiceNo} ${receivedParts.join(' | ')}`);saveState();closeModal('poReceiptModal');renderPurchaseOrders();if($('purchaseOrderModal').classList.contains('show'))openPurchaseOrder(id);toast(`Receipt posted — ${po.status}`);
+    if($('rawMaterialStockLedgerModal')?.classList.contains('show'))renderRawMaterialStockLedger();
   };
 
   function buildPurchaseOrderPDFHTML(po){
@@ -203,6 +228,7 @@
       ?`<div class="commercial-summary po-commercial-summary"><div class="sumtitle">Commercial Summary</div><div class="sumrow"><span>Items Subtotal (VAT Incl.)</span><b>${esc(poMoney(t.subtotal,currency))}</b></div>${t.shipping?`<div class="sumrow"><span>Shipping / Freight</span><b>${esc(poMoney(t.shipping,currency))}</b></div>`:''}${t.other?`<div class="sumrow"><span>Other Charges</span><b>${esc(poMoney(t.other,currency))}</b></div>`:''}${t.discount?`<div class="sumrow"><span>Discount</span><b>- ${esc(poMoney(t.discount,currency))}</b></div>`:''}<div class="sumrow"><span>Subtotal / Net (Excl. VAT)</span><b>${esc(poMoney(t.net,currency))}</b></div><div class="sumrow"><span>VAT ${money(vatRate)}%</span><b>${esc(poMoney(t.vat,currency))}</b></div><div class="sumrow grand"><span>TOTAL (Incl. VAT)</span><b>${esc(poMoney(t.total,currency))}</b></div></div>`
       :`<div class="commercial-summary po-commercial-summary"><div class="sumtitle">Commercial Summary</div><div class="sumrow"><span>Subtotal</span><b>${esc(poMoney(t.subtotal,currency))}</b></div>${t.shipping?`<div class="sumrow"><span>Shipping / Freight</span><b>${esc(poMoney(t.shipping,currency))}</b></div>`:''}${t.other?`<div class="sumrow"><span>Other Charges</span><b>${esc(poMoney(t.other,currency))}</b></div>`:''}${t.discount?`<div class="sumrow"><span>Discount</span><b>- ${esc(poMoney(t.discount,currency))}</b></div>`:''}<div class="sumrow grand"><span>TOTAL PURCHASE ORDER VALUE</span><b>${esc(poMoney(t.total,currency))}</b></div></div>`;
     const terms=[
+      ['Destination / Store Location',po.destinationLocation||'Rathmalana'],
       ['Payment Terms',po.paymentTerms||'As mutually agreed with the supplier.'],
       ['Shipping Method',po.shippingMethod||'As mutually agreed with the supplier.'],
       ['Expected Delivery',po.expectedDate||'As agreed with the supplier.'],
@@ -225,6 +251,117 @@
     }finally{host.remove()}
   };
   window.saveAndDownloadPurchaseOrder=async function(){const po=savePurchaseOrder(true);if(po)await downloadPurchaseOrderPDF(po.id)};
+
+  window.openRawMaterialStockLedgerModal=function(){
+    if(!$('rawMaterialStockLedgerModal'))return;
+    $('rawMaterialStockLedgerModal').classList.add('show');
+    renderRawMaterialStockLedger();
+  };
+
+  window.renderRawMaterialStockLedger=function(){
+    const host=$('rmStockLedgerContent');if(!host)return;
+    const ledger=Array.isArray(state.rawMaterialStockLedger)?state.rawMaterialStockLedger:[];
+    const locFilter=($('rmStockLocationFilter')?.value||'').trim();
+    const mode=($('rmStockViewMode')?.value||'summary').trim();
+    const q=($('rmStockSearch')?.value||'').trim().toLowerCase();
+
+    const filtered=ledger.filter(entry=>{
+      if(locFilter && entry.location !== locFilter) return false;
+      if(q && !([entry.item, entry.spec, entry.sourceNo, entry.supplierInvoiceNo, entry.supplierName, entry.jobNo, entry.note].filter(Boolean).join(' ').toLowerCase().includes(q))) return false;
+      return true;
+    });
+
+    if(mode==='summary'){
+      const map=new Map();
+      filtered.forEach(e=>{
+        const loc=e.location||'Rathmalana';
+        const item=e.item||'Raw Material';
+        const spec=e.spec||'-';
+        const unit=e.unit||'Units';
+        const key=`${loc}___${item}___${spec}___${unit}`;
+        if(!map.has(key)){
+          map.set(key, {location:loc, item, spec, unit, inQty:0, outQty:0});
+        }
+        const row=map.get(key);
+        const qty=Number(e.qty||0);
+        if(e.type==='IN') row.inQty+=qty;
+        else if(e.type==='OUT') row.outQty+=qty;
+      });
+
+      const rows=[...map.values()].map(r=>({
+        ...r,
+        balance: r.inQty - r.outQty
+      })).sort((a,b)=>a.location.localeCompare(b.location) || a.item.localeCompare(b.item));
+
+      if(!rows.length){
+        host.innerHTML='<div class="empty">No stock records found for the selected criteria.</div>';
+        return;
+      }
+
+      host.innerHTML=`
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Store Location</th>
+              <th>Raw Material Item</th>
+              <th>Specification</th>
+              <th style="text-align:right">Total Received (IN)</th>
+              <th style="text-align:right">Total Dispatched (OUT)</th>
+              <th style="text-align:right">Current Stock Balance</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r=>`
+              <tr>
+                <td><span class="tag" style="background:#e0f2fe;color:#0369a1;font-weight:700">${esc(r.location)}</span></td>
+                <td><b>${esc(r.item)}</b></td>
+                <td>${esc(r.spec)}</td>
+                <td style="text-align:right;color:#087247;font-weight:700">+${money(r.inQty)}</td>
+                <td style="text-align:right;color:#b91c1c;font-weight:700">-${money(r.outQty)}</td>
+                <td style="text-align:right;font-size:14px;font-weight:900;color:${r.balance<0?'#dc2626':'#087f83'}">${money(r.balance)}</td>
+                <td><b>${esc(r.unit)}</b></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    }else{
+      const sorted=[...filtered].sort((a,b)=>String(b.createdAt||b.date||'').localeCompare(String(a.createdAt||a.date||'')));
+      if(!sorted.length){
+        host.innerHTML='<div class="empty">No transaction records found.</div>';
+        return;
+      }
+      host.innerHTML=`
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Movement</th>
+              <th>Store Location</th>
+              <th>Material / Spec</th>
+              <th style="text-align:right">Quantity</th>
+              <th>Reference / Document</th>
+              <th>Details / Note</th>
+              <th>Recorded By</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(e=>`
+              <tr>
+                <td>${esc(e.date||'')}</td>
+                <td><span class="tag" style="background:${e.type==='IN'?'#dcfce7;color:#166534':'#fee2e2;color:#991b1b'};font-weight:800">${esc(e.type==='IN'?'IN (Receipt)':'OUT (Dispatch)')}</span></td>
+                <td><span class="tag" style="background:#e0f2fe;color:#0369a1;font-weight:700">${esc(e.location||'Rathmalana')}</span></td>
+                <td><b>${esc(e.item||'')}</b><div class="small">${esc(e.spec||'')}</div></td>
+                <td style="text-align:right;font-weight:800;color:${e.type==='IN'?'#166534':'#991b1b'}">${e.type==='IN'?'+':'-'}${money(e.qty)} ${esc(e.unit||'')}</td>
+                <td><b>${esc(e.sourceNo||'-')}</b>${e.supplierInvoiceNo?`<div class="small"><b>Inv:</b> ${esc(e.supplierInvoiceNo)}</div>`:''}${e.jobNo?`<div class="small"><b>Job:</b> ${esc(e.jobNo)}</div>`:''}</td>
+                <td class="small">${esc([e.supplierName, e.piSerial, e.note].filter(Boolean).join(' • ')||'-')}</td>
+                <td class="small">${esc(e.createdBy||'-')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    }
+  };
 
   const showPOBase=showView;showView=function(id){const r=showPOBase(id);if(id==='purchaseorders')renderPurchaseOrders();return r};
   const refreshPOBase=refreshAll;refreshAll=function(){refreshPOBase();if($('purchaseorders'))renderPurchaseOrders()};

@@ -59,10 +59,18 @@
           cols[0].innerHTML=`<b>${esc(p.dispatchNo||'')}</b><div class="small">Shared batch · ${group.length} production orders</div><div class="small">${esc(group.map(x=>x.r.orderNo||'').join(', '))}</div>`;
           cols[1].innerHTML=`<b>${esc(lead.r.size||'')} · ${esc(lead.r.material||'')}</b><div class="small">One physical dispatch across source jobs</div>`;
           cols[2].innerHTML=`<b>${money(total)} Rolls</b><div class="small">${(p.sharedBatchBoxes||p.boxes||[]).length} physical cartons • ${money(p.sharedBatchLoose??0)} loose<br>${esc(p.date||'')} • ${esc(p.carrier||'')}</div>`;
-          cols[3].innerHTML=g?`<b>${esc(g.grnNo)}</b><div class="${Math.abs(Number(g.variance||0))<eps?'grn-ok':'grn-bad'}">Received ${money(g.receivedQty)} • Variance ${money(g.variance)}</div><div class="small">${esc(g.varianceStatus||'')}</div>`:'<span class="tag amber">Awaiting Stores Count</span>';
+          cols[3].innerHTML=g?`<b>${esc(g.grnNo)}</b><div class="${Math.abs(Number(g.variance||0))<eps?'grn-ok':'grn-bad'}">Received ${money(g.receivedQty)} • Variance ${money(g.variance)}</div><div class="small">${esc(g.varianceStatus||'')}</div>${g.approvalStatus==='Rejected'?`<div class="small" style="color:#dc2626;font-weight:700">Reason: ${esc(g.rejectedReason||'')}</div>`:''}`:'<span class="tag amber">Awaiting Stores Count</span>';
           cols[4].innerHTML=`<button class="btn ghost sm" onclick="downloadDispatchPDFV81('${esc(p.id)}')">Dispatch PDF</button> `+
             (!consistent?'<span class="tag amber">Source allocations mismatch — review before receiving</span>':
             !g?`<button class="btn primary sm" onclick="openReceiveDispatchV81('${esc(p.id)}')">Receive / Count</button>`:
+            g.approvalStatus==='Pending Manager Approval'?(
+              (currentUser?.role==='admin'||currentUser?.role==='manager')?
+                `<button class="btn green sm" onclick="window.managerApproveGRNV64('${esc(g.id)}')">Approve Variance</button> <button class="btn red sm" onclick="window.managerRejectGRNV64('${esc(g.id)}')">Reject Count</button>`:
+                `<span class="tag amber">Pending Manager Approval</span>`
+            ):
+            g.approvalStatus==='Rejected'?(
+              `<button class="btn primary sm" onclick="window.reopenReceiveDispatchV64('${esc(g.id)}')">Correct Count</button>`
+            ):
             g.variance&&!g.factoryReason&&(currentUser?.role==='admin'||hasPerm('production_manage'))?`<button class="btn red sm" onclick="saveFactoryVarianceV81('${esc(g.id)}')">Factory Reason</button>`:
             g.variance&&!g.factoryReason?'<span class="tag amber">Reason pending</span>':'<span class="tag" style="background:#dcf8ec;color:#08734c;font-weight:800">Transferred to Finance</span>');
         }
@@ -107,7 +115,8 @@
         const modal=$('receiveModal'),key=modal?.dataset.sharedDispatchGroup;
         if(!key)return baseSave.apply(this,arguments);
         const group=sharedEntries().get(key);if(!group)return toast('Shared dispatch group no longer exists.');
-        if(recordedGRN(key))return toast('This dispatch has already been received. Duplicate GRN blocked.');
+        const existingGRN=recordedGRN(key);
+        if(existingGRN&&existingGRN.approvalStatus!=='Rejected')return toast('This dispatch has already been received. Duplicate GRN blocked.');
         if(typeof currentUserPasswordOKV82==='function'&&!currentUserPasswordOKV82('save the stores receiving count / GRN'))return;
         const lead=primary(group),d=lead.d,r=lead.r;
         const loaded=sharedTotal(group),sum=group.reduce((n,e)=>n+Number(e.d.qty||0),0);
@@ -115,25 +124,141 @@
         if(!Number.isFinite(received)||received<0)return toast('Enter a valid physical Stores count.');
         if(Math.abs(loaded-sum)>eps)return toast('Shared source-job allocation mismatch. GRN not created.');
         if(Math.abs(variance)>eps&&!reason)return toast('Variance reason is required for a differing Stores count.');
-        const g={id:uid('grn'),grnNo:nextGRNV8(),dispatchId:d.id,dispatchNo:d.dispatchNo,requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,item:`${r.size} / ${r.material} / ${r.layout} / ${r.pcs} pcs`,unit:'Rolls',boxes:d.sharedBatchBoxes||d.boxes,dispatchedQty:loaded,receivedQty:received,variance,storesReason:reason,factoryReason:'',varianceStatus:Math.abs(variance)<eps?'Matched':'Factory Explanation Pending',date:$('receivedDate').value||today(),countedBy:$('countedBy').value.trim(),receivedFrom:$('receivedFrom').value.trim(),createdBy:currentUser.display,createdByUser:currentUser.username,createdAt:new Date().toISOString(),sharedBatchDispatchId:key,sharedBatchJobs:group.map(x=>({requestId:x.r.id,orderNo:x.r.orderNo,dispatchedQty:x.d.qty,dispatchId:x.d.id}))};
-        state.grns.unshift(g);
+        const isMatch=Math.abs(variance)<eps;
+        const approvalStatus=isMatch?'Approved':'Pending Manager Approval';
+        const varianceStatus=isMatch?'Matched':'Pending Manager Approval';
+
+        let g=existingGRN;
+        if(g&&g.approvalStatus==='Rejected'){
+          g.receivedQty=received;
+          g.variance=variance;
+          g.storesReason=reason;
+          g.varianceStatus=varianceStatus;
+          g.approvalStatus=approvalStatus;
+          delete g.rejectedReason;
+          delete g.rejectedBy;
+          delete g.rejectedAt;
+          g.recountedBy=currentUser.display;
+          g.recountedAt=new Date().toISOString();
+        }else{
+          g={id:uid('grn'),grnNo:nextGRNV8(),dispatchId:d.id,dispatchNo:d.dispatchNo,requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,item:`${r.size} / ${r.material} / ${r.layout} / ${r.pcs} pcs`,unit:'Rolls',boxes:d.sharedBatchBoxes||d.boxes,dispatchedQty:loaded,receivedQty:received,variance,storesReason:reason,factoryReason:'',varianceStatus,approvalStatus,date:$('receivedDate').value||today(),countedBy:$('countedBy').value.trim(),receivedFrom:$('receivedFrom').value.trim(),createdBy:currentUser.display,createdByUser:currentUser.username,createdAt:new Date().toISOString(),sharedBatchDispatchId:key,sharedBatchJobs:group.map(x=>({requestId:x.r.id,orderNo:x.r.orderNo,dispatchedQty:x.d.qty,dispatchId:x.d.id}))};
+          state.grns.unshift(g);
+        }
+
         for(const e of group){
           const j=e.r;
-          // Preserve finished balance when a job has other, undispatched rolls.
-          if(productionAvailableV81(j)<eps)j.status='Received';
+          if(isMatch&&productionAvailableV81(j)<eps)j.status='Received';
           j.grnId=g.id;
           j.history=j.history||[];
-          j.history.push({status:'Received',note:`Shared GRN ${g.grnNo}; ${d.dispatchNo}; allocated ${e.d.qty} rolls`,by:currentUser.display,at:g.createdAt});
-          notifyV8(j.ownerUser,'Stores Count Completed',`${g.grnNo} shared batch: ${money(received)} physically received across ${group.length} jobs.`,j.id);
+          j.history.push({status:isMatch?'Received':'Stores Count Submitted',note:`Shared GRN ${g.grnNo}; ${d.dispatchNo}; allocated ${e.d.qty} rolls; status: ${approvalStatus}`,by:currentUser.display,at:g.createdAt});
+          notifyV8(j.ownerUser,isMatch?'Stores Count Completed':'GRN Variance Pending Manager Approval',`${g.grnNo} shared batch: ${money(received)} physically received across ${group.length} jobs.${isMatch?'':' Pending manager approval.'}`,j.id);
         }
-        if(Math.abs(variance)>eps)notifyV8(d.byUser,'Factory Variance Explanation Required',`${g.grnNo}: ${money(variance)} rolls variance`,r.id);
-        audit('CREATE_SHARED_DISPATCH_GRN',`${g.grnNo} ${d.dispatchNo} loaded ${loaded} received ${received}`);
+        if(!isMatch)notifyV8('admin','GRN Variance Pending Manager Approval',`${g.grnNo}: ${money(variance)} rolls variance requires manager approval.`,r.id);
+        audit('CREATE_SHARED_DISPATCH_GRN',`${g.grnNo} ${d.dispatchNo} loaded ${loaded} received ${received} status ${approvalStatus}`);
         saveState();closeModal('receiveModal');delete modal.dataset.sharedDispatchGroup;delete modal.dataset.dispatchId;
         renderStoresQueueV8();renderProductionBoard();
-        toast('One Stores GRN saved for the shared physical dispatch.');
+        toast(isMatch?'One Stores GRN saved for the shared physical dispatch.':'Stores GRN saved. Flagged as Pending Manager Approval.');
       };
       try{saveGRNV8=window.saveGRNV8}catch(_){}
     }
+
+    window.managerApproveGRNV64=function(grnId){
+      const g=(state.grns||[]).find(x=>x.id===grnId);
+      if(!g)return;
+      if(!(currentUser?.role==='admin'||currentUser?.role==='manager'||hasPerm('production_manage'))){
+        return toast('Only managers or admins can approve GRN variance.');
+      }
+      if(!confirm(`Approve count variance of ${money(g.variance)} rolls for ${g.grnNo}? This will finalize and transfer the GRN to Finance.`))return;
+      g.approvalStatus='Approved';
+      g.approvedBy=currentUser.display||currentUser.username;
+      g.approvedAt=new Date().toISOString();
+      g.varianceStatus='Manager Approved';
+
+      if(g.sharedBatchJobs&&Array.isArray(g.sharedBatchJobs)){
+        g.sharedBatchJobs.forEach(sj=>{
+          const j=(state.productionRequests||[]).find(r=>r.id===sj.requestId);
+          if(j){
+            if(typeof productionAvailableV81!=='function'||productionAvailableV81(j)<eps)j.status='Received';
+            j.history=j.history||[];
+            j.history.push({status:'Received',note:`GRN ${g.grnNo} variance approved by ${currentUser.display}`,by:currentUser.display,at:g.approvedAt});
+          }
+        });
+      }else if(g.requestId){
+        const r=(state.productionRequests||[]).find(x=>x.id===g.requestId);
+        if(r){
+          if(typeof productionAvailableV81!=='function'||productionAvailableV81(r)<eps)r.status='Received';
+          r.history=r.history||[];
+          r.history.push({status:'Received',note:`GRN ${g.grnNo} variance approved by ${currentUser.display}`,by:currentUser.display,at:g.approvedAt});
+        }
+      }
+
+      notifyV8(g.createdByUser,'GRN Variance Approved',`GRN ${g.grnNo} variance was approved by ${currentUser.display}. Transferred to Finance.`,g.requestId);
+      audit('APPROVE_GRN_VARIANCE',`${g.grnNo} by ${currentUser.display}`);
+      saveState();
+      renderStoresQueueV8();
+      renderProductionBoard();
+      if(typeof renderFinanceGRNRegister==='function')renderFinanceGRNRegister();
+      toast('GRN variance approved and transferred to Finance.');
+    };
+
+    window.managerRejectGRNV64=function(grnId){
+      const g=(state.grns||[]).find(x=>x.id===grnId);
+      if(!g)return;
+      if(!(currentUser?.role==='admin'||currentUser?.role==='manager'||hasPerm('production_manage'))){
+        return toast('Only managers or admins can reject GRN count.');
+      }
+      const reason=prompt(`Enter rejection reason for ${g.grnNo} count (mandatory):`);
+      if(reason===null)return;
+      if(!reason.trim())return toast('Rejection reason is mandatory.');
+
+      g.approvalStatus='Rejected';
+      g.rejectedReason=reason.trim();
+      g.rejectedBy=currentUser.display||currentUser.username;
+      g.rejectedAt=new Date().toISOString();
+      g.varianceStatus='Rejected by Manager';
+
+      if(g.sharedBatchJobs&&Array.isArray(g.sharedBatchJobs)){
+        g.sharedBatchJobs.forEach(sj=>{
+          const j=(state.productionRequests||[]).find(r=>r.id===sj.requestId);
+          if(j){
+            j.history=j.history||[];
+            j.history.push({status:'Count Rejected',note:`GRN ${g.grnNo} count rejected by manager: ${reason.trim()}`,by:currentUser.display,at:g.rejectedAt});
+          }
+        });
+      }else if(g.requestId){
+        const r=(state.productionRequests||[]).find(x=>x.id===g.requestId);
+        if(r){
+          r.history=r.history||[];
+          r.history.push({status:'Count Rejected',note:`GRN ${g.grnNo} count rejected by manager: ${reason.trim()}`,by:currentUser.display,at:g.rejectedAt});
+        }
+      }
+
+      notifyV8(g.createdByUser,'GRN Count Rejected',`GRN ${g.grnNo} count rejected: ${reason.trim()}. Recount and correction required.`,g.requestId);
+      audit('REJECT_GRN_COUNT',`${g.grnNo} by ${currentUser.display} reason: ${reason.trim()}`);
+      saveState();
+      renderStoresQueueV8();
+      renderProductionBoard();
+      toast('GRN count rejected. Stores user can now recount and correct.');
+    };
+
+    window.reopenReceiveDispatchV64=function(grnId){
+      const g=(state.grns||[]).find(x=>x.id===grnId);
+      if(!g)return;
+      if(g.sharedBatchDispatchId){
+        const targetId=g.dispatchId||(g.sharedBatchJobs?.[0]?.dispatchId);
+        if(typeof openReceiveDispatchV81==='function')openReceiveDispatchV81(targetId);
+      }else if(g.dispatchId){
+        if(typeof openReceiveDispatchV81==='function')openReceiveDispatchV81(g.dispatchId);
+      }else if(g.requestId){
+        if(typeof openReceiveV8==='function')openReceiveV8(g.requestId);
+      }
+      if($('receivedQty'))$('receivedQty').value=g.receivedQty||0;
+      if($('varianceReason'))$('varianceReason').value=g.storesReason||g.reason||'';
+      if(typeof updateVarianceV81==='function')updateVarianceV81();
+      toast('Recount and correct your figures, then save to resubmit.');
+    };
+    window.reopenReceiveV8=window.reopenReceiveDispatchV64;
+
     try{renderStoresQueueV8()}catch(e){console.warn('Shared Stores initial render',e)}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();

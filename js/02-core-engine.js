@@ -2787,7 +2787,7 @@ function renderStoresQueueV8(){if(!$('storesQueue'))return;const a=(state.produc
 function openReceiveV8(id){const r=state.productionRequests.find(x=>x.id===id);if(!r?.dispatch)return;$('receiveReqId').value=id;$('receivedQty').value=r.dispatch.qty;$('receivedDate').value=today();$('countedBy').value=currentUser?.display||'';$('receivedFrom').value=r.dispatch.carrier||'';$('varianceReason').value='';$('receiveMeta').innerHTML=`<b>${esc(r.orderNo)}</b> • ${esc(r.customerName)} • Factory dispatched ${money(r.dispatch.qty)} ${esc(r.unit)}`;updateVarianceV8();$('receiveModal').classList.add('show')}
 function updateVarianceV8(){const r=state.productionRequests.find(x=>x.id===$('receiveReqId').value);if(!r)return;const rec=Number($('receivedQty').value||0),v=rec-Number(r.dispatch.qty||0);$('varianceResult').innerHTML=v===0?`<span class="grn-ok">COUNT MATCHED — NO VARIANCE</span>`:`<span class="grn-bad">${v<0?'SHORTAGE':'EXCESS'}: ${money(Math.abs(v))} ${esc(r.unit)}</span>`}
 function nextGRNV8(){state.counters.grn=Number(state.counters.grn||0)+1;return `SC/GRN/${today().replaceAll('-','')}/${String(state.counters.grn).padStart(3,'0')}`}
-function saveGRNV8(){const r=state.productionRequests.find(x=>x.id===$('receiveReqId').value);if(!r)return;const receivedQty=Number($('receivedQty').value||0),variance=receivedQty-Number(r.dispatch.qty||0),reason=$('varianceReason').value.trim();if(variance!==0&&!reason)return toast('Variance reason is mandatory when the count differs');const g={id:uid('grn'),grnNo:nextGRNV8(),requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,item:`${r.size} / ${r.material} / ${r.layout} / ${r.pcs} pcs`,unit:r.unit,dispatchedQty:Number(r.dispatch.qty||0),receivedQty,variance,reason,date:$('receivedDate').value||today(),countedBy:$('countedBy').value.trim(),receivedFrom:$('receivedFrom').value.trim(),createdBy:currentUser.display,createdByUser:currentUser.username,createdAt:new Date().toISOString()};state.grns.unshift(g);r.status='Received';r.grnId=g.id;r.history.push({status:'Received',note:`GRN ${g.grnNo}; received ${receivedQty}; variance ${variance}`,by:currentUser.display,at:new Date().toISOString()});notifyV8(r.ownerUser,'Stores GRN Completed',`${g.grnNo}: received ${money(receivedQty)} ${r.unit}; variance ${money(variance)}.`,r.id);audit('CREATE_GRN',`${g.grnNo} ${r.orderNo} variance ${variance}`);saveState();closeModal('receiveModal');renderStoresQueueV8();renderProductionBoard();toast('GRN saved for finance')}
+function saveGRNV8(){const r=state.productionRequests.find(x=>x.id===$('receiveReqId').value);if(!r)return;const receivedQty=Number($('receivedQty').value||0),variance=receivedQty-Number(r.dispatch?.qty||0),reason=$('varianceReason').value.trim();if(variance!==0&&!reason)return toast('Variance reason is mandatory when the count differs');const isMatch=Math.abs(variance)<1e-6;const approvalStatus=isMatch?'Approved':'Pending Manager Approval';const varianceStatus=isMatch?'Matched':'Pending Manager Approval';let g=state.grns.find(x=>x.requestId===r.id);if(g&&g.approvalStatus==='Rejected'){g.receivedQty=receivedQty;g.variance=variance;g.reason=reason;g.varianceStatus=varianceStatus;g.approvalStatus=approvalStatus;delete g.rejectedReason;delete g.rejectedBy;delete g.rejectedAt;g.recountedBy=currentUser.display;g.recountedAt=new Date().toISOString();}else{g={id:uid('grn'),grnNo:nextGRNV8(),requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,item:`${r.size} / ${r.material} / ${r.layout} / ${r.pcs} pcs`,unit:r.unit,dispatchedQty:Number(r.dispatch?.qty||0),receivedQty,variance,reason,approvalStatus,varianceStatus,date:$('receivedDate').value||today(),countedBy:$('countedBy').value.trim(),receivedFrom:$('receivedFrom').value.trim(),createdBy:currentUser.display,createdByUser:currentUser.username,createdAt:new Date().toISOString()};state.grns.unshift(g);}if(isMatch)r.status='Received';r.grnId=g.id;r.history.push({status:isMatch?'Received':'Stores Count Submitted',note:`GRN ${g.grnNo}; received ${receivedQty}; variance ${variance}; status: ${approvalStatus}`,by:currentUser.display,at:new Date().toISOString()});notifyV8(r.ownerUser,isMatch?'Stores GRN Completed':'GRN Variance Pending Manager Approval',`${g.grnNo}: received ${money(receivedQty)} ${r.unit}; variance ${money(variance)}.${isMatch?'':' Pending manager approval.'}`,r.id);if(!isMatch)notifyV8('admin','GRN Variance Pending Approval',`${g.grnNo} for ${r.orderNo} variance ${money(variance)} requires manager approval.`,r.id);audit('CREATE_GRN',`${g.grnNo} ${r.orderNo} variance ${variance} status ${approvalStatus}`);saveState();closeModal('receiveModal');renderStoresQueueV8();renderProductionBoard();toast(isMatch?'GRN saved for finance':'GRN saved. Flagged as Pending Manager Approval')}
 async function downloadGRNV8(id){const g=state.grns.find(x=>x.id===id);if(!g)return;const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas),okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);if(!okC||!okP)return toast('PDF libraries unavailable');const h=document.createElement('div');h.className='paper';h.style='position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;padding:180px 55px 90px;box-sizing:border-box;background-size:100% 100%;color:#172f36';h.innerHTML=`<div style="border-left:7px solid #078f92;padding-left:14px"><h1 style="margin:0;color:#078f92">GOODS RECEIVED NOTE</h1><b>${esc(g.grnNo)}</b></div><table class="table" style="margin-top:24px"><tr><th>Production Request</th><td>${esc(g.orderNo)}</td><th>PI</th><td>${esc(g.piSerial)}</td></tr><tr><th>Customer</th><td colspan="3">${esc(g.customerName)}</td></tr><tr><th>Item</th><td colspan="3">${esc(g.item)}</td></tr><tr><th>Dispatched</th><td>${money(g.dispatchedQty)} ${esc(g.unit)}</td><th>Received</th><td>${money(g.receivedQty)} ${esc(g.unit)}</td></tr><tr><th>Variance</th><td style="color:${g.variance?'#bd2525':'#087247'};font-weight:900">${money(g.variance)}</td><th>Date</th><td>${esc(g.date)}</td></tr><tr><th>Variance Reason</th><td colspan="3">${esc(g.reason||'No variance')}</td></tr><tr><th>Counted By</th><td>${esc(g.countedBy)}</td><th>Received From</th><td>${esc(g.receivedFrom)}</td></tr></table><div style="margin-top:35px;padding:14px;background:#eef8f8;border-radius:12px"><b>Finance Control</b><br>This GRN is linked to ${esc(g.piSerial)} and ${esc(g.orderNo)}. Verify supplier/factory movement and quantity variance before posting.</div>`;document.body.appendChild(h);try{const c=await html2canvas(h,{scale:2,backgroundColor:'#fff',useCORS:true}),{jsPDF}=window.jspdf,p=new jsPDF({unit:'mm',format:'a4'});p.addImage(c.toDataURL('image/png'),'PNG',0,0,210,297);p.save(`${g.grnNo.replaceAll('/','-')}.pdf`);const r=state.productionRequests.find(x=>x.id===g.requestId);if(r){r.status='GRN Closed';r.history.push({status:'GRN Closed',note:g.grnNo,by:currentUser.display,at:new Date().toISOString()})}audit('DOWNLOAD_GRN_PDF',g.grnNo);saveState()}finally{h.remove()}renderStoresQueueV8();renderProductionBoard()}
 function productionConversionRowsV8(q){
   return (q.lines||[]).map((l,i)=>`
@@ -2866,8 +2866,9 @@ function autoSalesOrderFromConvertedPIV116(pi,q,plans,deliveryMethod){
     sourcePISerial:pi.serial,
     sourceQuoteId:q.id,
     sourceQuoteSerial:q.serial||'',
-    method:'Deliver all to dealer',
-    shipTo:{
+    method:pi.deliveryAddressType==='custom'?'Direct delivery to nominated address':'Deliver all to dealer',
+    deliveryAddress:pi.deliveryAddress||pi.shipTo?.address||customer?.delivery||customer?.address||q.customer?.delivery||q.customer?.address||'',
+    shipTo:pi.shipTo||{
       name:customer?.name||q.customer?.name||'',
       phone:customer?.phone||q.customer?.phone||'',
       address:customer?.delivery||customer?.address||q.customer?.delivery||q.customer?.address||'',
@@ -2924,6 +2925,8 @@ function autoSalesOrderFromConvertedPIV116(pi,q,plans,deliveryMethod){
       needDate:l.needDate||''
     })),
     consignments:[],
+    deliveryAddress:so.deliveryAddress||so.shipTo?.address||'',
+    shipTo:so.shipTo,
     createdAt:now,
     createdBy:currentUser?.display||'',
     erpSONo:''
@@ -2950,6 +2953,20 @@ function installProductionConversionV8(){
     window.scQuoteConversionSourceV1118=
       JSON.parse(JSON.stringify(d));
 
+    const convCust=(state.customers||[]).find(x=>x.id===d.customerId);
+    const defAddr=d.customer?.delivery||d.customer?.address||convCust?.delivery||convCust?.address||'';
+    const defName=d.customer?.name||convCust?.name||'';
+    const defPhone=d.customer?.phone||convCust?.phone||'';
+    const defMap=d.customer?.map||convCust?.map||'';
+
+    window.toggleConvDeliveryAddressV1118=function(){
+      const isCustom=document.getElementById('convDeliveryAddrType')?.value==='custom';
+      const defBlock=document.getElementById('convDefaultAddrBlock');
+      const custBlock=document.getElementById('convCustomAddrBlock');
+      if(defBlock)defBlock.style.display=isCustom?'none':'';
+      if(custBlock)custBlock.style.display=isCustom?'':'none';
+    };
+
     $('convertItems').innerHTML=`
       <div class="notice">
         <b>PI + Sales Order:</b>
@@ -2958,16 +2975,54 @@ function installProductionConversionV8(){
         <b>No production request is created from this screen.</b>
       </div>
 
-      <div class="pi-so-delivery-method">
-        <label for="convDeliveryMethod">Delivery Method</label>
-        <select id="convDeliveryMethod">
-          <option value="">-- Select Delivery Method --</option>
-          <option value="COD">COD</option>
-          <option value="Courier">Courier</option>
-          <option value="Pickup">Pickup</option>
-          <option value="Delivery">Delivery</option>
-          <option value="WhatsApp PO">WhatsApp PO</option>
-        </select>
+      <div class="pi-so-delivery-wrap" style="margin:12px 0;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+          <div class="field">
+            <label for="convDeliveryMethod"><b>Delivery Method *</b></label>
+            <select id="convDeliveryMethod">
+              <option value="">-- Select Delivery Method --</option>
+              <option value="COD">COD</option>
+              <option value="Courier">Courier</option>
+              <option value="Pickup">Pickup</option>
+              <option value="Delivery">Delivery</option>
+              <option value="WhatsApp PO">WhatsApp PO</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="convDeliveryAddrType"><b>Delivery Address Choice *</b></label>
+            <select id="convDeliveryAddrType" onchange="window.toggleConvDeliveryAddressV1118()">
+              <option value="default">Customer Default Address</option>
+              <option value="custom">Other / Custom Nominated Address</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="convDefaultAddrBlock" style="margin-top:10px;font-size:12px;color:#334155;background:#ffffff;padding:9px 12px;border-radius:6px;border:1px dashed #cbd5e1">
+          <b>Default Customer Address:</b> <span>${esc(defAddr||'No address saved for this customer')}</span>
+          <div class="small" style="color:#64748b;margin-top:2px">${esc(defName)} ${defPhone?'• '+esc(defPhone):''}</div>
+        </div>
+
+        <div id="convCustomAddrBlock" style="display:none;margin-top:10px;background:#ffffff;padding:12px;border-radius:6px;border:1px solid #cbd5e1">
+          <div style="font-weight:700;margin-bottom:8px;color:#0f172a;font-size:13px">Other / Nominated Delivery Address</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field">
+              <label>Recipient / Company Name</label>
+              <input id="convCustomShipName" placeholder="${esc(defName)}">
+            </div>
+            <div class="field">
+              <label>Contact Phone</label>
+              <input id="convCustomShipPhone" placeholder="${esc(defPhone)}">
+            </div>
+            <div class="field full" style="grid-column:1/-1">
+              <label><b>Delivery Address * (Mandatory when choosing other address)</b></label>
+              <textarea id="convCustomShipAddress" placeholder="Enter complete nominated delivery address..." style="width:100%;height:60px;border:1px solid #94a3b8;border-radius:4px;padding:6px 8px"></textarea>
+            </div>
+            <div class="field full" style="grid-column:1/-1">
+              <label>Google Maps Link / Landmark (Optional)</label>
+              <input id="convCustomShipMap" placeholder="Google Maps link or landmarks" style="width:100%">
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="production-line pi-so-convert-head" style="font-weight:900">
@@ -3005,6 +3060,28 @@ function installProductionConversionV8(){
 
     if(!deliveryMethod){
       return toast('Select a delivery method');
+    }
+
+    const convCust=(state.customers||[]).find(x=>x.id===q.customerId);
+    const defAddr=q.customer?.delivery||q.customer?.address||convCust?.delivery||convCust?.address||'';
+    const defName=q.customer?.name||convCust?.name||'';
+    const defPhone=q.customer?.phone||convCust?.phone||'';
+    const defMap=q.customer?.map||convCust?.map||'';
+
+    const addrType=String(document.getElementById('convDeliveryAddrType')?.value||'default');
+    let chosenName=defName;
+    let chosenPhone=defPhone;
+    let chosenAddress=defAddr;
+    let chosenMap=defMap;
+
+    if(addrType==='custom'){
+      chosenName=String(document.getElementById('convCustomShipName')?.value||'').trim()||defName;
+      chosenPhone=String(document.getElementById('convCustomShipPhone')?.value||'').trim()||defPhone;
+      chosenAddress=String(document.getElementById('convCustomShipAddress')?.value||'').trim();
+      chosenMap=String(document.getElementById('convCustomShipMap')?.value||'').trim();
+      if(!chosenAddress){
+        return toast('Delivery address is mandatory when selecting another address.');
+      }
     }
 
     // App-based PO details; no native browser prompt. A PO reference is optional.
@@ -3056,6 +3133,14 @@ function installProductionConversionV8(){
       whatsappTracking:true,
       created:Date.now(),
       deliveryMethod,
+      deliveryAddressType:addrType,
+      deliveryAddress:chosenAddress,
+      shipTo:{
+        name:chosenName,
+        phone:chosenPhone,
+        address:chosenAddress,
+        map:chosenMap
+      },
       productionStatus:'',
       linkedSalesOrderId:'',
       linkedSalesOrderNo:''
@@ -3173,6 +3258,72 @@ function updateDispatchTotalV81(){
  $('dispatchLoadTotal').innerHTML=`Loading: <b>${boxes.length}</b> boxes + <b>${money(loose)}</b> loose rolls • Total: <b>${money(qty)}</b> • Available: <b>${money(avail)}</b>${qty>avail+.001?' <span class="grn-bad">EXCEEDS AVAILABLE BALANCE</span>':''}`;
 }
 function nextDispatchNoV81(){state.counters.dispatch=Number(state.counters.dispatch||0)+1;return `SC/DN/${today().replaceAll('-','')}/${String(state.counters.dispatch).padStart(3,'0')}`}
+function spgsDeductRawMaterialStockForDispatchV2026(job,d){
+  if(!job||!d)return;
+  state.rawMaterialStockLedger=state.rawMaterialStockLedger||[];
+  if(state.rawMaterialStockLedger.some(x=>x.sourceType==='DISPATCH'&&String(x.sourceId)===String(d.id)))return;
+  let usageLines=job.rawMaterialUsage;
+  if(!usageLines||!usageLines.length){
+    const fDb=(typeof window.getFactoryDb==='function'?window.getFactoryDb():window.factoryDb);
+    if(fDb&&Array.isArray(fDb.issues)){
+      usageLines=fDb.issues.filter(i=>(i.productionRequestId===job.id||i.job===job.orderNo)).map(i=>({
+        item:{id:i.itemId,name:i.itemName,unit:i.unit},
+        location:i.location||'Rathmalana',
+        q:Number(i.qty||0)
+      }));
+    }
+  }
+  const finishedTotal=Number(job.finishedQty||job.packing?.total||job.requestQty||d.qty||1);
+  const dispatchRatio=finishedTotal>0?Math.min(1,Number(d.qty)/finishedTotal):1;
+  if(usageLines&&usageLines.length>0){
+    usageLines.forEach(u=>{
+      const item=u.item||{};
+      const deductQty=Number((Number(u.q||0)*dispatchRatio).toFixed(4));
+      if(deductQty>0){
+        state.rawMaterialStockLedger.push({
+          id:uid('rm_stock'),
+          type:'OUT',
+          date:d.date||today(),
+          sourceType:'DISPATCH',
+          sourceId:d.id,
+          sourceNo:d.dispatchNo,
+          jobNo:job.orderNo,
+          piSerial:job.piSerial||'',
+          location:u.location||'Rathmalana',
+          item:item.name||'Raw Material',
+          spec:`${job.size||''} ${job.material||''}`.trim(),
+          unit:item.unit||'Units',
+          qty:deductQty,
+          createdBy:currentUser?.display||currentUser?.username||'',
+          createdAt:new Date().toISOString(),
+          note:`Dispatch ${d.dispatchNo} for ${job.orderNo} (${money(d.qty)} rolls)`
+        });
+      }
+    });
+  }else{
+    const rollQty=Number(d.qty||0);
+    state.rawMaterialStockLedger.push({
+      id:uid('rm_stock'),
+      type:'OUT',
+      date:d.date||today(),
+      sourceType:'DISPATCH',
+      sourceId:d.id,
+      sourceNo:d.dispatchNo,
+      jobNo:job.orderNo,
+      piSerial:job.piSerial||'',
+      location:'Rathmalana',
+      item:job.material||'Raw Material',
+      spec:`${job.size||''} ${job.layout||''}`.trim(),
+      unit:'Rolls',
+      qty:rollQty,
+      createdBy:currentUser?.display||currentUser?.username||'',
+      createdAt:new Date().toISOString(),
+      note:`Dispatch ${d.dispatchNo} for ${job.orderNo} (${money(rollQty)} rolls)`
+    });
+  }
+  d.stockDeducted=true;
+}
+window.spgsDeductRawMaterialStockForDispatchV2026=spgsDeductRawMaterialStockForDispatchV2026;
 function confirmDispatchLoadingV81(options={}){
  const r=state.productionRequests.find(x=>x.id===$('dispatchLoadReqId').value);
  if(!r||flowIndexV81(r.status)<flowIndexV81('Finished'))return toast('Production is not dispatch ready');
@@ -3221,7 +3372,7 @@ function confirmDispatchLoadingV81(options={}){
   job.dispatches=job.dispatches||[];job.dispatches.push(d);job.dispatch=d;
   job.status=a.qty<prior-.001?'Finished':'Dispatched';job.history=job.history||[];
   job.history.push({status:'Dispatched',note:`${dispatchNo}; shared physical packing batch; ${money(a.qty)} rolls`,by:currentUser.display,at});
-  notifyV8(job.ownerUser,'Factory Dispatched',`${dispatchNo}: ${money(a.qty)} rolls allocated to ${job.orderNo}.`,job.id);
+  notifyV8(job.ownerUser,'Factory Dispatched',`${dispatchNo}: ${money(a.qty)} rolls allocated to ${job.orderNo}.`,job.id); try{spgsDeductRawMaterialStockForDispatchV2026(job,d)}catch(e){console.warn('Dispatch stock deduction error',e)}
  });
  audit('LOCK_FACTORY_DISPATCH',`${dispatchNo} • ${qty} rolls • ${boxes.length} physical boxes • ${slices.length} source jobs`);
  saveState();closeModal('dispatchNoteModal');renderProductionBoard();renderStoresQueueV8();
@@ -3238,14 +3389,14 @@ function openReceiveFromUploadV81(){const id=$('storesDispatchSelect').value,x=f
 function openReceiveDispatchV81(id){const x=findDispatchV81(id);if(!x)return;const {r,d}=x;$('receiveReqId').value=r.id;$('receivedQty').value=d.qty;$('receivedDate').value=today();$('countedBy').value=currentUser?.display||'';$('receivedFrom').value=d.carrier||'';$('varianceReason').value='';$('receiveModal').dataset.dispatchId=d.id;$('receiveMeta').innerHTML=`<b>${esc(d.dispatchNo)}</b> • ${esc(r.orderNo)} • ${esc(r.customerName)}<br>${d.boxes.length} boxes • Factory loaded ${money(d.qty)} rolls`;$('receiveModal').classList.add('show');updateVarianceV81()}
 function updateVarianceV81(){const x=findDispatchV81($('receiveModal')?.dataset.dispatchId||''),rec=Number($('receivedQty')?.value||0);if(!x)return;const v=rec-Number(x.d.qty||0);$('varianceResult').innerHTML=v===0?`<span class="grn-ok">COUNT MATCHED — ${money(rec)} ROLLS</span>`:`<span class="grn-bad">${v<0?'SHORTAGE':'EXCESS'}: ${money(Math.abs(v))} ROLLS</span>`}
 const updateVarianceOldV81=updateVarianceV8;updateVarianceV8=function(){if($('receiveModal')?.dataset.dispatchId)return updateVarianceV81();return updateVarianceOldV81()};
-function saveDispatchGRNV81(){const id=$('receiveModal').dataset.dispatchId,x=findDispatchV81(id);if(!x)return false;const {r,d}=x,receivedQty=Number($('receivedQty').value||0),variance=receivedQty-Number(d.qty||0),reason=$('varianceReason').value.trim();if(variance!==0&&!reason){toast('Stores count difference reason is mandatory');return true}const g={id:uid('grn'),grnNo:nextGRNV8(),dispatchId:d.id,dispatchNo:d.dispatchNo,requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,item:`${r.size} / ${r.material} / ${r.layout} / ${r.pcs} pcs`,unit:'Rolls',boxes:d.boxes,dispatchedQty:d.qty,receivedQty,variance,storesReason:reason,factoryReason:'',varianceStatus:variance===0?'Matched':'Factory Explanation Pending',date:$('receivedDate').value||today(),countedBy:$('countedBy').value.trim(),receivedFrom:$('receivedFrom').value.trim(),createdBy:currentUser.display,createdByUser:currentUser.username,createdAt:new Date().toISOString()};state.grns.unshift(g);r.status='Received';r.grnId=g.id;r.history.push({status:'Received',note:`${g.grnNo}; ${d.dispatchNo}; received ${receivedQty}; variance ${variance}`,by:currentUser.display,at:new Date().toISOString()});notifyV8(r.ownerUser,'Stores Count Completed',`${g.grnNo}: variance ${money(variance)}.`,r.id);if(variance)notifyV8(d.byUser,'Factory Variance Explanation Required',`${g.grnNo}: ${variance<0?'short':'excess'} ${money(Math.abs(variance))} rolls.`,r.id);audit('CREATE_DISPATCH_GRN',`${g.grnNo} ${d.dispatchNo} variance ${variance}`);saveState();closeModal('receiveModal');delete $('receiveModal').dataset.dispatchId;renderStoresQueueV8();renderProductionBoard();toast(variance?'GRN saved. Factory explanation is pending':'GRN saved. Count matched');return true}
+function saveDispatchGRNV81(){const id=$('receiveModal').dataset.dispatchId,x=findDispatchV81(id);if(!x)return false;const {r,d}=x,receivedQty=Number($('receivedQty').value||0),variance=receivedQty-Number(d.qty||0),reason=$('varianceReason').value.trim();if(variance!==0&&!reason){toast('Stores count difference reason is mandatory');return true}const isMatch=Math.abs(variance)<1e-6;const approvalStatus=isMatch?'Approved':'Pending Manager Approval';const varianceStatus=isMatch?'Matched':'Pending Manager Approval';let g=state.grns.find(x=>x.dispatchId===d.id);if(g&&g.approvalStatus==='Rejected'){g.receivedQty=receivedQty;g.variance=variance;g.storesReason=reason;g.varianceStatus=varianceStatus;g.approvalStatus=approvalStatus;delete g.rejectedReason;delete g.rejectedBy;delete g.rejectedAt;g.recountedBy=currentUser.display;g.recountedAt=new Date().toISOString();}else{g={id:uid('grn'),grnNo:nextGRNV8(),dispatchId:d.id,dispatchNo:d.dispatchNo,requestId:r.id,orderNo:r.orderNo,piId:r.piId,piSerial:r.piSerial,customerName:r.customerName,item:`${r.size} / ${r.material} / ${r.layout} / ${r.pcs} pcs`,unit:'Rolls',boxes:d.boxes,dispatchedQty:d.qty,receivedQty,variance,storesReason:reason,factoryReason:'',varianceStatus,approvalStatus,date:$('receivedDate').value||today(),countedBy:$('countedBy').value.trim(),receivedFrom:$('receivedFrom').value.trim(),createdBy:currentUser.display,createdByUser:currentUser.username,createdAt:new Date().toISOString()};state.grns.unshift(g);}if(isMatch)r.status='Received';r.grnId=g.id;r.history.push({status:isMatch?'Received':'Stores Count Submitted',note:`${g.grnNo}; ${d.dispatchNo}; received ${receivedQty}; variance ${variance}; status: ${approvalStatus}`,by:currentUser.display,at:new Date().toISOString()});notifyV8(r.ownerUser,isMatch?'Stores Count Completed':'GRN Variance Pending Manager Approval',`${g.grnNo}: received ${money(receivedQty)} rolls; variance ${money(variance)}.${isMatch?'':' Pending manager approval.'}`,r.id);if(!isMatch)notifyV8('admin','GRN Variance Pending Approval',`${g.grnNo}: ${variance<0?'short':'excess'} ${money(Math.abs(variance))} rolls. Manager approval required.`,r.id);audit('CREATE_DISPATCH_GRN',`${g.grnNo} ${d.dispatchNo} variance ${variance} status ${approvalStatus}`);saveState();closeModal('receiveModal');delete $('receiveModal').dataset.dispatchId;renderStoresQueueV8();renderProductionBoard();toast(isMatch?'GRN saved. Count matched':'GRN saved. Flagged as Pending Manager Approval');return true}
 const saveGRNOldV81=saveGRNV8;saveGRNV8=function(){if($('receiveModal')?.dataset.dispatchId){saveDispatchGRNV81();return}return saveGRNOldV81()};
 function saveFactoryVarianceV81(grnId){const g=state.grns.find(x=>x.id===grnId),r=state.productionRequests.find(x=>x.id===g?.requestId);if(!g||!r||g.variance===0)return;const reason=prompt(`Factory reason for ${g.variance<0?'shortage':'excess'} of ${money(Math.abs(g.variance))} rolls:`,g.factoryReason||'');if(reason===null)return;if(!reason.trim())return toast('Factory reason is required');g.factoryReason=reason.trim();g.varianceStatus='Explained / Finance Review';g.factoryExplainedBy=currentUser.display;g.factoryExplainedAt=new Date().toISOString();notifyV8(r.ownerUser,'Variance Explained',`${g.grnNo}: factory explanation received for finance review.`,r.id);audit('FACTORY_VARIANCE_REASON',`${g.grnNo}: ${reason}`);saveState();renderStoresQueueV8();renderProductionBoard();toast('Factory reason saved for finance')}
 function fixProductionImageV81(){productionSvgV8=function(r){const wrap=(t,n=62)=>{const a=[];for(let s=String(t||'');s.length;s=s.slice(n))a.push(s.slice(0,n));return a.slice(0,3)},ins=wrap(r.instructions||'Confirm material, size, winding, label count and packing quality.'),hist=(r.history||[]).slice(-4);return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200"><defs><linearGradient id="g81"><stop stop-color="#078f92"/><stop offset="1" stop-color="#0bb0b7"/></linearGradient></defs><rect width="1200" height="1200" fill="#f4f9fa"/><rect width="1200" height="175" fill="url(#g81)"/><g font-family="Arial, sans-serif"><text x="65" y="78" font-size="42" font-weight="800" fill="#fff">SoftCreation</text><text x="65" y="128" font-size="26" fill="#fff">PRODUCTION REQUEST &amp; FACTORY PLAN</text><rect x="55" y="210" width="1090" height="900" rx="28" fill="#fff" stroke="#cfe2e4" stroke-width="3"/><text x="85" y="270" font-size="30" font-weight="800" fill="#172f36">${esc(r.orderNo)}</text><text x="820" y="270" font-size="22" font-weight="800" fill="#078f92">${esc(r.status.toUpperCase())}</text>${[['PI / REF',`${r.piSerial} / ${r.poRef||'-'}`],['CUSTOMER',r.customerName],['ITEM / SIZE',r.size],['SPECIFICATION',`${r.material} • ${r.layout} • ${money(r.pcs)} pcs/roll`]].map((x,i)=>`<text x="85" y="${330+i*55}" font-size="20" fill="#667980">${esc(x[0])}</text><text x="320" y="${330+i*55}" font-size="24" font-weight="700" fill="#172f36">${esc(x[1])}</text>`).join('')}<rect x="85" y="545" width="1030" height="120" rx="18" fill="#eaf8f7"/><text x="115" y="590" font-size="20" fill="#087f83">REQUESTED / FINISHED</text><text x="115" y="640" font-size="38" font-weight="900" fill="#172f36">${money(r.requestQty)} / ${money(r.finishedQty||0)} ROLLS</text><text x="760" y="590" font-size="20" fill="#087f83">NEED DATE</text><text x="760" y="635" font-size="28" font-weight="800">${esc(r.needDate||'-')}</text><text x="85" y="720" font-size="20" font-weight="800" fill="#087f83">INSTRUCTIONS</text>${ins.map((x,i)=>`<text x="85" y="${755+i*28}" font-size="21" fill="#273b42">${esc(x)}</text>`).join('')}<text x="85" y="860" font-size="20" font-weight="800" fill="#087f83">STATUS HISTORY</text>${hist.map((h,i)=>`<text x="85" y="${895+i*37}" font-size="17" fill="#52646a">${esc(h.status)} • ${esc(h.by)} • ${esc(new Date(h.at).toLocaleString())}</text>`).join('')}<text x="85" y="1060" font-size="18" fill="#667980">Sales owner: ${esc(r.ownerDisplay||r.ownerUser)} • Generated ${esc(new Date().toLocaleString())}</text></g><rect x="55" y="1135" width="1090" height="8" fill="#078f92"/></svg>`}}
 const openProductionOldV81=openProductionV8;openProductionV8=function(id){openProductionOldV81(id);const r=state.productionRequests.find(x=>x.id===id);if(!r)return;const idx=flowIndexV81(r.status),sel=$('prodEditStatus');if(sel){[...sel.options].forEach(o=>{o.disabled=idx>=flowIndexV81('In Production')&&flowIndexV81(o.value)<idx});if(idx>=flowIndexV81('Finished'))sel.disabled=true}const actions=$('prodDetailBody')?.querySelector('.actions');if(actions){if(idx>=flowIndexV81('In Production')&&idx<flowIndexV81('Finished'))actions.insertAdjacentHTML('afterbegin',`<button class="btn amber" onclick="closeModal('productionDetailModal');openPackingV81('${r.id}')">Packing Count & Finish</button>`);if(idx===flowIndexV81('Finished'))actions.insertAdjacentHTML('afterbegin',`<button class="btn navy" onclick="closeModal('productionDetailModal');openDispatchLoadingV81('${r.id}')">Create Dispatch</button>`);if(idx>=flowIndexV81('Finished'))actions.insertAdjacentHTML('afterbegin','<span class="locked-flow">Finished/dispatch records are locked against backward changes.</span>');const g=state.grns.find(x=>x.requestId===r.id&&x.variance);if(g&&!g.factoryReason&&(currentUser?.role==='admin'||hasPerm('production_manage')))actions.insertAdjacentHTML('afterbegin',`<button class="btn red" onclick="saveFactoryVarianceV81('${g.id}')">Add Factory Variance Reason</button>`)}}
 const saveProductionOldV81=saveProductionUpdateV8;saveProductionUpdateV8=function(id){const r=state.productionRequests.find(x=>x.id===id),old=r?.status,next=$('prodEditStatus')?.value;if(!r)return;if(flowIndexV81(old)>=flowIndexV81('Finished'))return toast('Finished / dispatched production is permanently locked');if(next==='Finished')return toast('Use Packing Count & Finish so the actual finished quantity is recorded');if(flowIndexV81(old)>=flowIndexV81('In Production')&&flowIndexV81(next)<flowIndexV81(old))return toast('After In Production, backward status changes are locked');saveProductionOldV81(id);closeModal('productionDetailModal')};
 const productionCardOldV81=productionCardV8;productionCardV8=function(r){let h=productionCardOldV81(r);h=h.replace(`onclick="openDispatchV8('${r.id}')"`,`onclick="openDispatchLoadingV81('${r.id}')"`);const balance=productionAvailableV81(r);if(flowIndexV81(r.status)>=flowIndexV81('Dispatched')&&balance>0)h=h.replace('</div></div>',`<div class="actions"><button class="btn navy sm" onclick="openDispatchLoadingV81('${r.id}')">Dispatch Balance</button></div></div></div>`);h=h.replace('</div></div>',`${r.packing?`<div class="prod-meta"><b>Packed:</b> ${r.packing.boxes.length} boxes • ${money(r.finishedQty)} rolls • Balance ${money(balance)}</div>`:''}</div></div>`);return h};
-renderStoresQueueV8=function(){if(!$('storesQueue'))return;const rows=[];(state.productionRequests||[]).filter(productionVisibleV8).forEach(r=>(r.dispatches||[]).forEach(d=>rows.push({r,d,g:state.grns.find(x=>x.dispatchId===d.id)})));$('storesQueue').innerHTML=rows.length?`<table class="table"><thead><tr><th>Dispatch / Production</th><th>Customer / Item</th><th>Factory Loading</th><th>Stores / Variance</th><th>Actions</th></tr></thead><tbody>${rows.map(({r,d,g})=>`<tr><td><b>${esc(d.dispatchNo)}</b><div class="small">${esc(r.orderNo)} • PI ${esc(r.piSerial)}</div></td><td><b>${esc(r.customerName)}</b><div class="small">${esc(r.size)} • ${esc(r.material)} • ${esc(r.layout)}</div></td><td><b>${money(d.qty)} Rolls</b><div class="small">${d.boxes.length} boxes + ${money(d.loose)} loose<br>${esc(d.date)} • ${esc(d.carrier)}</div></td><td>${g?`<b>${esc(g.grnNo)}</b><div class="${g.variance===0?'grn-ok':'grn-bad'}">Received ${money(g.receivedQty)} • Variance ${money(g.variance)}</div><div class="small">${esc(g.varianceStatus||'')}</div>${g.factoryReason?`<div class="small"><b>Factory:</b> ${esc(g.factoryReason)}</div>`:''}`:'<span class="tag amber">Awaiting Stores Count</span>'}</td><td><button class="btn ghost sm" onclick="downloadDispatchPDFV81('${d.id}')">Dispatch PDF</button> ${!g?`<button class="btn primary sm" onclick="openReceiveDispatchV81('${d.id}')">Receive / Count</button>`:g.variance&&!g.factoryReason&&(currentUser?.role==='admin'||hasPerm('production_manage'))?`<button class="btn red sm" onclick="saveFactoryVarianceV81('${g.id}')">Factory Reason</button>`:g.variance&&!g.factoryReason?'<span class="tag amber">Reason pending</span>':`<button class="btn green sm" onclick="downloadGRNV8('${g.id}')">Finance PDF</button>`}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">No factory dispatches waiting for stores.</div>'};
+renderStoresQueueV8=function(){if(!$('storesQueue'))return;const rows=[];(state.productionRequests||[]).filter(productionVisibleV8).forEach(r=>(r.dispatches||[]).forEach(d=>rows.push({r,d,g:state.grns.find(x=>x.dispatchId===d.id)})));$('storesQueue').innerHTML=rows.length?`<table class="table"><thead><tr><th>Dispatch / Production</th><th>Customer / Item</th><th>Factory Loading</th><th>Stores / Variance</th><th>Actions</th></tr></thead><tbody>${rows.map(({r,d,g})=>`<tr><td><b>${esc(d.dispatchNo)}</b><div class="small">${esc(r.orderNo)} • PI ${esc(r.piSerial)}</div></td><td><b>${esc(r.customerName)}</b><div class="small">${esc(r.size)} • ${esc(r.material)} • ${esc(r.layout)}</div></td><td><b>${money(d.qty)} Rolls</b><div class="small">${d.boxes.length} boxes + ${money(d.loose)} loose<br>${esc(d.date)} • ${esc(d.carrier)}</div></td><td>${g?`<b>${esc(g.grnNo)}</b><div class="${Math.abs(Number(g.variance||0))<1e-6?'grn-ok':'grn-bad'}">Received ${money(g.receivedQty)} • Variance ${money(g.variance)}</div><div class="small">${esc(g.varianceStatus||'')}</div>${g.approvalStatus==='Pending Manager Approval'?'<div class="small"><span class="tag amber">Pending Manager Approval</span></div>':g.approvalStatus==='Rejected'?`<div class="small" style="color:#dc2626;font-weight:700">Reason: ${esc(g.rejectedReason||'')}</div>`:''}${g.factoryReason?`<div class="small"><b>Factory:</b> ${esc(g.factoryReason)}</div>`:''}`:'<span class="tag amber">Awaiting Stores Count</span>'}</td><td><button class="btn ghost sm" onclick="downloadDispatchPDFV81('${d.id}')">Dispatch PDF</button> ${!g?`<button class="btn primary sm" onclick="openReceiveDispatchV81('${d.id}')">Receive / Count</button>`:g.approvalStatus==='Pending Manager Approval'?((currentUser?.role==='admin'||currentUser?.role==='manager'||hasPerm('production_manage'))?`<button class="btn green sm" onclick="window.managerApproveGRNV64('${esc(g.id)}')">Approve Variance</button> <button class="btn red sm" onclick="window.managerRejectGRNV64('${esc(g.id)}')">Reject Count</button>`:'<span class="tag amber">Pending Manager Approval</span>'):g.approvalStatus==='Rejected'?`<button class="btn primary sm" onclick="window.reopenReceiveDispatchV64('${esc(g.id)}')">Correct Count</button>`:g.variance&&!g.factoryReason&&(currentUser?.role==='admin'||hasPerm('production_manage'))?`<button class="btn red sm" onclick="saveFactoryVarianceV81('${g.id}')">Factory Reason</button>`:g.variance&&!g.factoryReason?'<span class="tag amber">Reason pending</span>':`<button class="btn green sm" onclick="downloadGRNV8('${g.id}')">Finance PDF</button>`}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">No factory dispatches waiting for stores.</div>'};
 const downloadGRNOldV81=downloadGRNV8;downloadGRNV8=async function(id){const g=state.grns.find(x=>x.id===id);if(g?.variance&&!g.factoryReason)return toast('Factory variance explanation is required before finance PDF');if(g)g.reason=[g.storesReason?`Stores: ${g.storesReason}`:'',g.factoryReason?`Factory: ${g.factoryReason}`:''].filter(Boolean).join(' | ')||'No variance';return downloadGRNOldV81(id)};
 fixProductionImageV81();enhancePackingV81();
 
@@ -3291,7 +3442,7 @@ function enhanceIntroducerV84(){
  const firstModal=document.querySelector('.modal');firstModal.insertAdjacentHTML('beforebegin',`<section id="introducers" class="view"><div class="panel"><div class="panel-title">Customer Introducers & Commission Ledger <button class="btn sm" style="background:#fff;color:#087f83" onclick="openIntroducerModalV84()">+ Add Introducer</button></div><div class="panel-body"><div class="notice">Commission is calculated from saved quotation/PI snapshots. By default VAT and delivery charges are excluded. PI payment receipts control how much commission is currently earned.</div><div id="introKpis" class="intro-kpis"></div><div class="listbar"><input id="introSearch" class="search" placeholder="Search introducer / phone / customer" oninput="renderIntroducersV84()"><select id="introStatusFilter" onchange="renderIntroducersV84()"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div><div id="introducerList"></div></div></div></section>`);
  document.body.insertAdjacentHTML('beforeend',`<div id="introducerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Introducer Master</b><button class="closex" onclick="closeModal('introducerModal')">×</button></div><div class="modal-body"><input id="introId" type="hidden"><div class="grid"><div class="field"><label>Name / Company</label><input id="introName"></div><div class="field"><label>Contact Number</label><input id="introPhone"></div><div class="field"><label>Email</label><input id="introEmail"></div><div class="field"><label>NIC / Reference</label><input id="introRef"></div><div class="field"><label>Default Commission Type</label><select id="introType" onchange="updateIntroRuleHintV84()"><option value="percent">Percentage</option><option value="fixed">Fixed Amount per Paid Order</option></select></div><div class="field"><label>Rate % / Fixed Amount (LKR)</label><input id="introRate" type="number" min="0" step="0.01"></div><div class="field"><label>Commission Basis</label><select id="introBasis"><option value="net">Item Value excluding VAT</option><option value="gross">Item Value including VAT</option></select></div><div class="field"><label>Earn When</label><select id="introTrigger"><option value="collected">Customer Payment Collected (Pro-rata)</option><option value="fullpaid">PI Fully Paid</option><option value="pi">PI Saved / Confirmed</option></select></div><div class="field full"><label>Bank / Payment Details</label><textarea id="introBank"></textarea></div><div class="field full"><label>Internal Notes</label><textarea id="introNotes"></textarea></div><div class="field full"><label class="checkline"><input id="introActive" type="checkbox" checked> Active</label></div></div><div id="introRuleHint" class="intro-rule"></div><div class="actions"><button class="btn primary" onclick="saveIntroducerV84()">Save Introducer</button><button id="deleteIntroBtn" class="btn red" onclick="deleteIntroducerV84()">Delete</button></div></div></div></div>
  <div id="introLedgerModal" class="modal"><div class="modal-card" style="max-width:1100px"><div class="modal-head"><div><b>Introducer Commission Ledger</b><div id="introLedgerMeta" class="small"></div></div><button class="closex" onclick="closeModal('introLedgerModal')">×</button></div><div id="introLedgerBody" class="modal-body"></div></div></div>
- <div id="commissionPayModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Record Commission Payment</b><button class="closex" onclick="closeModal('commissionPayModal')">×</button></div><div class="modal-body"><input id="commissionPayIntroId" type="hidden"><div id="commissionPayMeta" class="notice"></div><div class="grid"><div class="field"><label>Payment Amount</label><input id="commissionPayAmount" type="number" min="0.01" step="0.01"></div><div class="field"><label>Payment Date</label><input id="commissionPayDate" type="date"></div><div class="field"><label>Method</label><select id="commissionPayMethod"><option>Bank Transfer</option><option>Cash</option><option>Cheque</option></select></div><div class="field"><label>Reference</label><input id="commissionPayRef"></div><div class="field full"><label>Note</label><textarea id="commissionPayNote"></textarea></div></div><div class="actions"><button class="btn green" onclick="saveCommissionPaymentV84()">Save Commission Payment</button></div></div></div></div>`);
+ <div id="commissionPayModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Record Commission Payment</b><button class="closex" onclick="closeModal('commissionPayModal')">×</button></div><div class="modal-body"><input id="commissionPayIntroId" type="hidden"><div id="commissionPayMeta" class="notice"></div><div class="grid"><div class="field full"><label>Apply to Specific PI Order (Optional)</label><select id="commissionPayDocId"></select></div><div class="field"><label>Payment Amount</label><input id="commissionPayAmount" type="number" min="0.01" step="0.01"></div><div class="field"><label>Payment Date</label><input id="commissionPayDate" type="date"></div><div class="field"><label>Method</label><select id="commissionPayMethod"><option>Bank Transfer</option><option>Cash</option><option>Cheque</option></select></div><div class="field"><label>Reference</label><input id="commissionPayRef"></div><div class="field full"><label>Note</label><textarea id="commissionPayNote"></textarea></div></div><div class="actions"><button class="btn green" onclick="saveCommissionPaymentV84()">Save Commission Payment</button></div></div></div></div>`);
  const notes=$('custNotes')?.closest('.field');if(notes)notes.insertAdjacentHTML('beforebegin',`<div class="section">Customer Introducer / Referral</div><div class="field"><label>Introduced By</label><select id="custIntroducer"></select></div><div class="field"><label>Commission Rule</label><select id="custIntroType" onchange="updateCustomerIntroHintV84()"><option value="default">Use Introducer Default</option><option value="percent">Custom Percentage</option><option value="fixed">Custom Fixed Amount</option><option value="none">No Commission</option></select></div><div class="field"><label>Custom Rate % / Amount</label><input id="custIntroRate" type="number" min="0" step="0.01"></div><div class="field"><label>Basis</label><select id="custIntroBasis"><option value="net">Item value excl. VAT</option><option value="gross">Item value incl. VAT</option></select></div><div class="field full"><div id="custIntroHint" class="intro-rule"></div></div>`);
 }
 function introOptionsV84(selected=''){return `<option value="">Direct Customer — No Introducer</option>${(state.introducers||[]).filter(x=>x.active!==false||x.id===selected).map(x=>`<option value="${x.id}" ${x.id===selected?'selected':''}>${esc(x.name)} • ${esc(x.phone||'')}</option>`).join('')}`}
@@ -3303,13 +3454,114 @@ function saveIntroducerV84(){if(currentUser?.role!=='admin')return toast('Admin 
 function deleteIntroducerV84(){const id=$('introId').value;if(!id||currentUser?.role!=='admin')return;if(state.customers.some(c=>c.introducerId===id)||state.docs.some(d=>d.introducerSnapshot?.id===id))return toast('This introducer is linked to customers/documents. Disable instead of deleting.');if(!loggedUserPasswordOKV83('delete introducer'))return;state.introducers=state.introducers.filter(x=>x.id!==id);saveState();closeModal('introducerModal');renderIntroducersV84()}
 function customerIntroRuleV84(c){const i=state.introducers.find(x=>x.id===c?.introducerId);if(!i)return null;const mode=c.introRuleType||'default';if(mode==='none')return null;const x=mode==='default'?i:{...i,type:mode,rate:Number(c.introRate||0),basis:c.introBasis||i.basis};return {id:i.id,name:i.name,phone:i.phone||'',type:x.type,rate:Number(x.rate||0),basis:x.basis||'net',trigger:x.trigger||'collected',capturedAt:new Date().toISOString()}}
 function itemValuesV84(doc){const gross=activeDocLines(doc).reduce((s,l)=>s+Number(l.qty||0)*Number(l.price||0),0),vat=doc.vatMode==='vat18'?Number(doc.accountingSnapshot?.vat??state.settings.vat??18):0,net=vat?gross/(1+vat/100):gross;return {gross,net}}
-function commissionSummaryV84(doc){const x=doc.introducerSnapshot;if(!x)return {eligible:0,earned:0,paid:0,due:0,basisValue:0,status:'none'};const v=itemValuesV84(doc),basisValue=x.basis==='gross'?v.gross:v.net,eligible=x.type==='fixed'?Number(x.rate||0):basisValue*Number(x.rate||0)/100,ps=doc.type==='PI'?paymentSummary(doc):{paid:0,total:docTotals(doc).gross,status:'pending'},ratio=ps.total>0?Math.min(1,ps.paid/ps.total):0,earned=x.trigger==='pi'&&doc.type==='PI'?eligible:x.trigger==='fullpaid'?(ps.status==='paid'?eligible:0):eligible*ratio,paid=(state.commissionPayments||[]).filter(p=>p.introducerId===x.id&&(!p.docId||p.docId===doc.id)).reduce((s,p)=>s+Number(p.amount||0),0),due=Math.max(0,earned-paid);return {eligible,earned,paid,due,basisValue,status:due>0?'due':earned>0?'paid':'pending',ratio}}
-function introducerTotalsV84(id){const docs=state.docs.filter(d=>d.type==='PI'&&d.introducerSnapshot?.id===id),eligible=docs.reduce((s,d)=>s+commissionSummaryV84(d).eligible,0),earned=docs.reduce((s,d)=>s+commissionSummaryV84(d).earned,0),paid=(state.commissionPayments||[]).filter(p=>p.introducerId===id).reduce((s,p)=>s+Number(p.amount||0),0);return {docs,eligible,earned,paid,due:Math.max(0,earned-paid)}}
+function docCommissionEarnedV84(doc){
+  const x=doc?.introducerSnapshot;if(!x)return 0;
+  const v=itemValuesV84(doc),basisValue=x.basis==='gross'?v.gross:v.net,eligible=x.type==='fixed'?Number(x.rate||0):basisValue*Number(x.rate||0)/100;
+  const ps=doc.type==='PI'?paymentSummary(doc):{paid:0,total:docTotals(doc).gross,status:'pending'};
+  const ratio=ps.total>0?Math.min(1,ps.paid/ps.total):0;
+  return x.trigger==='pi'&&doc.type==='PI'?eligible:x.trigger==='fullpaid'?(ps.status==='paid'?eligible:0):eligible*ratio;
+}
+function commissionSummaryV84(doc){
+  const x=doc.introducerSnapshot;
+  if(!x)return {eligible:0,earned:0,paid:0,due:0,basisValue:0,status:'none'};
+  const v=itemValuesV84(doc),basisValue=x.basis==='gross'?v.gross:v.net,eligible=x.type==='fixed'?Number(x.rate||0):basisValue*Number(x.rate||0)/100;
+  const ps=doc.type==='PI'?paymentSummary(doc):{paid:0,total:docTotals(doc).gross,status:'pending'};
+  const ratio=ps.total>0?Math.min(1,ps.paid/ps.total):0;
+  const earned=docCommissionEarnedV84(doc);
+
+  const introPayments=(state.commissionPayments||[]).filter(p=>p.introducerId===x.id);
+  const directPaid=introPayments.filter(p=>p.docId===doc.id).reduce((s,p)=>s+Number(p.amount||0),0);
+
+  let generalPool=introPayments.filter(p=>!p.docId).reduce((s,p)=>s+Number(p.amount||0),0);
+  const introDocs=state.docs.filter(d=>d.type==='PI'&&d.introducerSnapshot?.id===x.id).sort((a,b)=>String(a.date||a.id).localeCompare(String(b.date||b.id)));
+  for(const other of introDocs){
+    if(other.id===doc.id)break;
+    const oe=docCommissionEarnedV84(other);
+    const od=introPayments.filter(p=>p.docId===other.id).reduce((s,p)=>s+Number(p.amount||0),0);
+    const needed=Math.max(0,oe-od);
+    generalPool=Math.max(0,generalPool-needed);
+  }
+  const generalAllocated=Math.min(Math.max(0,earned-directPaid),generalPool);
+  const paid=directPaid+generalAllocated;
+  const due=Math.max(0,earned-paid);
+  const status=(earned<=0.001)?'pending':(due<=0.01?'paid':(paid>0.01?'partial':'due'));
+  return {eligible,earned,paid,due,basisValue,status,ratio};
+}
+function introducerTotalsV84(id){
+  const docs=state.docs.filter(d=>d.type==='PI'&&d.introducerSnapshot?.id===id).sort((a,b)=>String(b.date||b.id).localeCompare(String(a.date||a.id)));
+  const eligible=docs.reduce((s,d)=>s+commissionSummaryV84(d).eligible,0);
+  const earned=docs.reduce((s,d)=>s+commissionSummaryV84(d).earned,0);
+  const paid=(state.commissionPayments||[]).filter(p=>p.introducerId===id).reduce((s,p)=>s+Number(p.amount||0),0);
+  return {docs,eligible,earned,paid,due:Math.max(0,earned-paid)};
+}
 function renderIntroducersV84(){if(!$('introducerList'))return;const q=($('introSearch')?.value||'').toLowerCase(),f=$('introStatusFilter')?.value||'',a=state.introducers.filter(x=>(!f||(f==='active'?x.active!==false:x.active===false))&&[x.name,x.phone,x.email].join(' ').toLowerCase().includes(q)),all=state.introducers.map(x=>introducerTotalsV84(x.id));$('introKpis').innerHTML=[['Introducers',state.introducers.length],['Earned',all.reduce((s,x)=>s+x.earned,0)],['Paid',all.reduce((s,x)=>s+x.paid,0)],['Outstanding',all.reduce((s,x)=>s+x.due,0)]].map((x,i)=>`<div class="intro-kpi"><span>${x[0]}</span><b>${i?`LKR ${money(x[1])}`:x[1]}</b></div>`).join('');$('introducerList').innerHTML=a.length?`<table class="table"><thead><tr><th>Introducer</th><th>Rule</th><th>Customers</th><th>Orders / Earned</th><th>Paid / Due</th><th></th></tr></thead><tbody>${a.map(x=>{const t=introducerTotalsV84(x.id),cs=state.customers.filter(c=>c.introducerId===x.id);return `<tr><td><b>${esc(x.name)}</b><div class="small">${esc(x.phone||'')} • ${x.active!==false?'Active':'Inactive'}</div></td><td>${esc(introRuleTextV84(x))}</td><td>${cs.length}<div class="small">${cs.slice(0,3).map(c=>esc(c.name)).join(', ')}</div></td><td>${t.docs.length}<div class="commission-due">Earned LKR ${money(t.earned)}</div></td><td><span class="commission-paid">Paid LKR ${money(t.paid)}</span><div class="commission-due">Due LKR ${money(t.due)}</div></td><td><button class="btn ghost sm" onclick="openIntroLedgerV84('${x.id}')">Ledger</button> <button class="btn green sm" onclick="openCommissionPayV84('${x.id}')">Pay</button> <button class="btn ghost sm" onclick="openIntroducerModalV84('${x.id}')">Edit</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">No introducers found.</div>'}
-function openIntroLedgerV84(id){const x=state.introducers.find(y=>y.id===id),t=introducerTotalsV84(id);if(!x)return;$('introLedgerMeta').textContent=`${x.name} • ${x.phone||''}`;$('introLedgerBody').innerHTML=`<div class="intro-kpis"><div class="intro-kpi"><span>Eligible</span><b>LKR ${money(t.eligible)}</b></div><div class="intro-kpi"><span>Earned from Collections</span><b>LKR ${money(t.earned)}</b></div><div class="intro-kpi"><span>Paid</span><b>LKR ${money(t.paid)}</b></div><div class="intro-kpi"><span>Outstanding</span><b>LKR ${money(t.due)}</b></div></div><h4>Order Commission</h4><table class="table"><thead><tr><th>PI / Customer</th><th>Basis</th><th>Eligible</th><th>Collected</th><th>Earned</th><th>Status</th></tr></thead><tbody>${t.docs.map(d=>{const c=commissionSummaryV84(d),p=paymentSummary(d);return `<tr><td><b>${esc(d.serial)}</b><div class="small">${esc(d.customer?.name||'')} • ${esc(d.date)}</div></td><td>LKR ${money(c.basisValue)}<div class="small">${esc(d.introducerSnapshot.type==='fixed'?'Fixed':d.introducerSnapshot.rate+'% '+d.introducerSnapshot.basis)}</div></td><td>LKR ${money(c.eligible)}</td><td>LKR ${money(p.paid)} / ${money(p.total)}</td><td><b>LKR ${money(c.earned)}</b></td><td>${esc(c.status)}</td></tr>`}).join('')||'<tr><td colspan="6">No PI orders</td></tr>'}</tbody></table><h4>Commission Payments</h4><table class="table"><thead><tr><th>Date</th><th>Amount</th><th>Method / Ref</th><th>Recorded By</th></tr></thead><tbody>${state.commissionPayments.filter(p=>p.introducerId===id).map(p=>`<tr><td>${esc(p.date)}</td><td>LKR ${money(p.amount)}</td><td>${esc(p.method)} • ${esc(p.reference||'')}</td><td>${esc(p.by)}</td></tr>`).join('')||'<tr><td colspan="4">No commission payments</td></tr>'}</tbody></table>`;$('introLedgerModal').classList.add('show')}
+function openIntroLedgerV84(id){
+  const x=state.introducers.find(y=>y.id===id),t=introducerTotalsV84(id);if(!x)return;
+  $('introLedgerMeta').textContent=`${x.name} • ${x.phone||''}`;
+  $('introLedgerBody').innerHTML=`<div class="intro-kpis"><div class="intro-kpi"><span>Eligible</span><b>LKR ${money(t.eligible)}</b></div><div class="intro-kpi"><span>Earned from Collections</span><b>LKR ${money(t.earned)}</b></div><div class="intro-kpi"><span>Paid</span><b>LKR ${money(t.paid)}</b></div><div class="intro-kpi"><span>Outstanding</span><b>LKR ${money(t.due)}</b></div></div>
+  <h4>Order Commission Ledger</h4>
+  <table class="table"><thead><tr><th>Transaction / PI</th><th>Customer</th><th>Basis</th><th>Eligible</th><th>Earned</th><th>Paid</th><th>Due</th><th>Status</th></tr></thead><tbody>${t.docs.map(d=>{
+    const c=commissionSummaryV84(d);
+    return `<tr>
+      <td><b>${esc(d.serial)}</b><div class="small">${esc(d.date)}</div></td>
+      <td><b>${esc(d.customer?.name||'')}</b></td>
+      <td>LKR ${money(c.basisValue)}<div class="small">${esc(d.introducerSnapshot.type==='fixed'?'Fixed':d.introducerSnapshot.rate+'% '+d.introducerSnapshot.basis)}</div></td>
+      <td>LKR ${money(c.eligible)}</td>
+      <td><b>LKR ${money(c.earned)}</b></td>
+      <td><span class="commission-paid">LKR ${money(c.paid)}</span></td>
+      <td><span class="commission-due">LKR ${money(c.due)}</span></td>
+      <td><span class="tag ${c.status==='paid'?'green':c.status==='partial'?'amber':'ghost'} sm">${esc(c.status.toUpperCase())}</span></td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="8">No PI orders for this introducer</td></tr>'}</tbody></table>
+  <h4>Commission Payments History</h4>
+  <table class="table"><thead><tr><th>Date</th><th>Amount</th><th>Method / Ref</th><th>Applied To</th><th>Recorded By</th></tr></thead><tbody>${state.commissionPayments.filter(p=>p.introducerId===id).map(p=>`<tr><td>${esc(p.date)}</td><td><b>LKR ${money(p.amount)}</b></td><td>${esc(p.method)} • ${esc(p.reference||'')}</td><td>${esc(p.docSerial||'General Payout')}</td><td>${esc(p.by)}</td></tr>`).join('')||'<tr><td colspan="5">No commission payments</td></tr>'}</tbody></table>`;
+  $('introLedgerModal').classList.add('show');
+}
 function adminPasswordOKV84(action){if(currentUser?.role!=='admin'){toast('Admin access is required');return false}const u=state.users.find(x=>x.id===currentUser.id),p=prompt(`Administrator password required to ${action}:`);if(p!==u?.password){toast('Incorrect administrator password');return false}return true}
-function openCommissionPayV84(id){const x=state.introducers.find(y=>y.id===id),t=introducerTotalsV84(id);if(!x)return;if(currentUser?.role!=='admin')return toast('Admin access is required');$('commissionPayIntroId').value=id;$('commissionPayAmount').value=t.due?t.due.toFixed(2):'';$('commissionPayDate').value=today();$('commissionPayMethod').value='Bank Transfer';$('commissionPayRef').value='';$('commissionPayNote').value='';$('commissionPayMeta').innerHTML=`<b>${esc(x.name)}</b> • Earned LKR ${money(t.earned)} • Paid LKR ${money(t.paid)} • <b>Due LKR ${money(t.due)}</b>`;$('commissionPayModal').classList.add('show')}
-function saveCommissionPaymentV84(){const id=$('commissionPayIntroId').value,x=state.introducers.find(y=>y.id===id),t=introducerTotalsV84(id),amount=Number($('commissionPayAmount').value||0);if(!x||!(amount>0))return toast('Enter a payment amount');if(amount>t.due+.01)return toast(`Payment cannot exceed earned outstanding LKR ${money(t.due)}`);if(!adminPasswordOKV84('record commission payment'))return;state.commissionPayments.unshift({id:uid('cpay'),introducerId:id,amount,date:$('commissionPayDate').value||today(),method:$('commissionPayMethod').value,reference:$('commissionPayRef').value.trim(),note:$('commissionPayNote').value.trim(),by:currentUser.display,byUser:currentUser.username,at:new Date().toISOString()});audit('COMMISSION_PAYMENT',`${x.name} LKR ${amount}`);saveState();closeModal('commissionPayModal');renderIntroducersV84();toast('Commission payment recorded')}
+function openCommissionPayV84(id){
+  const x=state.introducers.find(y=>y.id===id),t=introducerTotalsV84(id);if(!x)return;
+  if(currentUser?.role!=='admin')return toast('Admin access is required');
+  $('commissionPayIntroId').value=id;
+  $('commissionPayAmount').value=t.due?t.due.toFixed(2):'';
+  $('commissionPayDate').value=today();
+  $('commissionPayMethod').value='Bank Transfer';
+  $('commissionPayRef').value='';
+  $('commissionPayNote').value='';
+  $('commissionPayMeta').innerHTML=`<b>${esc(x.name)}</b> • Earned LKR ${money(t.earned)} • Paid LKR ${money(t.paid)} • <b>Due LKR ${money(t.due)}</b>`;
+  const docSel=$('commissionPayDocId');
+  if(docSel){
+    docSel.innerHTML=`<option value="">-- General Introducer Payout (All Open Orders) --</option>`+
+      t.docs.filter(d=>commissionSummaryV84(d).due>0.01).map(d=>`<option value="${esc(d.id)}">${esc(d.serial)} • ${esc(d.customer?.name||'')} • Due LKR ${money(commissionSummaryV84(d).due)}</option>`).join('');
+  }
+  $('commissionPayModal').classList.add('show');
+}
+function saveCommissionPaymentV84(){
+  const id=$('commissionPayIntroId').value,x=state.introducers.find(y=>y.id===id),t=introducerTotalsV84(id),amount=Number($('commissionPayAmount').value||0);
+  if(!x||!(amount>0))return toast('Enter a payment amount');
+  if(amount>t.due+.01)return toast(`Payment cannot exceed earned outstanding LKR ${money(t.due)}`);
+  if(!adminPasswordOKV84('record commission payment'))return;
+  const docId=$('commissionPayDocId')?.value||'';
+  const targetDoc=docId?state.docs.find(d=>d.id===docId):null;
+  state.commissionPayments.unshift({
+    id:uid('cpay'),
+    introducerId:id,
+    docId:docId||'',
+    docSerial:targetDoc?.serial||'',
+    amount,
+    date:$('commissionPayDate').value||today(),
+    method:$('commissionPayMethod').value,
+    reference:$('commissionPayRef').value.trim(),
+    note:$('commissionPayNote').value.trim(),
+    by:currentUser.display,
+    byUser:currentUser.username,
+    at:new Date().toISOString()
+  });
+  audit('COMMISSION_PAYMENT',`${x.name} LKR ${amount}${targetDoc?' for '+targetDoc.serial:''}`);
+  saveState();
+  closeModal('commissionPayModal');
+  renderIntroducersV84();
+  toast('Commission payment recorded');
+}
 const openCustomerV84=openCustomerModal;openCustomerModal=function(id=''){openCustomerV84(id);const c=state.customers.find(x=>x.id===id);$('custIntroducer').innerHTML=introOptionsV84(c?.introducerId||'');$('custIntroType').value=c?.introRuleType||'default';$('custIntroRate').value=c?.introRate??'';$('custIntroBasis').value=c?.introBasis||'net';updateCustomerIntroHintV84()};
 const saveCustomerV84=saveCustomer;saveCustomer=async function(){const id=$('custId').value||'',intro={introducerId:$('custIntroducer')?.value||'',introRuleType:$('custIntroType')?.value||'default',introRate:Number($('custIntroRate')?.value||0),introBasis:$('custIntroBasis')?.value||'net'};await saveCustomerV84();const c=state.customers.find(x=>x.id===(id||$('customerSelect').value));if(c){Object.assign(c,intro);audit('CUSTOMER_INTRODUCER',`${c.name}: ${state.introducers.find(x=>x.id===c.introducerId)?.name||'Direct'}`);saveState();renderCustomers()}};
 const collectCurrentV84=collectCurrent;collectCurrent=function(){const d=collectCurrentV84();if(!d)return d;const c=state.customers.find(x=>x.id===d.customerId);d.introducerSnapshot=d.introducerSnapshot||customerIntroRuleV84(c);return d};

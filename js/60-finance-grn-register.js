@@ -9,7 +9,7 @@
   const allowed=()=>typeof currentUser!=='undefined'&&!!currentUser&&(currentUser.role==='admin'||hasPerm('finance_view')||hasPerm('finance_grn'));
   let page=1;
   const pageSize=12;
-  const financeReady=g=>!!g&&(!n(g.variance)||!!String(g.factoryReason||'').trim());
+  const financeReady=g=>!!g&&(Math.abs(n(g.variance))<1e-6 || g.approvalStatus==='Approved')&&(!n(g.variance)||!!String(g.factoryReason||'').trim());
   const grns=()=>typeof state!=='undefined'&&Array.isArray(state.grns)?state.grns:[];
   const jobs=()=>typeof state!=='undefined'&&Array.isArray(state.productionRequests)?state.productionRequests:[];
   const jobFor=g=>jobs().find(r=>String(r.id)===String(g.requestId));
@@ -31,7 +31,7 @@
     const totalPages=Math.max(1,Math.ceil(rows.length/pageSize));page=Math.min(Math.max(1,page),totalPages);
     const slice=rows.slice((page-1)*pageSize,page*pageSize);
     byId('scFinanceCountersV60').innerHTML=`<div><small>Received GRNs in Finance</small><strong>${allCount}</strong></div><div><small>Matching records</small><strong>${rows.length}</strong></div><div><small>Rolls received (filtered)</small><strong>${fmt(rows.reduce((s,x)=>s+n(x.g.receivedQty),0))}</strong></div><div><small>Unresolved variance</small><strong>${grns().filter(g=>!financeReady(g)).length}</strong></div>`;
-    host.innerHTML=rows.length?`<div class="tablewrap"><table class="table"><thead><tr><th>GRN / Date</th><th>Production / Dispatch</th><th>Product / Customer</th><th>Received / Variance</th><th>Material rate</th><th>Report</th></tr></thead><tbody>${slice.map(({g,r})=>`<tr>
+    host.innerHTML=rows.length?`<div class="tablewrap"><table class="table"><thead><tr><th>GRN / Date</th><th>Production / Dispatch</th><th>Product / Customer</th><th>Received / Variance</th><th>Material rate</th><th>Report</th><th>ERP Updated</th></tr></thead><tbody>${slice.map(({g,r})=>`<tr>
       <td><b>${escText(g.grnNo)}</b><div class="small">${escText(g.date||g.createdAt||'')}</div></td>
       <td>${escText(g.orderNo||r?.orderNo||'-')}<div class="small">${escText(g.dispatchNo||'-')}</div></td>
       <td><b>${escText(g.customerName||r?.customerName||'-')}</b><div class="small">${escText([r?.size,r?.material,r?.layout].filter(Boolean).join(' ')||g.item||'-')}</div></td>
@@ -42,6 +42,14 @@
           <button type="button" class="btn primary sm" data-grn-view-pdf="${escText(g.id)}">View PDF</button>
           <button type="button" class="btn green sm" data-grn-pdf="${escText(g.id)}">Costing PDF</button>
         </div>
+      </td>
+      <td>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:${allowed()?'pointer':'not-allowed'};margin:0">
+          <input type="checkbox" data-grn-erp-update="${escText(g.id)}" ${g.erpUpdated?'checked':''} ${allowed()?'':'disabled'} style="width:16px;height:16px;accent-color:#087e82;cursor:inherit">
+          <span style="font-size:12px;font-weight:${g.erpUpdated?'700':'400'};color:${g.erpUpdated?'#08734c':'#64748b'}">
+            ${g.erpUpdated ? `✓ Updated<div class="small" style="font-weight:normal;color:#64748b;font-size:10px">${escText(g.erpUpdatedBy||'')} · ${escText(g.erpUpdatedAt?new Date(g.erpUpdatedAt).toLocaleDateString():'')}</div>` : 'Pending'}
+          </span>
+        </label>
       </td>
     </tr>`).join('')}</tbody></table></div>`:'<div class="empty">No confirmed GRNs matching the filter. Complete Stores Receive / Count first.</div>';
     byId('scFinancePagerV60').innerHTML=`<span>${rows.length?((page-1)*pageSize+1):0}–${Math.min(page*pageSize,rows.length)} of ${rows.length}</span><button type="button" class="btn ghost sm" data-finance-page="prev" ${page===1?'disabled':''}>Previous</button><span>Page ${page} / ${totalPages}</span><button type="button" class="btn ghost sm" data-finance-page="next" ${page>=totalPages?'disabled':''}>Next</button>`;
@@ -296,6 +304,24 @@
       const viewPdf=evt.target.closest('[data-grn-view-pdf]');if(viewPdf){scFinanceCostingPdfV60(viewPdf.dataset.grnViewPdf,'view');return}
       const pdf=evt.target.closest('[data-grn-pdf]');if(pdf){scFinanceCostingPdfV60(pdf.dataset.grnPdf,'download');return}
       const pageButton=evt.target.closest('[data-finance-page]');if(pageButton){page+=pageButton.dataset.financePage==='next'?1:-1;paintFinance()}
+    });
+    finance.addEventListener('change',evt=>{
+      const chk=evt.target.closest('[data-grn-erp-update]');
+      if(!chk)return;
+      if(!allowed()){
+        evt.target.checked=!evt.target.checked;
+        if(typeof toast==='function')toast('Finance access is required to update ERP status');
+        return;
+      }
+      const grnId=chk.dataset.grnErpUpdate;
+      const g=grns().find(x=>String(x.id)===String(grnId));
+      if(!g)return;
+      g.erpUpdated=!!chk.checked;
+      g.erpUpdatedBy=chk.checked?(currentUser?.display||currentUser?.username||'Finance'):'';
+      g.erpUpdatedAt=chk.checked?new Date().toISOString():'';
+      if(typeof saveState==='function')saveState();
+      if(typeof toast==='function')toast(g.erpUpdated?`${g.grnNo} marked as ERP Updated`:`${g.grnNo} ERP update removed`);
+      paintFinance();
     });
     window.renderFinanceV1059=function(){paintFinance();return Promise.resolve()};
     try{renderFinanceV1059=window.renderFinanceV1059}catch(_){}

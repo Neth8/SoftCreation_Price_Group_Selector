@@ -355,6 +355,116 @@ window.pcCloseScOrdersModal=function(){
   const modal=document.getElementById('pcScOrdersModal');
   if(modal)modal.classList.remove('show');
 };
+
+function pcEnsureCancelDemandModal(){
+  if(document.getElementById('pcCancelDemandModal'))return;
+  document.body.insertAdjacentHTML('beforeend',`
+    <div id="pcCancelDemandModal" class="modal">
+      <div class="modal-card" style="max-width:560px">
+        <div class="modal-head">
+          <b>Cancel Production Demand Line</b>
+          <button class="closex" type="button" onclick="pcCloseCancelDemandModal()">×</button>
+        </div>
+        <div class="modal-body" style="padding:16px 20px">
+          <input type="hidden" id="pcCancelSoId">
+          <input type="hidden" id="pcCancelLineIndex">
+          <div id="pcCancelDemandMeta" class="notice" style="background:#fff1f2;border:1px solid #fecdd3;color:#9f1239"></div>
+          <div class="field" style="margin-top:12px">
+            <label><b>Reason for Cancellation * (Mandatory)</b></label>
+            <textarea id="pcCancelDemandReason" placeholder="Enter non-empty reason why this demand line is cancelled..." style="width:100%;height:80px;box-sizing:border-box" required></textarea>
+            <div class="hint" style="color:#64748b;font-size:11px;margin-top:4px">Empty or whitespace-only cancellation reasons are strictly prohibited.</div>
+          </div>
+          <div class="actions" style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn ghost" onclick="pcCloseCancelDemandModal()">Keep Demand</button>
+            <button type="button" class="btn red" onclick="pcConfirmCancelDemand()">Confirm Cancellation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+window.pcOpenCancelDemandModal=function(soId,lineIndex){
+  pcEnsureCancelDemandModal();
+  const so=(state.salesOrders||[]).find(s=>String(s.id)===String(soId));
+  if(!so)return toast('Sales order not found');
+  const l=so.lines?.[lineIndex];
+  if(!l)return toast('Order line not found');
+
+  const ordered=pcNum(l.qty);
+  const dispatched=Math.min(ordered,pcDispatchedForSOLine(so,lineIndex));
+  const cancelled=pcNum(l.cancelledQty);
+  const grossOpen=Math.max(0,ordered-dispatched-cancelled);
+  const allocated=Math.min(grossOpen,pcAllocatedToOpenRequests(so.id,lineIndex));
+  const available=Math.max(0,grossOpen-allocated);
+
+  if(available<=0)return toast('No open demand remains to cancel on this line.');
+
+  document.getElementById('pcCancelSoId').value=soId;
+  document.getElementById('pcCancelLineIndex').value=lineIndex;
+  document.getElementById('pcCancelDemandReason').value='';
+  document.getElementById('pcCancelDemandMeta').innerHTML=`
+    <b>Sales Order: ${pcEsc(so.soNo||so.id)}</b> • Customer: <b>${pcEsc(so.customerName||'')}</b><br>
+    Item: <b>${pcEsc(l.desc||'Item')} ${pcEsc(l.size||'')} ${pcEsc(l.material||'')}</b><br>
+    Ordered: <b>${pcMoney(ordered)}</b> • Open Demand to Cancel: <b>${pcMoney(available)} ${pcEsc(l.unit||'Rolls')}</b>
+  `;
+  document.getElementById('pcCancelDemandModal')?.classList.add('show');
+};
+
+window.pcCloseCancelDemandModal=function(){
+  document.getElementById('pcCancelDemandModal')?.classList.remove('show');
+};
+
+window.pcConfirmCancelDemand=function(){
+  const soId=document.getElementById('pcCancelSoId')?.value;
+  const lineIndex=Number(document.getElementById('pcCancelLineIndex')?.value);
+  const reason=String(document.getElementById('pcCancelDemandReason')?.value||'').trim();
+
+  if(!reason){
+    return toast('Cancellation reason is mandatory. Cannot cancel demand without a valid explanation.');
+  }
+
+  const so=(state.salesOrders||[]).find(s=>String(s.id)===String(soId));
+  if(!so)return toast('Sales order not found');
+  const l=so.lines?.[lineIndex];
+  if(!l)return toast('Order line not found');
+
+  const ordered=pcNum(l.qty);
+  const dispatched=Math.min(ordered,pcDispatchedForSOLine(so,lineIndex));
+  const cancelled=pcNum(l.cancelledQty);
+  const grossOpen=Math.max(0,ordered-dispatched-cancelled);
+  const allocated=Math.min(grossOpen,pcAllocatedToOpenRequests(so.id,lineIndex));
+  const available=Math.max(0,grossOpen-allocated);
+
+  if(available<=0){
+    pcCloseCancelDemandModal();
+    return toast('No open demand available to cancel on this line.');
+  }
+
+  const now=new Date().toISOString();
+  const userName=currentUser?.display||currentUser?.username||'User';
+  l.cancelledQty=cancelled+available;
+  l.cancellationHistory=l.cancellationHistory||[];
+  l.cancellationHistory.push({
+    reason,
+    cancelledQty:available,
+    user:userName,
+    username:currentUser?.username||'user',
+    at:now
+  });
+  so.history=so.history||[];
+  so.history.push({
+    action:'Demand Cancelled',
+    by:userName,
+    at:now,
+    note:`Line ${lineIndex+1} (${l.desc} ${l.size}): cancelled ${available} rolls demand. Reason: ${reason}`
+  });
+
+  saveState();
+  pcCloseCancelDemandModal();
+  pcRender();
+  toast(`Cancelled demand for ${so.soNo}: ${available} rolls removed from planning.`);
+};
 function pcGroup(k){return pcDemandGroups().find(x=>x.key===k)||null}
 async function pcLoadCloud(){const q='?select=*&order=created_at.desc';const [requests,lines,allocations,messages,audit,policies,releases]=await Promise.all([
 pcFetch('/spgs_prod_control_requests?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*&order=created_at.desc'),pcFetch('/spgs_prod_control_request_lines'+q),pcFetch('/spgs_prod_control_so_allocations'+q),pcFetch('/spgs_prod_control_messages'+q),pcFetch('/spgs_prod_control_audit'+q),pcFetch('/spgs_prod_control_item_policy?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*'),pcFetch('/spgs_prod_control_releases?workspace=eq.'+encodeURIComponent(PC_WORKSPACE)+'&select=*&order=created_at.asc')]);pcCloud={requests:requests||[],lines:lines||[],allocations:allocations||[],messages:messages||[],audit:audit||[],policies:policies||[],releases:releases||[]}}
@@ -505,7 +615,7 @@ function pcPlannerGroupHTML(g){
 
   return `<div class="pc-demand-title"><div><b>${pcEsc(pcLineLabel(g))}</b><small>${pcEsc(g.key)}</small></div><span class="pc-pill blue">${pcMoney(g.demand)} rolls open demand</span></div>
   ${!hasScOrder?`<div class="notice" style="margin:10px 0;background:#fff8ee;border:1px solid #f6cf9c;color:#87470d;"><b>Note:</b> Only SoftCreation orders can be sent from Production Control. No open Sales Order for <b>SoftCreation (Pvt) Ltd</b> was found for this item. Please have Sales create a SoftCreation SO first.</div>`:''}
-  <div class="pc-scroll"><table class="pc-table"><thead><tr><th style="width:70px;text-align:center">Select</th><th>SO / Customer</th><th>Required</th><th class="num">Ordered</th><th class="num">Dispatched</th><th class="num">Open</th><th class="num">Already PR</th><th class="num">To Plan</th></tr></thead><tbody>${g.orders.map(o=>{
+  <div class="pc-scroll"><table class="pc-table"><thead><tr><th style="width:70px;text-align:center">Select</th><th>SO / Customer</th><th>Required</th><th class="num">Ordered</th><th class="num">Dispatched</th><th class="num">Open</th><th class="num">Already PR</th><th class="num">To Plan</th><th style="text-align:center">Action</th></tr></thead><tbody>${g.orders.map(o=>{
     const open=pcNum(o.grossOpen),assigned=pcNum(o.allocated),toPlan=pcNum(o.available);
     const isSC=pcIsSoftcreationOrder(o);
     const scKey=pcOrderSelectionKey(o);
@@ -533,8 +643,11 @@ function pcPlannerGroupHTML(g){
       <td class="num">${pcMoney(o.grossOpen)}</td>
       <td class="num">${pcMoney(o.allocated)}</td>
       <td class="num"><b>${pcMoney(o.available)}</b></td>
+      <td style="text-align:center">
+        ${toPlan>0?`<button type="button" class="btn red sm" style="font-size:11px;padding:2px 8px;white-space:nowrap" onclick="pcOpenCancelDemandModal(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)})">Cancel Demand</button>`:`<span style="color:#94a3b8;font-size:11px">—</span>`}
+      </td>
     </tr>`;
-  }).join('')||'<tr><td colspan="8">No outstanding SO demand. Stock replenishment can still be planned.</td></tr>'}</tbody></table></div>`;
+  }).join('')||'<tr><td colspan="9">No outstanding SO demand. Stock replenishment can still be planned.</td></tr>'}</tbody></table></div>`;
 }
 function pcIntelligenceHTML(g){
  const soOpen=g.orders.reduce((n,o)=>n+o.grossOpen,0);
