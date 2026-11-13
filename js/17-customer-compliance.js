@@ -655,9 +655,9 @@
 
     const html=`
       <div class="field" id="custAssignedSystemUserFieldV1024">
-        <label>Introduced By <span class="required-dot">*</span></label>
+        <label>Account Manager / Internal Officer <span class="required-dot">*</span></label>
         <select id="custAssignedSystemUser"></select>
-        <div class="hint">Select the system user / freelancer who introduced or manages this customer. This assignment also controls the existing customer ownership / visibility flow.</div>
+        <div class="hint">Select the internal system user who manages this customer account. Controls customer record access and visibility.</div>
       </div>
     `;
 
@@ -1106,18 +1106,15 @@
       assigned.closest('.field').style.display='';
     }
 
-    /*
-      The old Introducer Master / commission controls are retained in DOM
-      only for legacy records and commission history. They are no longer
-      the visible "Introduced By" field. The visible field is now the
-      System User / Freelancer dropdown requested for customer ownership.
-    */
+    // Customer Introducer & Commission section is active and visible
     ['custIntroducer','custIntroType','custIntroRate','custIntroBasis','custIntroHint']
       .forEach(id=>{
         const el=$(id);
         const field=el?.closest('.field');
-        if(field)field.style.display='none';
+        if(field)field.style.display='';
       });
+    const introHeading = $('custIntroducer')?.closest('.modal-body')?.querySelector('.section');
+    if (introHeading) introHeading.style.display = '';
   }
 
   const populateCustomerAssignedUserV1025=populateCustomerAssignedUserV1024;
@@ -1181,44 +1178,17 @@
     clearCustomerSaveErrorV1025();
 
     const existingId=$('custId')?.value||'';
-    const old=state.customers.find(c=>c.id===existingId)||null;
-    const legacyIntroducerId=old?.introducerId||'';
-    const legacyIntroRuleType=old?.introRuleType||'default';
-    const legacyIntroRate=old?.introRate??0;
-    const legacyIntroBasis=old?.introBasis||'net';
-
     const result=await saveCustomerV1025();
 
-    /*
-      Final save function already stores the selected system user into
-      ownerUser / referralUsername. Restore the hidden legacy commission
-      introducer fields so this UI change cannot rewrite old commission
-      assignments.
-    */
     const savedId=existingId||$('customerSelect')?.value||'';
     const c=state.customers.find(x=>x.id===savedId);
 
-    if(c && old){
-      let changed=false;
-
-      if(c.introducerId!==legacyIntroducerId){
-        c.introducerId=legacyIntroducerId;
-        changed=true;
-      }
-      if(c.introRuleType!==legacyIntroRuleType){
-        c.introRuleType=legacyIntroRuleType;
-        changed=true;
-      }
-      if(Number(c.introRate||0)!==Number(legacyIntroRate||0)){
-        c.introRate=Number(legacyIntroRate||0);
-        changed=true;
-      }
-      if(c.introBasis!==legacyIntroBasis){
-        c.introBasis=legacyIntroBasis;
-        changed=true;
-      }
-
-      if(changed)saveState();
+    if(c){
+      c.introducerId=$('custIntroducer')?.value||'';
+      c.introRuleType=$('custIntroType')?.value||'default';
+      c.introRate=Number($('custIntroRate')?.value||0);
+      c.introBasis=$('custIntroBasis')?.value||'net';
+      saveState();
     }
 
     return result;
