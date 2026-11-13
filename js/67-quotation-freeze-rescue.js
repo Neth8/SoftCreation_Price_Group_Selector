@@ -116,9 +116,131 @@
      notify('A4 quotation opened. Select Save PDF / Print.');
    }catch(e){console.error('Quotation print preparation failed',e);win.document.body.textContent='Could not build quotation: '+e.message;notify('Quotation page error; check console.');}
  }
+
+ async function downloadQuotationDirectPDF(doc){
+   if(typeof requirePerm==='function'&&!requirePerm('quote_pdf','download document PDFs'))return;
+   const serial=escSafe(doc.serial||'Quotation');
+   const custRaw=String(doc.customer?.name || doc.customer_name || doc.customerName || (typeof doc.customer==='string'?doc.customer:'') || '').trim();
+   const titleName=custRaw?`${doc.serial||'Quotation'} - ${custRaw}`:(doc.serial||'Quotation');
+   const fileName=titleName.replace(/[\\/:*?"<>|]/g,'-')+'.pdf';
+   notify('Generating quotation PDF download...');
+   
+   try{
+     const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas);
+     const okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);
+     if(!okC||!okP){
+       notify('Direct PDF library unavailable; opening print view');
+       return openPrintable(doc);
+     }
+     
+     const {body,foot}=getSource(doc);
+     const heading=[...body.children].filter(el=>el.classList.contains('dochead')||el.classList.contains('customerbox'));
+     const other=[...body.children].filter(el=>!heading.includes(el));
+     const pageNodes=[];
+     function createPage(first){
+       const p=document.createElement('div');
+       p.className='paper sc-a4-rescue';
+       p.style.cssText='width:794px;height:1123px;box-sizing:border-box;position:relative;background:#fff url("assets/images/paper-bg.png") center/100% 100% no-repeat;overflow:hidden;padding:0;margin:0;';
+       const b=document.createElement('div');
+       b.className='docbody';
+       b.style.cssText='position:absolute;top:238px;left:58px;right:58px;bottom:122px;overflow:hidden;';
+       p.appendChild(b);
+       if(first) heading.forEach(n=>b.appendChild(n.cloneNode(true)));
+       if(foot){
+         const f=foot.cloneNode(true);
+         f.style.cssText='position:absolute;left:58px;right:58px;bottom:101px;';
+         p.appendChild(f);
+       }
+       pageNodes.push(p);
+       return b;
+     }
+     
+     let target=createPage(true);
+     if(doc.category==='device'){
+       const cards=other.filter(el=>el.classList.contains('device-quote-card'));
+       const section=other.find(el=>el.classList.contains('docsection'));
+       const suffix=other.filter(el=>!el.classList.contains('device-quote-card')&&el!==section);
+       if(section)target.appendChild(section.cloneNode(true));
+       let onPage=0;
+       cards.forEach((card)=>{
+         const limit=pageNodes.length===1?2:3;
+         if(onPage>=limit){target=createPage(false);onPage=0;if(section)target.appendChild(section.cloneNode(true));}
+         target.appendChild(card.cloneNode(true));onPage++;
+       });
+       if(onPage>=3 && suffix.length){target=createPage(false);}
+       suffix.forEach(el=>target.appendChild(el.cloneNode(true)));
+     } else {
+       let rowCount=0;
+       const section=other.find(el=>el.classList.contains('docsection'));
+       for(const el of other){
+         if(el.tagName!=='TABLE'){
+           if(rowCount>12){target=createPage(false);rowCount=0;}
+           target.appendChild(el.cloneNode(true));continue;
+         }
+         const trs=[...el.querySelectorAll('tbody > tr')];
+         const firstLimit=10, continuationLimit=16;
+         let idx=0;
+         while(idx<trs.length){
+           if(rowCount >= (pageNodes.length===1?firstLimit:continuationLimit)){
+             target=createPage(false);rowCount=0;
+             if(section)target.appendChild(section.cloneNode(true));
+           }
+           const table=el.cloneNode(true),tbody=table.querySelector('tbody');
+           if(tbody)tbody.innerHTML='';
+           const capacity=(pageNodes.length===1?firstLimit:continuationLimit)-rowCount;
+           const n=Math.max(1,Math.min(capacity,trs.length-idx));
+           for(let j=0;j<n;j++)tbody.appendChild(trs[idx+j].cloneNode(true));
+           target.appendChild(table);idx+=n;rowCount+=n;
+         }
+       }
+     }
+     const total=pageNodes.length;
+     pageNodes.forEach((p,i)=>{
+       const footEl=p.querySelector('.docfoot');
+       if(footEl){
+         const span=footEl.querySelector('span');
+         if(span)span.textContent=(span.textContent||'')+` • Page ${i+1} of ${total}`;
+       }
+     });
+     
+     const host=document.createElement('div');
+     host.style.cssText='position:fixed;left:-12000px;top:0;width:794px;z-index:-1;background:#fff';
+     document.body.appendChild(host);
+     
+     try{
+       const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+       for(let i=0;i<pageNodes.length;i++){
+         const p=pageNodes[i];
+         host.appendChild(p);
+         const canvas=await html2canvas(p,{
+           scale:1.4,
+           backgroundColor:'#ffffff',
+           useCORS:true,
+           logging:false,
+           width:794,
+           height:1123,
+           windowWidth:794,
+           windowHeight:1123
+         });
+         if(i>0) pdf.addPage('a4','portrait');
+         pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297,undefined,'FAST');
+         p.remove();
+       }
+       pdf.save(fileName);
+       notify(`Quotation PDF downloaded: ${fileName}`);
+     }finally{
+       host.remove();
+     }
+   }catch(err){
+     console.error('Quotation direct download failed',err);
+     notify('Direct PDF failed; opening print view instead');
+     openPrintable(doc);
+   }
+ }
+
  const previousPDF=window.downloadDocPDF;
- function rescuePDF(doc){if(doc&&doc.type==='Q')return openPrintable(doc);return previousPDF.apply(this,arguments);}
+ function rescuePDF(doc){if(doc&&doc.type==='Q')return downloadQuotationDirectPDF(doc);return previousPDF.apply(this,arguments);}
  window.downloadDocPDF=rescuePDF;
  try{downloadDocPDF=rescuePDF}catch(_){ }
- window.downloadSavedPDF=async function(id){const d=find(id);if(!d)return;if(d.type==='Q'){if(!visible(d))return notify('This document belongs to another user');return openPrintable(d);}return rescuePDF(d);};
+ window.downloadSavedPDF=async function(id){const d=find(id);if(!d)return;if(d.type==='Q'){if(!visible(d))return notify('This document belongs to another user');return downloadQuotationDirectPDF(d);}return rescuePDF(d);};
 })();
