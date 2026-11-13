@@ -3501,7 +3501,8 @@ function enhanceIntroducerV84(){
  const nav=document.querySelector('.nav'),settings=document.querySelector('[data-view="settings"]'),b=document.createElement('button');b.className='navbtn';b.dataset.view='introducers';b.textContent='Introducers';b.onclick=()=>showView('introducers');nav.insertBefore(b,settings);
  const firstModal=document.querySelector('.modal');firstModal.insertAdjacentHTML('beforebegin',`<section id="introducers" class="view"><div class="panel"><div class="panel-title">Customer Introducers & Commission Ledger <button class="btn sm" style="background:#fff;color:#087f83" onclick="openIntroducerModalV84()">+ Add Introducer</button></div><div class="panel-body"><div class="notice">Commission is calculated from saved quotation/PI snapshots. By default VAT and delivery charges are excluded. PI payment receipts control how much commission is currently earned.</div><div id="introKpis" class="intro-kpis"></div><div class="listbar"><input id="introSearch" class="search" placeholder="Search introducer / phone / customer" oninput="renderIntroducersV84()"><select id="introStatusFilter" onchange="renderIntroducersV84()"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div><div id="introducerList"></div></div></div></section>`);
  document.body.insertAdjacentHTML('beforeend',`<div id="introducerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Introducer Master</b><button class="closex" onclick="closeModal('introducerModal')">×</button></div><div class="modal-body"><input id="introId" type="hidden"><div class="grid"><div class="field"><label>Name / Company</label><input id="introName"></div><div class="field"><label>Contact Number</label><input id="introPhone"></div><div class="field"><label>Email</label><input id="introEmail"></div><div class="field"><label>NIC / Reference</label><input id="introRef"></div><div class="field"><label>Default Commission Type</label><select id="introType" onchange="updateIntroRuleHintV84()"><option value="percent">Percentage</option><option value="fixed">Fixed Amount per Paid Order</option></select></div><div class="field"><label>Rate % / Fixed Amount (LKR)</label><input id="introRate" type="number" min="0" step="0.01"></div><div class="field"><label>Commission Basis</label><select id="introBasis"><option value="net">Item Value excluding VAT</option><option value="gross">Item Value including VAT</option></select></div><div class="field"><label>Earn When</label><select id="introTrigger"><option value="collected">Customer Payment Collected (Pro-rata)</option><option value="fullpaid">PI Fully Paid</option><option value="pi">PI Saved / Confirmed</option></select></div><div class="field full"><label>Bank / Payment Details</label><textarea id="introBank"></textarea></div><div class="field full"><label>Internal Notes</label><textarea id="introNotes"></textarea></div><div class="field full"><label class="checkline"><input id="introActive" type="checkbox" checked> Active</label></div></div><div id="introRuleHint" class="intro-rule"></div><div class="actions"><button class="btn primary" onclick="saveIntroducerV84()">Save Introducer</button><button id="deleteIntroBtn" class="btn red" onclick="deleteIntroducerV84()">Delete</button></div></div></div></div>
- <div id="introLedgerModal" class="modal"><div class="modal-card" style="max-width:1100px"><div class="modal-head"><div><b>Introducer Commission Ledger</b><div id="introLedgerMeta" class="small"></div></div><button class="closex" onclick="closeModal('introLedgerModal')">×</button></div><div id="introLedgerBody" class="modal-body"></div></div></div>
+ <div id="introLedgerModal" class="modal"><div class="modal-card" style="max-width:1180px"><div class="modal-head"><div><b>Introducer Commission Ledger</b><div id="introLedgerMeta" class="small"></div></div><button class="closex" onclick="closeModal('introLedgerModal')">×</button></div><div id="introLedgerBody" class="modal-body"></div></div></div>
+ <div id="introCustomersModal" class="modal"><div class="modal-card" style="max-width:920px"><div class="modal-head"><div><b id="introCustomersModalTitle">Linked Customers</b><div id="introCustomersModalSubtitle" class="small"></div></div><button class="closex" onclick="closeModal('introCustomersModal')">×</button></div><div id="introCustomersModalBody" class="modal-body"></div></div></div>
  <div id="commissionPayModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Record Commission Payment</b><button class="closex" onclick="closeModal('commissionPayModal')">×</button></div><div class="modal-body"><input id="commissionPayIntroId" type="hidden"><div id="commissionPayMeta" class="notice"></div><div class="grid"><div class="field full"><label>Apply to Specific PI Order (Optional)</label><select id="commissionPayDocId"></select></div><div class="field"><label>Payment Amount</label><input id="commissionPayAmount" type="number" min="0.01" step="0.01"></div><div class="field"><label>Payment Date</label><input id="commissionPayDate" type="date"></div><div class="field"><label>Method</label><select id="commissionPayMethod"><option>Bank Transfer</option><option>Cash</option><option>Cheque</option></select></div><div class="field"><label>Reference</label><input id="commissionPayRef"></div><div class="field full"><label>Note</label><textarea id="commissionPayNote"></textarea></div></div><div class="actions"><button class="btn green" onclick="saveCommissionPaymentV84()">Save Commission Payment</button></div></div></div></div>`);
  const notes=$('custNotes')?.closest('.field');if(notes)notes.insertAdjacentHTML('beforebegin',`<div class="section">Customer Introducer / Referral</div><div class="field"><label>Introduced By</label><select id="custIntroducer"></select></div><div class="field"><label>Commission Rule</label><select id="custIntroType" onchange="updateCustomerIntroHintV84()"><option value="default">Use Introducer Default</option><option value="percent">Custom Percentage</option><option value="fixed">Custom Fixed Amount</option><option value="none">No Commission</option></select></div><div class="field"><label>Custom Rate % / Amount</label><input id="custIntroRate" type="number" min="0" step="0.01"></div><div class="field"><label>Basis</label><select id="custIntroBasis"><option value="net">Item value excl. VAT</option><option value="gross">Item value incl. VAT</option></select></div><div class="field full"><div id="custIntroHint" class="intro-rule"></div></div>`);
 }
@@ -3549,16 +3550,23 @@ function commissionSummaryV84(doc){
 }
 function soCommissionDataV84(so, intro){
   if (!so || !intro) return { net: 0, gross: 0, rate: 0, type: 'percent', commission: 0, isPaid: false };
-  const c = (state.customers || []).find(cust => cust.id === so.customerId);
+  const c = (state.customers || []).find(cust => String(cust.id) === String(so.customerId) || (cust.name && (cust.name.trim().toLowerCase() === (so.customerName || so.customer?.name || '').trim().toLowerCase())));
   const gross = Number(so.total || (so.lines || []).reduce((s, l) => s + (Number(l.qty || 0) * Number(l.price || 0)), 0));
   const vatRate = Number(state.settings?.vat || 18);
   const isVat = !!(c?.vatEnabled || c?.vat || so.vatMode === 'vat18');
   const net = isVat ? (gross / (1 + vatRate / 100)) : gross;
 
-  const ruleType = intro.type || 'percent';
-  const rate = Number(intro.rate || 0);
-  const commission = ruleType === 'fixed' ? rate : (net * rate / 100);
+  let ruleType = intro.type || 'percent';
+  let rate = Number(intro.rate || 0);
+  if (c && c.introRuleType && c.introRuleType !== 'default') {
+    if (c.introRuleType === 'none') {
+      return { net, gross, rate: 0, type: 'none', commission: 0, isPaid: false, customer: c };
+    }
+    ruleType = c.introRuleType;
+    rate = Number(c.introRate || 0);
+  }
 
+  const commission = ruleType === 'fixed' ? rate : (net * rate / 100);
   const isPaid = !!(so.commissionPaid || so.introCommissionPaid);
   return {
     net,
@@ -3567,6 +3575,7 @@ function soCommissionDataV84(so, intro){
     type: ruleType,
     commission,
     isPaid,
+    customer: c,
     paidAt: so.commissionPaidAt || '',
     paidBy: so.commissionPaidBy || '',
     paidRef: so.commissionPaidRef || ''
@@ -3574,12 +3583,20 @@ function soCommissionDataV84(so, intro){
 }
 
 function introducerTotalsV84(id){
-  const intro = (state.introducers || []).find(x => x.id === id);
-  if (!intro) return { sos: [], eligible: 0, earned: 0, paid: 0, due: 0, totalNet: 0 };
+  const intro = (state.introducers || []).find(x => String(x.id) === String(id));
+  if (!intro) return { intro: null, customers: [], customerSummaries: [], sos: [], eligible: 0, earned: 0, paid: 0, due: 0, totalNet: 0 };
 
-  const custIds = new Set((state.customers || []).filter(c => c.introducerId === id).map(c => c.id));
+  const introCustomers = (state.customers || []).filter(c => String(c.introducerId) === String(id));
+  const custIds = new Set(introCustomers.map(c => String(c.id)));
+  const custNames = new Set(introCustomers.map(c => (c.name || '').trim().toLowerCase()).filter(Boolean));
+
   const sos = (state.salesOrders || [])
-    .filter(s => custIds.has(s.customerId) && !window.scSOIsCancelledV57?.(s))
+    .filter(s => {
+      if (window.scSOIsCancelledV57?.(s)) return false;
+      const sCustId = s.customerId != null ? String(s.customerId) : '';
+      const sCustName = (s.customerName || s.customer?.name || '').trim().toLowerCase();
+      return custIds.has(sCustId) || (sCustName && custNames.has(sCustName));
+    })
     .sort((a, b) => (Date.parse(b.date || b.createdAt || 0) || 0) - (Date.parse(a.date || a.createdAt || 0) || 0));
 
   let totalNet = 0, earned = 0, paid = 0;
@@ -3590,8 +3607,31 @@ function introducerTotalsV84(id){
     if (cd.isPaid) paid += cd.commission;
   });
 
+  const customerSummaries = introCustomers.map(cust => {
+    const cSos = sos.filter(s => String(s.customerId) === String(cust.id) || (cust.name && (cust.name.trim().toLowerCase() === (s.customerName || s.customer?.name || '').trim().toLowerCase())));
+    let cNet = 0, cEarned = 0, cPaid = 0;
+    cSos.forEach(s => {
+      const cd = soCommissionDataV84(s, intro);
+      cNet += cd.net;
+      cEarned += cd.commission;
+      if (cd.isPaid) cPaid += cd.commission;
+    });
+    return {
+      id: cust.id,
+      name: cust.name || 'Unnamed Customer',
+      phone: cust.phone || cust.tel || '-',
+      email: cust.email || '',
+      contactPerson: cust.contactPerson || cust.contact || '',
+      soCount: cSos.length,
+      totalNet: cNet,
+      earned: cEarned,
+      paid: cPaid,
+      due: Math.max(0, cEarned - cPaid)
+    };
+  });
+
   const due = Math.max(0, earned - paid);
-  return { intro, sos, totalNet, eligible: earned, earned, paid, due };
+  return { intro, customers: introCustomers, customerSummaries, sos, totalNet, eligible: earned, earned, paid, due };
 }
 
 function renderIntroducersV84(){
@@ -3605,7 +3645,7 @@ function renderIntroducersV84(){
     ['Total Introducers', state.introducers.length],
     ['Commission Earned (SO)', all.reduce((s, x) => s + x.earned, 0)],
     ['Paid by Admin', all.reduce((s, x) => s + x.paid, 0)],
-    ['Outstanding Due', all.reduce((s, x) => s + x.due, 0)]
+    ['Outstanding Due to Pay', all.reduce((s, x) => s + x.due, 0)]
   ].map((x, i) => `<div class="intro-kpi"><span>${x[0]}</span><b>${i ? `LKR ${money(x[1])}` : x[1]}</b></div>`).join('');
 
   $('introducerList').innerHTML = a.length ? `
@@ -3614,16 +3654,16 @@ function renderIntroducersV84(){
         <tr>
           <th>Introducer</th>
           <th>Commission Rule (Excl. VAT)</th>
-          <th>Customers</th>
+          <th>Linked Customers</th>
           <th>Sales Orders / Earned</th>
-          <th>Paid / Due</th>
+          <th>Paid / Outstanding Due</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         ${a.map(x => {
           const t = introducerTotalsV84(x.id);
-          const cs = state.customers.filter(c => c.introducerId === x.id);
+          const cs = t.customers || [];
           return `
             <tr>
               <td>
@@ -3632,8 +3672,15 @@ function renderIntroducersV84(){
               </td>
               <td>${esc(introRuleTextV84(x))}</td>
               <td>
-                <b>${cs.length}</b> customer(s)
-                <div class="small">${cs.slice(0, 3).map(c => esc(c.name)).join(', ')}${cs.length > 3 ? '...' : ''}</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <div>
+                    <b>${cs.length}</b> customer(s)
+                    <div class="small" style="color:#64748b">${cs.slice(0, 2).map(c => esc(c.name)).join(', ')}${cs.length > 2 ? '...' : ''}</div>
+                  </div>
+                  <button class="btn ghost sm" style="font-size:11px;padding:3px 9px;white-space:nowrap;font-weight:600" onclick="openIntroCustomersModalV84('${x.id}')">
+                    View
+                  </button>
+                </div>
               </td>
               <td>
                 <b>${t.sos.length}</b> Sales Orders
@@ -3641,11 +3688,11 @@ function renderIntroducersV84(){
               </td>
               <td>
                 <span class="commission-paid">Paid: LKR ${money(t.paid)}</span>
-                <div class="commission-due">Due: LKR ${money(t.due)}</div>
+                <div class="commission-due" style="color:${t.due > 0 ? '#b45309' : '#64748b'}">Due to Pay: LKR ${money(t.due)}</div>
               </td>
               <td>
                 <div style="display:flex;gap:6px">
-                  <button class="btn ghost sm" onclick="openIntroLedgerV84('${x.id}')">Ledger</button>
+                  <button class="btn ghost sm" onclick="openIntroLedgerV84('${x.id}')">View Ledger</button>
                   <button class="btn ghost sm" onclick="openIntroducerModalV84('${x.id}')">Edit</button>
                 </div>
               </td>
@@ -3657,11 +3704,93 @@ function renderIntroducersV84(){
   ` : '<div class="empty">No introducers found.</div>';
 }
 
+function openIntroCustomersModalV84(id){
+  const intro = (state.introducers || []).find(x => String(x.id) === String(id));
+  if(!intro) return toast('Introducer not found');
+
+  const t = introducerTotalsV84(id);
+  $('introCustomersModalTitle').textContent = `Linked Customers — ${intro.name}`;
+  $('introCustomersModalSubtitle').innerHTML = `
+    ${esc(intro.phone || 'No phone')} · Commission Rule: <b>${esc(introRuleTextV84(intro))}</b>
+    ${intro.bank ? `<span style="margin-left:8px;color:#087f83">· Bank: ${esc(intro.bank)}</span>` : ''}
+  `;
+
+  const rows = (t.customerSummaries || []).map((cs, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>
+        <b>${esc(cs.name)}</b>
+      </td>
+      <td>
+        <div>${esc(cs.phone)}</div>
+        ${cs.contactPerson ? `<div class="small" style="color:#64748b">${esc(cs.contactPerson)}</div>` : ''}
+      </td>
+      <td style="text-align:center"><b>${cs.soCount}</b></td>
+      <td style="text-align:right">LKR ${money(cs.totalNet)}</td>
+      <td style="text-align:right"><b style="color:#087f83">LKR ${money(cs.earned)}</b></td>
+      <td style="text-align:right"><span style="color:#087247">LKR ${money(cs.paid)}</span></td>
+      <td style="text-align:right"><b style="color:${cs.due > 0 ? '#b45309' : '#64748b'}">LKR ${money(cs.due)}</b></td>
+      <td>
+        <button class="btn ghost sm" style="font-size:10px;padding:3px 7px" onclick="closeModal('introCustomersModal');openCustomerModal('${cs.id}')">Edit</button>
+      </td>
+    </tr>
+  `).join('');
+
+  $('introCustomersModalBody').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0;flex-wrap:wrap;gap:8px">
+      <div>
+        <span style="font-size:12px;color:#64748b">Total Customers: <b>${t.customerSummaries.length}</b></span>
+        <span style="margin:0 8px;color:#cbd5e1">|</span>
+        <span style="font-size:12px;color:#64748b">Total Sales Orders: <b>${t.sos.length}</b></span>
+        <span style="margin:0 8px;color:#cbd5e1">|</span>
+        <span style="font-size:12px;color:#64748b">Commission Earned: <b style="color:#087f83">LKR ${money(t.earned)}</b></span>
+        <span style="margin:0 8px;color:#cbd5e1">|</span>
+        <span style="font-size:12px;color:#64748b">Outstanding Due: <b style="color:${t.due > 0 ? '#b45309' : '#15803d'}">LKR ${money(t.due)}</b></span>
+      </div>
+      <button class="btn ghost sm" onclick="closeModal('introCustomersModal');openIntroLedgerV84('${id}')" style="font-size:11px">
+        View Full Ledger →
+      </button>
+    </div>
+
+    ${t.customerSummaries.length ? `
+      <div class="tablewrap" style="max-height:60vh;overflow-y:auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:4%">#</th>
+              <th style="width:24%">Customer Name</th>
+              <th style="width:20%">Contact Details</th>
+              <th style="width:10%;text-align:center">Sales Orders</th>
+              <th style="width:14%;text-align:right">Net Sales (Excl. VAT)</th>
+              <th style="width:12%;text-align:right">Earned</th>
+              <th style="width:10%;text-align:right">Paid</th>
+              <th style="width:10%;text-align:right">Due</th>
+              <th style="width:8%">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    ` : `
+      <div style="text-align:center;padding:24px;color:#64748b">
+        <p style="font-size:13px;margin:0 0 8px">No customers are currently linked to <b>${esc(intro.name)}</b>.</p>
+        <span class="small" style="color:#94a3b8">To link a customer, open Customer Master and select <b>${esc(intro.name)}</b> in the "Introduced By" field.</span>
+      </div>
+    `}
+  `;
+
+  $('introCustomersModal').classList.add('show');
+}
+
 let activeIntroLedgerId = null;
+window.introLedgerStatusFilter = 'all';
 
 function openIntroLedgerV84(id){
   activeIntroLedgerId = id;
-  const x = state.introducers.find(y => y.id === id);
+  window.introLedgerStatusFilter = 'all';
+  const x = (state.introducers || []).find(y => String(y.id) === String(id));
   if(!x) return;
 
   $('introLedgerMeta').innerHTML = `
@@ -3674,27 +3803,54 @@ function openIntroLedgerV84(id){
   $('introLedgerModal').classList.add('show');
 }
 
+function setIntroLedgerTab(id, tab){
+  window.introLedgerStatusFilter = tab;
+  renderIntroLedgerContent(id);
+}
+
 function renderIntroLedgerContent(id){
-  const intro = state.introducers.find(y => y.id === id);
+  const intro = (state.introducers || []).find(y => String(y.id) === String(id));
   if(!intro) return;
 
   const t = introducerTotalsV84(id);
   const from = $('introLedgerFrom')?.value || '';
   const to = $('introLedgerTo')?.value || '';
 
-  const filteredSos = t.sos.filter(s => {
+  // All sales orders in the date range
+  const allSosInRange = t.sos.filter(s => {
     if (from && s.date < from) return false;
     if (to && s.date > to) return false;
     return true;
   });
 
-  let filteredNet = 0, filteredEarned = 0, filteredPaid = 0;
-  const rows = filteredSos.map((so, idx) => {
-    const cd = soCommissionDataV84(so, intro);
-    filteredNet += cd.net;
-    filteredEarned += cd.commission;
-    if (cd.isPaid) filteredPaid += cd.commission;
+  let totalNetInRange = 0, totalEarnedInRange = 0, totalPaidInRange = 0;
+  let unpaidCount = 0, paidCount = 0;
 
+  allSosInRange.forEach(so => {
+    const cd = soCommissionDataV84(so, intro);
+    totalNetInRange += cd.net;
+    totalEarnedInRange += cd.commission;
+    if (cd.isPaid) {
+      totalPaidInRange += cd.commission;
+      paidCount++;
+    } else {
+      unpaidCount++;
+    }
+  });
+
+  const totalDueInRange = Math.max(0, totalEarnedInRange - totalPaidInRange);
+
+  // Filter based on selected tab: all | unpaid | paid
+  const currentTab = window.introLedgerStatusFilter || 'all';
+  const displaySos = allSosInRange.filter(so => {
+    const cd = soCommissionDataV84(so, intro);
+    if (currentTab === 'unpaid') return !cd.isPaid;
+    if (currentTab === 'paid') return cd.isPaid;
+    return true;
+  });
+
+  const rows = displaySos.map((so, idx) => {
+    const cd = soCommissionDataV84(so, intro);
     return `
       <tr>
         <td>${idx + 1}</td>
@@ -3703,18 +3859,18 @@ function renderIntroLedgerContent(id){
           <div class="small">${esc(so.date)}</div>
         </td>
         <td>
-          <b>${esc(so.customerName)}</b>
+          <b>${esc(so.customerName || 'Customer')}</b>
           <div class="small">${esc(so.customerRef ? 'PO/Ref: ' + so.customerRef : '')}</div>
         </td>
         <td>
-          <div class="small">${(so.lines || []).slice(0, 2).map(l => esc(l.desc + ' ' + (l.size || '') + ' × ' + money(l.qty))).join('<br>')}</div>
+          <div class="small">${(so.lines || []).slice(0, 2).map(l => esc(l.desc + ' ' + (l.size || '') + ' × ' + money(l.qty))).join('<br>')}${(so.lines || []).length > 2 ? `<div style="color:#94a3b8;font-size:10px">+${so.lines.length - 2} more</div>` : ''}</div>
         </td>
         <td style="text-align:right"><b>LKR ${money(cd.net)}</b></td>
         <td style="text-align:center">${cd.type === 'fixed' ? 'Fixed' : cd.rate + '%'}</td>
         <td style="text-align:right"><b style="color:#087f83">LKR ${money(cd.commission)}</b></td>
         <td>
-          <span class="tag ${cd.isPaid ? 'green' : 'amber'} sm">
-            ${cd.isPaid ? 'PAID' : 'UNPAID'}
+          <span class="tag ${cd.isPaid ? 'green' : 'amber'} sm" style="font-weight:700">
+            ${cd.isPaid ? 'PAID' : 'UNPAID - DUE'}
           </span>
           ${cd.paidAt ? `<div class="small" style="color:#64748b;font-size:10px">${new Date(cd.paidAt).toLocaleDateString()} · ${esc(cd.paidRef || 'By Admin')}</div>` : ''}
         </td>
@@ -3727,10 +3883,30 @@ function renderIntroLedgerContent(id){
     `;
   }).join('');
 
-  const filteredDue = Math.max(0, filteredEarned - filteredPaid);
-  const unpaidCount = filteredSos.filter(s => !(s.commissionPaid || s.introCommissionPaid)).length;
+  // Linked Customers table rows
+  const custRows = (t.customerSummaries || []).map((cs, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>
+        <b>${esc(cs.name)}</b>
+      </td>
+      <td>
+        <div>${esc(cs.phone)}</div>
+        ${cs.contactPerson ? `<div class="small" style="color:#64748b">${esc(cs.contactPerson)}</div>` : ''}
+      </td>
+      <td style="text-align:center"><b>${cs.soCount}</b></td>
+      <td style="text-align:right">LKR ${money(cs.totalNet)}</td>
+      <td style="text-align:right"><b style="color:#087f83">LKR ${money(cs.earned)}</b></td>
+      <td style="text-align:right"><span style="color:#087247">LKR ${money(cs.paid)}</span></td>
+      <td style="text-align:right"><b style="color:${cs.due > 0 ? '#b45309' : '#64748b'}">LKR ${money(cs.due)}</b></td>
+      <td>
+        <button class="btn ghost sm" style="font-size:10px;padding:3px 7px" onclick="openCustomerModal('${cs.id}')">View</button>
+      </td>
+    </tr>
+  `).join('');
 
   $('introLedgerBody').innerHTML = `
+    <!-- Top Filter Bar -->
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
       <div class="field" style="margin:0">
         <label style="font-size:11px;font-weight:700">From Date</label>
@@ -3748,20 +3924,93 @@ function renderIntroLedgerContent(id){
       </button>
     </div>
 
-    <div class="intro-kpis" style="margin-bottom:16px">
-      <div class="intro-kpi"><span>Sales Orders in Range</span><b>${filteredSos.length}</b></div>
-      <div class="intro-kpi"><span>Net Sales (Excl. VAT)</span><b>LKR ${money(filteredNet)}</b></div>
-      <div class="intro-kpi"><span>Commission Earned</span><b>LKR ${money(filteredEarned)}</b></div>
-      <div class="intro-kpi"><span>Paid by Admin</span><b style="color:#087247">LKR ${money(filteredPaid)}</b></div>
-      <div class="intro-kpi"><span>Outstanding Due</span><b style="color:#b45309">LKR ${money(filteredDue)}</b></div>
+    <!-- Summary KPIs -->
+    <div class="intro-kpis" style="margin-bottom:14px">
+      <div class="intro-kpi"><span>Linked Customers</span><b>${t.customers.length}</b></div>
+      <div class="intro-kpi"><span>Sales Orders in Range</span><b>${allSosInRange.length}</b></div>
+      <div class="intro-kpi"><span>Net Sales (Excl. VAT)</span><b>LKR ${money(totalNetInRange)}</b></div>
+      <div class="intro-kpi"><span>Commission Earned</span><b>LKR ${money(totalEarnedInRange)}</b></div>
+      <div class="intro-kpi"><span>Paid by Admin</span><b style="color:#087247">LKR ${money(totalPaidInRange)}</b></div>
+      <div class="intro-kpi"><span>Outstanding Due to Pay</span><b style="color:#b45309">LKR ${money(totalDueInRange)}</b></div>
     </div>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <h4 style="margin:0">Customer Sales Orders & Commission Status</h4>
+    <!-- Prominent Admin Payout Banner -->
+    <div style="background:${totalDueInRange > 0 ? '#fffbeb' : '#f0fdf4'};border:1px solid ${totalDueInRange > 0 ? '#fde68a' : '#bbf7d0'};border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:11px;font-weight:800;color:${totalDueInRange > 0 ? '#b45309' : '#15803d'};text-transform:uppercase;letter-spacing:0.5px">
+          ${totalDueInRange > 0 ? '⚠️ Commissions Admin Needs to Pay to Introducer' : '✓ All Introducer Commissions Fully Settled'}
+        </div>
+        <div style="font-size:22px;font-weight:900;color:${totalDueInRange > 0 ? '#b45309' : '#15803d'};margin-top:2px">
+          LKR ${money(totalDueInRange)}
+          <span style="font-size:12px;font-weight:600;color:#64748b">(${unpaidCount} sales order${unpaidCount === 1 ? '' : 's'} waiting for admin payment)</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${unpaidCount > 0 && currentUser?.role === 'admin' ? `
+          <button class="btn green sm" type="button" onclick="markAllFilteredSoPaid('${id}')" style="font-weight:700;padding:7px 14px">
+            ✓ Pay All ${unpaidCount} Outstanding in Range (LKR ${money(totalDueInRange)})
+          </button>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- Section 1: Linked Customers -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px">
+          <span>👥 Linked Customers (${t.customerSummaries.length})</span>
+          <span style="font-size:11px;font-weight:normal;color:#64748b">— Clients introduced by ${esc(intro.name)}</span>
+        </div>
+        <div style="font-size:11px;color:#64748b">
+          ${t.customerSummaries.length ? `<b>${t.customerSummaries.length}</b> customer(s) registered under this introducer` : ''}
+        </div>
+      </div>
+      ${t.customerSummaries.length ? `
+        <div class="tablewrap" style="max-height:180px;overflow-y:auto;border:1px solid #f1f5f9;border-radius:6px">
+          <table class="table" style="font-size:11px;margin:0">
+            <thead>
+              <tr style="background:#f8fafc">
+                <th style="width:4%">#</th>
+                <th style="width:26%">Customer Name</th>
+                <th style="width:20%">Contact Details</th>
+                <th style="width:10%;text-align:center">Sales Orders</th>
+                <th style="width:14%;text-align:right">Total Net Sales (Excl. VAT)</th>
+                <th style="width:12%;text-align:right">Commission Earned</th>
+                <th style="width:11%;text-align:right">Paid by Admin</th>
+                <th style="width:11%;text-align:right">Outstanding Due</th>
+                <th style="width:8%">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${custRows}
+            </tbody>
+          </table>
+        </div>
+      ` : `
+        <div style="padding:10px;text-align:center;color:#64748b;font-size:11px;background:#f8fafc;border-radius:6px">
+          No customers are currently linked to this introducer.<br>
+          <span style="font-size:10px;color:#94a3b8">To link a customer, edit the customer in the Customers tab and select <b>${esc(intro.name)}</b> as their Introducer.</span>
+        </div>
+      `}
+    </div>
+
+    <!-- Section 2: Sales Orders & Admin Payment Status -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn ${currentTab === 'all' ? 'primary' : 'ghost'} sm" type="button" onclick="setIntroLedgerTab('${id}', 'all')">
+          All Orders (${allSosInRange.length})
+        </button>
+        <button class="btn ${currentTab === 'unpaid' ? 'primary' : 'ghost'} sm" type="button" onclick="setIntroLedgerTab('${id}', 'unpaid')" style="${currentTab !== 'unpaid' && unpaidCount > 0 ? 'border-color:#f59e0b;color:#b45309;font-weight:700' : ''}">
+          ⚠️ Admin Needs to Pay (${unpaidCount})
+        </button>
+        <button class="btn ${currentTab === 'paid' ? 'primary' : 'ghost'} sm" type="button" onclick="setIntroLedgerTab('${id}', 'paid')">
+          ✓ Paid History (${paidCount})
+        </button>
+      </div>
       ${unpaidCount > 0 ? `<button class="btn green sm" type="button" onclick="markAllFilteredSoPaid('${id}')">✓ Mark All ${unpaidCount} Unpaid in Range as Paid</button>` : ''}
     </div>
 
-    <div class="tablewrap" style="max-height:55vh;overflow-y:auto">
+    <div class="tablewrap" style="max-height:50vh;overflow-y:auto">
       <table class="table">
         <thead>
           <tr>
@@ -3777,7 +4026,7 @@ function renderIntroLedgerContent(id){
           </tr>
         </thead>
         <tbody>
-          ${rows || '<tr><td colspan="9" style="text-align:center;padding:16px;color:#64748b">No Sales Orders found for this introducer in this date range.</td></tr>'}
+          ${rows || `<tr><td colspan="9" style="text-align:center;padding:16px;color:#64748b">No Sales Orders found matching this filter (${currentTab}) in this date range.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -3795,27 +4044,28 @@ function toggleSoCommissionPaid(introId, soId, markPaid){
   const so = (state.salesOrders || []).find(x => x.id === soId);
   if(!so) return toast('Sales order not found');
 
-  let ref = '';
-  if(markPaid){
-    ref = prompt(`Mark ${so.soNo} as commission PAID.\nEnter Payment Reference / Note (e.g. Bank Transfer Ref, Cheque No, Cash Voucher):`, 'Bank Transfer');
-    if(ref === null) return;
-  }
+  const intro = state.introducers.find(x => x.id === introId);
+  if(!intro) return;
 
-  so.commissionPaid = !!markPaid;
-  so.introCommissionPaid = !!markPaid;
   if(markPaid){
+    const ref = prompt(`Mark Sales Order ${so.soNo} commission as PAID to ${intro.name}?\nEnter payment reference (e.g. Bank Transfer Ref, Cheque No):`, 'Direct Bank Transfer');
+    if(ref === null) return;
+    so.commissionPaid = true;
+    so.introCommissionPaid = true;
     so.commissionPaidAt = new Date().toISOString();
     so.commissionPaidBy = currentUser?.display || currentUser?.username || 'Admin';
-    so.commissionPaidRef = String(ref || 'Paid by Admin').trim();
+    so.commissionPaidRef = String(ref || '').trim();
+    audit('COMMISSION_PAY', `${intro.name}: SO ${so.soNo} marked PAID (${ref})`);
   } else {
-    delete so.commissionPaid;
-    delete so.introCommissionPaid;
-    delete so.commissionPaidAt;
-    delete so.commissionPaidBy;
-    delete so.commissionPaidRef;
+    if(!confirm(`Revert commission payment for Sales Order ${so.soNo} to UNPAID?`)) return;
+    so.commissionPaid = false;
+    so.introCommissionPaid = false;
+    so.commissionPaidAt = null;
+    so.commissionPaidBy = null;
+    so.commissionPaidRef = null;
+    audit('COMMISSION_UNPAY', `${intro.name}: SO ${so.soNo} marked UNPAID`);
   }
 
-  audit('COMMISSION_SO_STATUS', `${so.soNo}: ${markPaid ? 'PAID (' + ref + ')' : 'UNPAID'}`);
   saveState();
 
   if(typeof window.spgsSyncSalesOrders === 'function'){
@@ -3884,7 +4134,7 @@ window.downloadIntroLedgerPDF = async function(id){
     return true;
   });
 
-  if(!filteredSos.length) return toast('No sales orders to export for this date range');
+  if(!filteredSos.length && !t.customerSummaries.length) return toast('No data to export for this introducer in this date range');
 
   const okC = await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', () => window.html2canvas);
   const okP = await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', () => window.jspdf);
@@ -3902,18 +4152,31 @@ window.downloadIntroLedgerPDF = async function(id){
         <td style="padding:6px 7px;text-align:center">${idx + 1}</td>
         <td style="padding:6px 7px"><b>${esc(so.soNo)}</b></td>
         <td style="padding:6px 7px">${esc(so.date)}</td>
-        <td style="padding:6px 7px"><b>${esc(so.customerName)}</b></td>
+        <td style="padding:6px 7px"><b>${esc(so.customerName || 'Customer')}</b></td>
         <td style="padding:6px 7px;text-align:right">LKR ${money(cd.net)}</td>
         <td style="padding:6px 7px;text-align:center">${cd.type === 'fixed' ? 'Fixed' : cd.rate + '%'}</td>
-        <td style="padding:6px 7px;text-align:right;font-weight:700">LKR ${money(cd.commission)}</td>
+        <td style="padding:6px 7px;text-align:right;font-weight:700;color:#087f83">LKR ${money(cd.commission)}</td>
         <td style="padding:6px 7px;text-align:center">
           <span style="display:inline-block;padding:2px 7px;border-radius:99px;font-weight:700;font-size:9px;background:${cd.isPaid ? '#dcfce7;color:#15803d' : '#fef3c7;color:#b45309'}">
-            ${cd.isPaid ? 'PAID' : 'UNPAID'}
+            ${cd.isPaid ? 'PAID' : 'UNPAID - DUE'}
           </span>
         </td>
       </tr>
     `;
   }).join('');
+
+  const custSummaryHtml = (t.customerSummaries || []).map((cs, idx) => `
+    <tr style="border-bottom:1px solid #e2e8f0;font-size:9.5px">
+      <td style="padding:5px 7px;text-align:center">${idx + 1}</td>
+      <td style="padding:5px 7px"><b>${esc(cs.name)}</b></td>
+      <td style="padding:5px 7px">${esc(cs.phone)}</td>
+      <td style="padding:5px 7px;text-align:center"><b>${cs.soCount}</b></td>
+      <td style="padding:5px 7px;text-align:right">LKR ${money(cs.totalNet)}</td>
+      <td style="padding:5px 7px;text-align:right;font-weight:700;color:#087f83">LKR ${money(cs.earned)}</td>
+      <td style="padding:5px 7px;text-align:right;color:#087247">LKR ${money(cs.paid)}</td>
+      <td style="padding:5px 7px;text-align:right;font-weight:700;color:${cs.due > 0 ? '#b45309' : '#64748b'}">LKR ${money(cs.due)}</td>
+    </tr>
+  `).join('');
 
   const filteredDue = Math.max(0, filteredEarned - filteredPaid);
   const periodText = (from && to) ? `${from} to ${to}` : (from ? `From ${from}` : (to ? `Up to ${to}` : 'All Recorded Orders'));
@@ -3968,36 +4231,65 @@ window.downloadIntroLedgerPDF = async function(id){
       <div style="background:#fffbeb;border:1px solid #fde68a;padding:8px;border-radius:7px">
         <div style="font-size:9px;font-weight:700;color:#b45309;text-transform:uppercase">Outstanding Due</div>
         <div style="font-size:16px;font-weight:900;color:#b45309;margin-top:2px">LKR ${money(filteredDue)}</div>
-        <div style="font-size:9px;color:#b45309">Payable</div>
+        <div style="font-size:9px;color:#b45309">Admin Needs to Pay</div>
       </div>
     </div>
 
-    <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
-      <thead>
-        <tr style="background:#f1f5f9;font-size:9px;font-weight:800;color:#475569;text-transform:uppercase;border-bottom:2px solid #cbd5e1">
-          <th style="padding:6px;width:5%;text-align:center">#</th>
-          <th style="padding:6px;width:20%;text-align:left">Sales Order No</th>
-          <th style="padding:6px;width:12%;text-align:left">Date</th>
-          <th style="padding:6px;width:25%;text-align:left">Customer</th>
-          <th style="padding:6px;width:15%;text-align:right">Net Excl. VAT</th>
-          <th style="padding:6px;width:8%;text-align:center">Rate</th>
-          <th style="padding:6px;width:15%;text-align:right">Commission</th>
-          <th style="padding:6px;width:10%;text-align:center">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml}
-      </tbody>
-      <tfoot>
-        <tr style="background:#f8fafc;font-weight:800;border-top:2px solid #cbd5e1;font-size:10px">
-          <td colspan="4" style="padding:7px;text-align:right">TOTALS:</td>
-          <td style="padding:7px;text-align:right">LKR ${money(filteredNet)}</td>
-          <td></td>
-          <td style="padding:7px;text-align:right;color:#087f83">LKR ${money(filteredEarned)}</td>
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
+    <!-- Linked Customers Summary in PDF -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:800;color:#0f172a;text-transform:uppercase;margin-bottom:4px;border-bottom:1px solid #cbd5e1;padding-bottom:3px">
+        1. LINKED CUSTOMERS SUMMARY (${t.customerSummaries.length})
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:6px;font-size:9px">
+        <thead>
+          <tr style="background:#f1f5f9;font-weight:800;color:#475569;text-transform:uppercase;border-bottom:1px solid #cbd5e1">
+            <th style="padding:4px 6px;width:5%;text-align:center">#</th>
+            <th style="padding:4px 6px;width:28%;text-align:left">Customer Name</th>
+            <th style="padding:4px 6px;width:18%;text-align:left">Contact</th>
+            <th style="padding:4px 6px;width:9%;text-align:center">Orders</th>
+            <th style="padding:4px 6px;width:15%;text-align:right">Net Sales (Excl. VAT)</th>
+            <th style="padding:4px 6px;width:13%;text-align:right">Earned</th>
+            <th style="padding:4px 6px;width:12%;text-align:right">Paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${custSummaryHtml || '<tr><td colspan="7" style="padding:6px;text-align:center;color:#64748b">No customers currently registered under this introducer.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Sales Orders Breakdown in PDF -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:800;color:#0f172a;text-transform:uppercase;margin-bottom:4px;border-bottom:1px solid #cbd5e1;padding-bottom:3px">
+        2. SALES ORDERS & COMMISSION ITEMIZATION (EXCL. VAT)
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+        <thead>
+          <tr style="background:#f1f5f9;font-size:9px;font-weight:800;color:#475569;text-transform:uppercase;border-bottom:2px solid #cbd5e1">
+            <th style="padding:6px;width:5%;text-align:center">#</th>
+            <th style="padding:6px;width:20%;text-align:left">Sales Order No</th>
+            <th style="padding:6px;width:12%;text-align:left">Date</th>
+            <th style="padding:6px;width:25%;text-align:left">Customer</th>
+            <th style="padding:6px;width:15%;text-align:right">Net Excl. VAT</th>
+            <th style="padding:6px;width:8%;text-align:center">Rate</th>
+            <th style="padding:6px;width:15%;text-align:right">Commission</th>
+            <th style="padding:6px;width:10%;text-align:center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml || '<tr><td colspan="8" style="padding:8px;text-align:center;color:#64748b">No sales orders found for this introducer in this date range.</td></tr>'}
+        </tbody>
+        <tfoot>
+          <tr style="background:#f8fafc;font-weight:800;border-top:2px solid #cbd5e1;font-size:10px">
+            <td colspan="4" style="padding:7px;text-align:right">TOTALS:</td>
+            <td style="padding:7px;text-align:right">LKR ${money(filteredNet)}</td>
+            <td></td>
+            <td style="padding:7px;text-align:right;color:#087f83">LKR ${money(filteredEarned)}</td>
+            <td style="padding:7px;text-align:center;color:#b45309">Due: LKR ${money(filteredDue)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:35px;padding-top:14px;border-top:1px dashed #cbd5e1;font-size:10px;text-align:center">
       <div>
