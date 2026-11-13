@@ -19,8 +19,22 @@
       const status=statusFor(so),type=classes[status]||'unknown';
       let wrap=first.querySelector('.spgs-live-chip-slot');
       if(!wrap){wrap=document.createElement('span');wrap.className='spgs-live-chip-slot';first.appendChild(wrap);}
-      let chip=wrap.querySelector('.spgs-live-chip');
-      if(!chip){chip=document.createElement('span');wrap.appendChild(chip);}
+      const inProd = so.productionStatus==='In Production' || so.inProduction===true;
+      let prodChip = wrap.querySelector('.spgs-prod-chip');
+      if(inProd){
+        if(!prodChip){
+          prodChip=document.createElement('span');
+          prodChip.className='spgs-live-chip spgs-prod-chip';
+          prodChip.style.cssText='background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;margin-right:5px;font-weight:800;font-size:10px;padding:2px 7px;border-radius:999px;display:inline-block;';
+          prodChip.textContent='In Production';
+          wrap.insertBefore(prodChip, wrap.firstChild);
+        }
+        prodChip.title=so.productionRequestNo ? `In Production (Request ${so.productionRequestNo})` : 'In Production';
+      } else if(prodChip){
+        prodChip.remove();
+      }
+      let chip=wrap.querySelector('.spgs-live-chip:not(.spgs-prod-chip)');
+      if(!chip){chip=document.createElement('span');chip.className='spgs-live-chip';wrap.appendChild(chip);}
       chip.className='spgs-live-chip is-'+type;
       chip.textContent=labels[status]||labels.Unknown;
       const p=progress[String(so.id)];

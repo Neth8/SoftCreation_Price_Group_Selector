@@ -85,42 +85,52 @@
   }
 
   /* ---------------------- JBR length preview ---------------------- */
-  window.jbrActualLengthPreviewV1066=function(){
-    const calc=(typeof jbrCalcV1055==='function')
-      ? jbrCalcV1055()
-      : {
-          jbrLengthM:Number($('jbrLengthV1055')?.value||0),
-          pcsPerRoll:Number($('jbrPcsV1055')?.value||0),
-          pitch:Number($('jbrLabelHeightV1055')?.value||0)+Number($('jbrGapV1055')?.value||0),
-          lanes:0,
-          theoreticalRolls:0
-        };
-
-    const actual=Math.max(0,Number($('jbrActualRollsV1055')?.value||0));
-    const lanes=Math.max(0,Number(calc.lanes||0));
-    const pcs=Math.max(0,Number(calc.pcsPerRoll||0));
-    const pitch=Math.max(0,Number(calc.pitch||0));
-    const original=Math.max(0,Number(calc.jbrLengthM||0));
-
-    const used=(lanes>0&&pcs>0&&pitch>0)
-      ? (actual*pcs*pitch)/(lanes*1000)
-      : 0;
-    const balance=Math.max(0,original-used);
-
-    if($('jbrPreviewActualRollsV1066'))$('jbrPreviewActualRollsV1066').textContent=money(actual);
-    if($('jbrPreviewUsedLengthV1066'))$('jbrPreviewUsedLengthV1066').textContent=`${money(used)} m`;
-    if($('jbrPreviewOriginalLengthV1066'))$('jbrPreviewOriginalLengthV1066').textContent=`${money(original)} m`;
-    if($('jbrPreviewBalanceLengthV1066'))$('jbrPreviewBalanceLengthV1066').textContent=`${money(balance)} m`;
-
-    const card=$('jbrActualLengthCardV1066');
-    if(card){
-      card.classList.toggle('over',used>original+.0001);
-      if(used>original+.0001){
-        $('jbrPreviewBalanceLengthV1066').textContent=`OVER BY ${money(used-original)} m`;
+  let jbrPreviewBusyV1066=false;
+  window.jbrActualLengthPreviewV1066=function(providedCalc=null){
+    if(jbrPreviewBusyV1066)return null;
+    jbrPreviewBusyV1066=true;
+    try{
+      let calc=providedCalc;
+      if(!calc){
+        const width=Number($('jbrWidthV1055')?.value||0);
+        const jbrLengthM=Number($('jbrLengthV1055')?.value||0);
+        const labelWidth=Number($('jbrLabelWidthV1055')?.value||0);
+        const labelHeight=Number($('jbrLabelHeightV1055')?.value||0);
+        const gap=Number($('jbrGapV1055')?.value||0);
+        const pcsPerRoll=Number($('jbrPcsV1055')?.value||0);
+        const lanes=(width>0&&labelWidth>0)?Math.floor(width/labelWidth):0;
+        const pitch=labelHeight>0?labelHeight+Math.max(0,gap):0;
+        calc={jbrLengthM,pcsPerRoll,pitch,lanes};
       }
-    }
 
-    return {actual,usedLengthM:used,originalLengthM:original,balanceLengthM:balance};
+      const actual=Math.max(0,Number($('jbrActualRollsV1055')?.value||0));
+      const lanes=Math.max(0,Number(calc?.lanes||0));
+      const pcs=Math.max(0,Number(calc?.pcsPerRoll||0));
+      const pitch=Math.max(0,Number(calc?.pitch||0));
+      const original=Math.max(0,Number(calc?.jbrLengthM||0));
+
+      const used=(lanes>0&&pcs>0&&pitch>0)
+        ? (actual*pcs*pitch)/(lanes*1000)
+        : 0;
+      const balance=Math.max(0,original-used);
+
+      if($('jbrPreviewActualRollsV1066'))$('jbrPreviewActualRollsV1066').textContent=money(actual);
+      if($('jbrPreviewUsedLengthV1066'))$('jbrPreviewUsedLengthV1066').textContent=`${money(used)} m`;
+      if($('jbrPreviewOriginalLengthV1066'))$('jbrPreviewOriginalLengthV1066').textContent=`${money(original)} m`;
+      if($('jbrPreviewBalanceLengthV1066'))$('jbrPreviewBalanceLengthV1066').textContent=`${money(balance)} m`;
+
+      const card=$('jbrActualLengthCardV1066');
+      if(card){
+        card.classList.toggle('over',used>original+.0001);
+        if(used>original+.0001){
+          $('jbrPreviewBalanceLengthV1066').textContent=`OVER BY ${money(used-original)} m`;
+        }
+      }
+
+      return {actual,usedLengthM:used,originalLengthM:original,balanceLengthM:balance};
+    }finally{
+      jbrPreviewBusyV1066=false;
+    }
   };
 
   function installJbrPreviewV1066(){
@@ -131,20 +141,7 @@
     if(typeof base==='function'){
       window.jbrCalcV1055=function(){
         const result=base.apply(this,arguments);
-        /* Avoid recursion by updating preview directly from returned calc. */
-        const actual=Math.max(0,Number($('jbrActualRollsV1055')?.value||0));
-        const lanes=Math.max(0,Number(result?.lanes||0));
-        const pcs=Math.max(0,Number(result?.pcsPerRoll||0));
-        const pitch=Math.max(0,Number(result?.pitch||0));
-        const original=Math.max(0,Number(result?.jbrLengthM||0));
-        const used=(lanes>0&&pcs>0&&pitch>0)?(actual*pcs*pitch)/(lanes*1000):0;
-        const balance=Math.max(0,original-used);
-
-        if($('jbrPreviewActualRollsV1066'))$('jbrPreviewActualRollsV1066').textContent=money(actual);
-        if($('jbrPreviewUsedLengthV1066'))$('jbrPreviewUsedLengthV1066').textContent=`${money(used)} m`;
-        if($('jbrPreviewOriginalLengthV1066'))$('jbrPreviewOriginalLengthV1066').textContent=`${money(original)} m`;
-        if($('jbrPreviewBalanceLengthV1066'))$('jbrPreviewBalanceLengthV1066').textContent=used>original+.0001?`OVER BY ${money(used-original)} m`:`${money(balance)} m`;
-        $('jbrActualLengthCardV1066')?.classList.toggle('over',used>original+.0001);
+        if(result)window.jbrActualLengthPreviewV1066(result);
         return result;
       };
       try{jbrCalcV1055=window.jbrCalcV1055}catch(_){}

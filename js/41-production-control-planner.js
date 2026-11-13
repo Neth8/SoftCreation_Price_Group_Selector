@@ -4,7 +4,11 @@
 'use strict';
 const PC_REST='https://qyxgamverzdmhtvezbft.supabase.co/rest/v1',PC_WORKSPACE='softcreation_main',PC_KEY_STORE='spgs_supabase_browser_key_v1';
 let pcSearchTermNov3='';
-let pcManualSOSelections=new Map();
+let pcSelectedScOrderKey='';
+let pcScInnerSelections=new Map();
+let pcModalScOrder=null;
+let pcModalCandidateOrders=[];
+let pcModalTempCheckedKeys=new Set();
 let pcView='planner',pcCloud={requests:[],lines:[],allocations:[],messages:[],audit:[],policies:[],releases:[]},pcBasket=[],pcSelectedRequest='',pcReturnTarget='',pcPlannerItemKey='';
 function pcKey(){const k=(localStorage.getItem(PC_KEY_STORE)||'').trim();if(!k)throw new Error('SoftCreation cloud key is not configured on this device.');return k}
 function pcHeaders(extra={}){const k=pcKey(),h={apikey:k,...extra};if(k.startsWith('eyJ'))h.Authorization='Bearer '+k;return h}
@@ -153,18 +157,203 @@ function pcDemandGroups(){
 // Customer matching is exact after case and whitespace normalization; never use a substring.
 function pcIsSoftcreationOrder(o){return pcNorm(o?.customer).replace(/\s*\(\s*/g,' (').replace(/\s*\)\s*/g,')').replace(/\s+/g,' ').trim()==='SOFTCREATION (PVT) LTD'}
 function pcOrderSelectionKey(o){return String(o.sourceSoId)+'|'+Number(o.lineIndex)}
-function pcIsOrderSelected(o){const k=pcOrderSelectionKey(o);return pcManualSOSelections.has(k)?pcManualSOSelections.get(k):true}
-function pcSelectedOrders(g){return (g?.orders||[]).filter(o=>o.available>0&&pcIsOrderSelected(o))}
-function pcSelectedDemand(g){return pcSelectedOrders(g).reduce((n,o)=>n+pcNum(o.available),0)}
-function pcSelectedRecommended(g){return Math.max(0,Math.ceil(pcSelectedDemand(g)+g.cover+g.safety-g.stock-g.pipeline))}
-function pcSelectionSummary(g){const selected=pcSelectedOrders(g);return `${selected.length} of ${g.orders.filter(o=>o.available>0).length} eligible SO lines selected · ${pcMoney(pcSelectedDemand(g))} rolls`}
-window.pcToggleSOSelection=function(soId,lineIndex,checked){
-  pcManualSOSelections.set(String(soId)+'|'+Number(lineIndex),Boolean(checked));pcRender();
+
+function pcSelectedOrders(g){
+  if(!g)return [];
+  const scOrders=(g.orders||[]).filter(pcIsSoftcreationOrder);
+  const activeSc=scOrders.find(o=>pcOrderSelectionKey(o)===pcSelectedScOrderKey);
+  if(!activeSc)return [];
+  const innerKeys=pcScInnerSelections.get(pcOrderSelectionKey(activeSc))||new Set();
+  const innerOrders=(g.orders||[]).filter(o=>!pcIsSoftcreationOrder(o)&&innerKeys.has(pcOrderSelectionKey(o))&&o.available>0);
+  return [activeSc,...innerOrders];
+}
+
+function pcSelectedDemand(g){
+  const orders=pcSelectedOrders(g);
+  if(!orders.length)return 0;
+  const scOrder=orders[0];
+  const innerOrders=orders.slice(1);
+  const scQty=pcNum(scOrder?.available);
+  const innerQty=innerOrders.reduce((n,o)=>n+pcNum(o.available),0);
+  return Math.max(scQty,innerQty);
+}
+
+function pcSelectedRecommended(g){
+  return Math.max(0,Math.ceil(pcSelectedDemand(g)+g.cover+g.safety-g.stock-g.pipeline));
+}
+
+function pcSelectionSummary(g){
+  const orders=pcSelectedOrders(g);
+  if(!orders.length)return 'No SoftCreation order selected · 0 rolls';
+  const scOrder=orders[0];
+  const innerOrders=orders.slice(1);
+  return `${scOrder.sourceSoNo} (SoftCreation) · ${innerOrders.length} customer order(s) inside · ${pcMoney(pcSelectedDemand(g))} rolls`;
+}
+
+window.pcToggleScOrder=function(soId,lineIndex,checked){
+  const g=pcGroup(pcPlannerItemKey);
+  if(!g)return;
+  const key=String(soId)+'|'+Number(lineIndex);
+  if(checked){
+    pcSelectedScOrderKey=key;
+    pcOpenScOrdersModal(soId,lineIndex);
+  }else{
+    if(pcSelectedScOrderKey===key){
+      pcSelectedScOrderKey='';
+      pcScInnerSelections.delete(key);
+    }
+    pcRender();
+  }
 };
-window.pcSelectAllSO=function(checked){
- const g=pcGroup(pcPlannerItemKey);if(!g)return;
- for(const o of g.orders.filter(o=>o.available>0))pcManualSOSelections.set(pcOrderSelectionKey(o),Boolean(checked));
- pcRender();
+
+window.pcOpenScOrdersModal=function(soId,lineIndex){
+  const g=pcGroup(pcPlannerItemKey);
+  if(!g)return;
+  const key=String(soId)+'|'+Number(lineIndex);
+  const scOrder=(g.orders||[]).find(o=>pcOrderSelectionKey(o)===key);
+  if(!scOrder)return;
+  pcModalScOrder=scOrder;
+  pcSelectedScOrderKey=key;
+  pcEnsureScOrdersModal();
+
+  pcModalCandidateOrders=(g.orders||[]).filter(o=>!pcIsSoftcreationOrder(o)&&o.available>0);
+  const existing=pcScInnerSelections.get(key);
+  if(existing){
+    pcModalTempCheckedKeys=new Set(existing);
+  }else{
+    pcModalTempCheckedKeys=new Set(pcModalCandidateOrders.map(pcOrderSelectionKey));
+  }
+
+  const titleEl=document.getElementById('pcScModalTitle');
+  if(titleEl)titleEl.textContent=`Select Orders Inside SoftCreation SO (${scOrder.sourceSoNo})`;
+  const subEl=document.getElementById('pcScModalSubtitle');
+  if(subEl)subEl.textContent=`${pcLineLabel(g)} · SoftCreation Order Qty: ${pcMoney(scOrder.available)} rolls`;
+
+  pcRenderModalOrdersList();
+  const modal=document.getElementById('pcScOrdersModal');
+  if(modal)modal.classList.add('show');
+};
+
+function pcEnsureScOrdersModal(){
+  if(document.getElementById('pcScOrdersModal'))return;
+  document.body.insertAdjacentHTML('beforeend',`
+    <div id="pcScOrdersModal" class="modal" role="dialog" aria-modal="true">
+      <div class="modal-card" style="max-width:760px;width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <div class="modal-head" style="padding:14px 20px;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <b id="pcScModalTitle" style="font-size:16px;color:#0f172a">Orders Inside SoftCreation Order</b>
+            <div id="pcScModalSubtitle" class="small" style="color:#64748b"></div>
+          </div>
+          <button class="closex" type="button" onclick="pcCloseScOrdersModal()">×</button>
+        </div>
+        <div class="modal-body" style="flex:1;overflow-y:auto;padding:16px 20px">
+          <div class="notice" style="margin-bottom:14px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534">
+            <b>SoftCreation Order Packaging:</b> Select the customer Sales Orders in this size that are being produced / fulfilled inside this SoftCreation production order.
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <span id="pcScModalSelectionCount" style="font-weight:700;font-size:13px;color:#334155"></span>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="btn ghost sm" onclick="pcModalSelectAll(true)">Select all</button>
+              <button type="button" class="btn ghost sm" onclick="pcModalSelectAll(false)">Clear selection</button>
+            </div>
+          </div>
+          <div id="pcScModalOrdersList" class="pc-scroll" style="max-height:300px;border:1px solid #e2e8f0;border-radius:8px"></div>
+          <div id="pcScModalFooterInfo" style="margin-top:14px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;font-size:13px"></div>
+          <div class="actions" style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn ghost" onclick="pcCloseScOrdersModal()">Cancel</button>
+            <button type="button" class="btn primary" onclick="pcConfirmScOrdersModal()">OK / Confirm Selection</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function pcRenderModalOrdersList(){
+  const host=document.getElementById('pcScModalOrdersList');
+  if(!host)return;
+  if(!pcModalCandidateOrders.length){
+    host.innerHTML='<div class="empty" style="padding:24px">No other open customer Sales Orders found for this size. SoftCreation order will be requested directly.</div>';
+    const countEl=document.getElementById('pcScModalSelectionCount');
+    if(countEl)countEl.textContent='0 customer orders';
+    const footEl=document.getElementById('pcScModalFooterInfo');
+    if(footEl)footEl.innerHTML=`SoftCreation planned target: <b>${pcMoney(pcModalScOrder?.available)} rolls</b>`;
+    return;
+  }
+
+  const selected=pcModalCandidateOrders.filter(o=>pcModalTempCheckedKeys.has(pcOrderSelectionKey(o)));
+  const sum=selected.reduce((s,o)=>s+pcNum(o.available),0);
+  const scTarget=pcNum(pcModalScOrder?.available);
+
+  const countEl=document.getElementById('pcScModalSelectionCount');
+  if(countEl)countEl.textContent=`${selected.length} of ${pcModalCandidateOrders.length} customer order(s) selected`;
+
+  const footEl=document.getElementById('pcScModalFooterInfo');
+  if(footEl)footEl.innerHTML=`
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <span>Customer Orders Demand: <b style="color:#0369a1">${pcMoney(sum)} rolls</b></span>
+      <span>SoftCreation Order Qty: <b style="color:#c2410c">${pcMoney(scTarget)} rolls</b></span>
+      <span>${scTarget>=sum?`Surplus / Extra: <b style="color:#15803d">+${pcMoney(scTarget-sum)} rolls</b>`:`Shortfall: <b style="color:#b91c1c">${pcMoney(sum-scTarget)} rolls more needed</b>`}</span>
+    </div>
+  `;
+
+  host.innerHTML=`<table class="pc-table">
+    <thead>
+      <tr>
+        <th style="width:44px;text-align:center">Select</th>
+        <th>SO / Customer</th>
+        <th>Need Date</th>
+        <th class="num">Ordered</th>
+        <th class="num">Open</th>
+        <th class="num">To Plan</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${pcModalCandidateOrders.map(o=>{
+        const k=pcOrderSelectionKey(o);
+        const checked=pcModalTempCheckedKeys.has(k);
+        return `<tr style="${checked?'background:#f0f9ff;':''}">
+          <td style="text-align:center">
+            <input type="checkbox" ${checked?'checked':''} onchange="pcModalItemToggle('${k}',this.checked)">
+          </td>
+          <td><b>${pcEsc(o.sourceSoNo)}</b><small>${pcEsc(o.customer)}</small></td>
+          <td>${pcEsc(o.requiredDate||'-')}</td>
+          <td class="num">${pcMoney(o.ordered)}</td>
+          <td class="num">${pcMoney(o.grossOpen)}</td>
+          <td class="num"><b>${pcMoney(o.available)}</b></td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+window.pcModalItemToggle=function(key,checked){
+  if(checked)pcModalTempCheckedKeys.add(key);else pcModalTempCheckedKeys.delete(key);
+  pcRenderModalOrdersList();
+};
+
+window.pcModalSelectAll=function(checked){
+  if(checked){
+    pcModalCandidateOrders.forEach(o=>pcModalTempCheckedKeys.add(pcOrderSelectionKey(o)));
+  }else{
+    pcModalTempCheckedKeys.clear();
+  }
+  pcRenderModalOrdersList();
+};
+
+window.pcConfirmScOrdersModal=function(){
+  if(!pcModalScOrder)return;
+  const scKey=pcOrderSelectionKey(pcModalScOrder);
+  pcSelectedScOrderKey=scKey;
+  pcScInnerSelections.set(scKey,new Set(pcModalTempCheckedKeys));
+  pcCloseScOrdersModal();
+  pcRender();
+  toast(`Linked ${pcModalTempCheckedKeys.size} customer order(s) inside SoftCreation order`);
+};
+
+window.pcCloseScOrdersModal=function(){
+  const modal=document.getElementById('pcScOrdersModal');
+  if(modal)modal.classList.remove('show');
 };
 function pcGroup(k){return pcDemandGroups().find(x=>x.key===k)||null}
 async function pcLoadCloud(){const q='?select=*&order=created_at.desc';const [requests,lines,allocations,messages,audit,policies,releases]=await Promise.all([
@@ -223,6 +412,7 @@ function pcInstallUI(){
     <div class="panel-body"><div class="pc-tabs"><button data-pc-view="planner" onclick="pcGo('planner')">Production Request</button><button data-pc-view="approvals" onclick="pcGo('approvals')">Manager Approvals <span id="pcPendingCount"></span></button><button data-pc-view="register" onclick="pcGo('register')">Request Register</button><button data-pc-view="history" onclick="pcGo('history')">History <span id="pcHistoryCount"></span></button><button data-pc-view="demand" onclick="pcGo('demand')">Demand / Sales Orders</button></div><div id="pcKpis" class="pc-kpis"></div><div class="pc-search-nov3"><input type="search" id="pcSearchNov3" placeholder="Search current view: order, request, customer, material, item..." oninput="pcSearchChangedNov3(this.value)" aria-label="Search Production Control"></div><div id="pcBody"></div></div></div>`;
   const firstModal=document.querySelector('.modal');if(firstModal)firstModal.insertAdjacentElement('beforebegin',section);else document.querySelector('.app')?.appendChild(section);
   document.body.insertAdjacentHTML('beforeend',`<div id="pcReturnModal" class="modal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><b>Return Production Request</b><button class="closex" onclick="closeModal('pcReturnModal')">×</button></div><div class="modal-body"><div class="field"><label>Return Reason</label><textarea id="pcReturnReason" placeholder="Explain what HO Stores must correct"></textarea></div><div class="actions"><button class="btn amber" onclick="pcConfirmReturn()">Return to HO Stores</button></div></div></div></div>`);
+  try{pcEnsureScOrdersModal()}catch(_){}
 }
 window.pcSearchChangedNov3=function(value){
  pcSearchTermNov3=String(value||'').trim().toLowerCase();
@@ -307,10 +497,44 @@ function pcPlannerHTML(){
   <div>${g?pcIntelligenceHTML(g):''}<div class="pc-card pc-request-submission-v1143"><div class="pc-card-head"><h3>Submit production request</h3></div><p class="pc-muted">Requests with additional production go to Manager Approval. Sales Order-only requests are eligible for automatic approval by the server.</p><div class="pc-submission-counter-v1143">Prepared items: <b>${pcBasket.length}</b> · Route: <b>${pcBasket.some(x=>pcNum(x.additionalQty)>0)?'Manager approval required':'Automatic approval eligible (server controlled)'}</b></div><div class="field"><label>Required at HO</label><input id="pcDue" type="date" value="${today()}"></div><div class="field"><label>Material arrangement</label><select id="pcMaterial"><option>Factory to arrange material</option><option>HO material issued</option><option>HO material pending issue</option></select></div><div class="field"><label>Request note</label><textarea id="pcRequestReason"></textarea></div><div class="actions"><button class="btn primary" onclick="pcSubmitRequest()" ${!pcHas('production_control_create')||!pcBasket.length?'disabled':''}>Submit Production Request →</button><button class="btn ghost sm" type="button" onclick="pcBasket=[];pcRender()" ${!pcBasket.length?'disabled':''}>Clear prepared items</button></div></div></div></div>`;
 }
 function pcPlannerGroupHTML(g){
- const eligible=g.orders.filter(o=>o.available>0),allChecked=eligible.length>0&&eligible.every(pcIsOrderSelected);
- return `<div class="pc-demand-title"><div><b>${pcEsc(pcLineLabel(g))}</b><small>${pcEsc(g.key)}</small></div><span class="pc-pill blue">${pcMoney(g.demand)} rolls to plan</span></div>
- <div class="pc-so-select-toolbar"><span id="pcSelectionSummary" aria-live="polite">${pcEsc(pcSelectionSummary(g))}</span><div><button type="button" class="btn ghost sm" onclick="pcSelectAllSO(true)">Select all</button><button type="button" class="btn ghost sm" onclick="pcSelectAllSO(false)">Clear selection</button></div></div>
- <div class="pc-scroll"><table class="pc-table pc-selectable-orders"><thead><tr><th class="pc-check-col"><input type="checkbox" aria-label="Select all eligible Sales Orders" ${allChecked?'checked':''} onchange="pcSelectAllSO(this.checked)" ${!eligible.length?'disabled':''}></th><th>SO / Customer</th><th>Required</th><th class="num">Ordered</th><th class="num">Dispatched</th><th class="num">Open</th><th class="num">Already PR</th><th class="num">To Plan</th></tr></thead><tbody>${g.orders.map(o=>{const open=pcNum(o.grossOpen),assigned=pcNum(o.allocated),toPlan=pcNum(o.available),selected=pcIsOrderSelected(o)&&toPlan>0;const rowState=assigned>0&&toPlan>0?'mixed':assigned>0?'assigned':toPlan>0?'toplan':'open';return `<tr class="pc-so-row-nov11 pc-so-row-${rowState} ${pcIsSoftcreationOrder(o)?'pc-so-softcreation':''} ${selected?'pc-so-selected':''}" title="${pcIsSoftcreationOrder(o)?'SoftCreation (Pvt) Ltd · ':''}${rowState==='mixed'?'Partially assigned to production; remaining quantity to plan':rowState==='assigned'?'Already assigned to production':rowState==='toplan'?'Sales Order quantity still to produce':'Open Sales Order'}"><td class="pc-check-col"><input type="checkbox" aria-label="Include ${pcEsc(o.sourceSoNo)} in production request" ${selected?'checked':''} ${toPlan<=0?'disabled':''} onchange="pcToggleSOSelection(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)},this.checked)"></td><td><b>${pcEsc(o.sourceSoNo)}</b><small>${pcEsc(o.customer)} ${pcIsSoftcreationOrder(o)?'<span class="pc-softcreation-label">Softcreation order</span>':''}</small></td><td>${pcEsc(o.requiredDate||'-')}</td><td class="num">${pcMoney(o.ordered)}</td><td class="num">${pcMoney(o.dispatched)}</td><td class="num">${pcMoney(o.grossOpen)}</td><td class="num">${pcMoney(o.allocated)}</td><td class="num"><b>${pcMoney(o.available)}</b></td></tr>`}).join('')||'<tr><td colspan="8">No outstanding SO demand. Stock replenishment can still be planned.</td></tr>'}</tbody></table></div>`
+  const scOrders=g.orders.filter(pcIsSoftcreationOrder);
+  const hasScOrder=scOrders.length>0;
+  const selectedSc=scOrders.find(o=>pcOrderSelectionKey(o)===pcSelectedScOrderKey);
+  const innerKeys=selectedSc?(pcScInnerSelections.get(pcOrderSelectionKey(selectedSc))||new Set()):new Set();
+  const innerOrders=g.orders.filter(o=>innerKeys.has(pcOrderSelectionKey(o)));
+
+  return `<div class="pc-demand-title"><div><b>${pcEsc(pcLineLabel(g))}</b><small>${pcEsc(g.key)}</small></div><span class="pc-pill blue">${pcMoney(g.demand)} rolls open demand</span></div>
+  ${!hasScOrder?`<div class="notice" style="margin:10px 0;background:#fff8ee;border:1px solid #f6cf9c;color:#87470d;"><b>Note:</b> Only SoftCreation orders can be sent from Production Control. No open Sales Order for <b>SoftCreation (Pvt) Ltd</b> was found for this item. Please have Sales create a SoftCreation SO first.</div>`:''}
+  <div class="pc-scroll"><table class="pc-table"><thead><tr><th style="width:70px;text-align:center">Select</th><th>SO / Customer</th><th>Required</th><th class="num">Ordered</th><th class="num">Dispatched</th><th class="num">Open</th><th class="num">Already PR</th><th class="num">To Plan</th></tr></thead><tbody>${g.orders.map(o=>{
+    const open=pcNum(o.grossOpen),assigned=pcNum(o.allocated),toPlan=pcNum(o.available);
+    const isSC=pcIsSoftcreationOrder(o);
+    const scKey=pcOrderSelectionKey(o);
+    const isScChecked=isSC&&pcSelectedScOrderKey===scKey;
+    const isInnerSelected=!isSC&&innerKeys.has(scKey);
+    const rowState=assigned>0&&toPlan>0?'mixed':assigned>0?'assigned':toPlan>0?'toplan':'open';
+
+    let checkCell='';
+    if(isSC){
+      checkCell=`<input type="checkbox" class="pc-sc-tick" aria-label="Select SoftCreation order ${pcEsc(o.sourceSoNo)}" ${isScChecked?'checked':''} ${toPlan<=0?'disabled':''} onchange="pcToggleScOrder(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)},this.checked)">`;
+    }else{
+      checkCell=isInnerSelected?`<span class="tag green sm" style="font-size:10px;padding:2px 5px">Inside SC</span>`:`<span style="color:#94a3b8;font-size:12px">—</span>`;
+    }
+
+    return `<tr class="pc-so-row-nov11 pc-so-row-${rowState} ${isSC?'pc-so-softcreation':''} ${isScChecked||isInnerSelected?'pc-so-selected':''}">
+      <td style="text-align:center">${checkCell}</td>
+      <td>
+        <b>${pcEsc(o.sourceSoNo)}</b>
+        <small>${pcEsc(o.customer)} ${isSC?'<span class="pc-softcreation-label">Softcreation order</span>':''}</small>
+        ${isSC&&isScChecked?`<div class="small" style="color:#a44913;font-weight:700;margin-top:3px">✓ ${innerOrders.length} customer order(s) selected inside (${pcMoney(innerOrders.reduce((s,x)=>s+x.available,0))} rolls) <button type="button" class="btn ghost sm" style="padding:1px 6px;font-size:11px;margin-left:6px" onclick="pcOpenScOrdersModal(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)})">Edit inside orders</button></div>`:''}
+      </td>
+      <td>${pcEsc(o.requiredDate||'-')}</td>
+      <td class="num">${pcMoney(o.ordered)}</td>
+      <td class="num">${pcMoney(o.dispatched)}</td>
+      <td class="num">${pcMoney(o.grossOpen)}</td>
+      <td class="num">${pcMoney(o.allocated)}</td>
+      <td class="num"><b>${pcMoney(o.available)}</b></td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="8">No outstanding SO demand. Stock replenishment can still be planned.</td></tr>'}</tbody></table></div>`;
 }
 function pcIntelligenceHTML(g){
  const soOpen=g.orders.reduce((n,o)=>n+o.grossOpen,0);
@@ -345,7 +569,59 @@ window.pcUpdateSimpleQtyV1142=function(){
 }
 window.pcSelectItem=function(v){pcPlannerItemKey=decodeURIComponent(v);pcRender()}
 window.pcRemoveBasket=function(i){pcBasket.splice(i,1);pcRender()}
-window.pcAddToBasket=function(){const g=pcGroup(pcPlannerItemKey);if(!g)return;const qty=pcNum(document.getElementById('pcQty')?.value),reason=String(document.getElementById('pcOverride')?.value||'').trim();const extra=pcNum(document.getElementById('pcExtraQty')?.value);if(!Number.isInteger(extra)||extra<0)return toast('Additional production must be zero or a positive whole number.');if(!Number.isInteger(qty)||qty<=0)return toast('Enter a positive whole quantity.');const chosen=pcSelectedOrders(g),chosenDemand=pcSelectedDemand(g);if(!chosen.length)return toast('Select at least one Sales Order line in the table.');if(qty<chosenDemand)return toast('Quantity must cover selected SO demand.');if(qty!==chosenDemand+extra)return toast('Requested quantity must equal selected SO demand plus additional production.');if(extra>0&&!reason)return toast('Enter a reason for additional production quantity.');if(pcBasket.some(x=>x.itemKey===g.key))return toast('This item is already in the basket.');pcBasket.push({additionalQty:extra,itemKey:g.key,sourceItemId:g.sourceItemId,label:pcLineLabel(g),desc:g.desc,size:g.size,material:g.material,layout:g.layout,pcs:g.pcs,unit:g.unit,requestedQty:qty,soDemand:chosenDemand,cover:g.cover,safety:g.safety,stock:g.stock,pipeline:g.pipeline,recommended:pcSelectedRecommended(g),overrideReason:reason,coverWeeks:g.coverWeeks,allocations:chosen.map(o=>({source_so_id:o.sourceSoId,source_so_no:o.sourceSoNo,source_so_line_index:o.lineIndex,customer_name:o.customer,required_date:o.requiredDate,qty:o.available}))});pcRender();toast('Item added to request')}
+window.pcAddToBasket=function(){
+  const g=pcGroup(pcPlannerItemKey);if(!g)return;
+  const qty=pcNum(document.getElementById('pcQty')?.value),reason=String(document.getElementById('pcOverride')?.value||'').trim();
+  const extra=pcNum(document.getElementById('pcExtraQty')?.value);
+  if(!Number.isInteger(extra)||extra<0)return toast('Additional production must be zero or a positive whole number.');
+  if(!Number.isInteger(qty)||qty<=0)return toast('Enter a positive whole quantity.');
+
+  const scOrders=(g.orders||[]).filter(pcIsSoftcreationOrder);
+  if(!scOrders.length)return toast('Only SoftCreation orders can be sent from Production Control.');
+  if(!pcSelectedScOrderKey)return toast('Please tick the SoftCreation order in the table to select it.');
+
+  const sc=scOrders.find(o=>pcOrderSelectionKey(o)===pcSelectedScOrderKey);
+  if(!sc)return toast('Selected SoftCreation order not found.');
+
+  const chosen=pcSelectedOrders(g),chosenDemand=pcSelectedDemand(g);
+  if(!chosen.length)return toast('Select at least one Sales Order line in the table.');
+  if(qty<chosenDemand)return toast('Quantity must cover selected SO demand ('+money(chosenDemand)+' rolls).');
+  if(qty!==chosenDemand+extra)return toast('Requested quantity must equal selected SO demand plus additional production.');
+  if(extra>0&&!reason)return toast('Enter a reason for additional production quantity.');
+  if(pcBasket.some(x=>x.itemKey===g.key))return toast('This item is already in the basket.');
+
+  pcBasket.push({
+    additionalQty:extra,
+    itemKey:g.key,
+    sourceItemId:g.sourceItemId,
+    label:pcLineLabel(g),
+    desc:g.desc,
+    size:g.size,
+    material:g.material,
+    layout:g.layout,
+    pcs:g.pcs,
+    unit:g.unit,
+    requestedQty:qty,
+    soDemand:chosenDemand,
+    cover:g.cover,
+    safety:g.safety,
+    stock:g.stock,
+    pipeline:g.pipeline,
+    recommended:pcSelectedRecommended(g),
+    overrideReason:reason,
+    coverWeeks:g.coverWeeks,
+    allocations:chosen.map(o=>({
+      source_so_id:o.sourceSoId,
+      source_so_no:o.sourceSoNo,
+      source_so_line_index:o.lineIndex,
+      customer_name:o.customer,
+      required_date:o.requiredDate,
+      qty:o.available
+    }))
+  });
+  pcRender();
+  toast('Item added to request');
+};
 window.pcSavePolicy=async function(){const g=pcGroup(pcPlannerItemKey);if(!g)return;try{await pcRpc('spgs_pc_upsert_item_policy',{p_item_key:g.key,p_source_item_id:g.sourceItemId||'',p_safety_stock_qty:pcNum(document.getElementById('pcSafety')?.value),p_available_stock_qty:pcNum(document.getElementById('pcStock')?.value),p_cover_weeks:pcNum(document.getElementById('pcCoverWeeks')?.value)||2,p_username:currentUser?.username||''});await pcRefresh(false);toast('Stock policy saved')}catch(e){console.error(e);toast(e.message)}}
 window.pcSubmitRequest=async function(){
   const oldDispatchSnapshot=JSON.stringify([...pcOrdexaSent.entries()].sort());
@@ -354,7 +630,53 @@ window.pcSubmitRequest=async function(){
 
   const role=String(currentUser?.role||'').toLowerCase();
   if(role==='manager')return toast('Managers cannot create Production Control requests.');
-  if(!pcHas('production_control_create'))return requirePerm('production_control_create','submit Production Control requests');if(!pcBasket.length)return toast('Add at least one item.');const due=document.getElementById('pcDue')?.value;if(!due)return toast('Choose Required at HO date.');const needsManagerApproval=pcBasket.some(x=>pcNum(x.additionalQty)>0);const payload={approval_route:needsManagerApproval?'manager':'automatic',auto_approve_eligible:!needsManagerApproval,workspace:PC_WORKSPACE,required_date:due,material_mode:document.getElementById('pcMaterial')?.value||'Factory to arrange material',reason:String(document.getElementById('pcRequestReason')?.value||'').trim(),user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},lines:pcBasket.map(x=>({item_key:x.itemKey,source_item_id:x.sourceItemId,description:x.desc,size_label:x.size,material:x.material,layout:x.layout,pcs_per_roll:x.pcs,unit:x.unit,requested_qty:x.requestedQty,additional_production_qty:pcNum(x.additionalQty),so_demand_qty:x.soDemand,stock_cover_qty:x.cover,safety_stock_qty:x.safety,available_stock_qty:x.stock,pipeline_qty:x.pipeline,recommended_qty:x.recommended,override_reason:x.overrideReason,cover_weeks:x.coverWeeks,allocations:x.allocations}))};try{const r=await pcRpc('spgs_pc_create_request',{p_payload:payload});pcBasket=[];pcView='register';pcSelectedRequest=r?.id||'';await pcRefresh(false);const saved=pcCloud.requests.find(x=>x.id===(r?.id||''));const actual=saved?.status||r?.status||'Unknown';if(needsManagerApproval){toast(`${r?.request_no||'Production request'} submitted — ${actual}. Manager approval required.`)}else if(actual==='Approved'){toast(`${r?.request_no||'Production request'} automatically approved and released.`)}else{toast(`${r?.request_no||'Production request'} saved as ${actual}. Automatic approval requires Supabase spgs_pc_create_request support; no approval has been assumed.`)}}catch(e){console.error(e);toast(e.message)}}
+  if(!pcHas('production_control_create'))return requirePerm('production_control_create','submit Production Control requests');if(!pcBasket.length)return toast('Add at least one item.');const due=document.getElementById('pcDue')?.value;if(!due)return toast('Choose Required at HO date.');const needsManagerApproval=pcBasket.some(x=>pcNum(x.additionalQty)>0);
+  const payload={approval_route:needsManagerApproval?'manager':'automatic',auto_approve_eligible:!needsManagerApproval,workspace:PC_WORKSPACE,required_date:due,material_mode:document.getElementById('pcMaterial')?.value||'Factory to arrange material',reason:String(document.getElementById('pcRequestReason')?.value||'').trim(),user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},lines:pcBasket.map(x=>({item_key:x.itemKey,source_item_id:x.sourceItemId,description:x.desc,size_label:x.size,material:x.material,layout:x.layout,pcs_per_roll:x.pcs,unit:x.unit,requested_qty:x.requestedQty,additional_production_qty:pcNum(x.additionalQty),so_demand_qty:x.soDemand,stock_cover_qty:x.cover,safety_stock_qty:x.safety,available_stock_qty:x.stock,pipeline_qty:x.pipeline,recommended_qty:x.recommended,override_reason:x.overrideReason,cover_weeks:x.coverWeeks,allocations:x.allocations}))};
+  try{
+    const r=await pcRpc('spgs_pc_create_request',{p_payload:payload});
+
+    // Update all sent orders to "In Production"
+    const allAllocations=pcBasket.flatMap(x=>x.allocations||[]);
+    let soUpdatedCount=0;
+    allAllocations.forEach(alloc=>{
+      const so=(state.salesOrders||[]).find(s=>String(s.id)===String(alloc.source_so_id));
+      if(so){
+        so.productionStatus='In Production';
+        so.productionRequestId=r?.id||'';
+        so.productionRequestNo=r?.request_no||'';
+        so.inProduction=true;
+        so.history=so.history||[];
+        so.history.push({
+          action:'In Production',
+          by:currentUser?.display||currentUser?.username||'User',
+          at:new Date().toISOString(),
+          note:`Allocated to Production Request ${r?.request_no||''}`
+        });
+        soUpdatedCount++;
+      }
+    });
+    if(soUpdatedCount>0){
+      saveState();
+      try{if(typeof window.renderSalesOrders91==='function')window.renderSalesOrders91()}catch(_){}
+    }
+
+    pcBasket=[];
+    pcSelectedScOrderKey='';
+    pcScInnerSelections.clear();
+    pcView='register';
+    pcSelectedRequest=r?.id||'';
+    await pcRefresh(false);
+    const saved=pcCloud.requests.find(x=>x.id===(r?.id||''));
+    const actual=saved?.status||r?.status||'Unknown';
+    if(needsManagerApproval){
+      toast(`${r?.request_no||'Production request'} submitted — ${actual}. Manager approval required.`);
+    }else if(actual==='Approved'){
+      toast(`${r?.request_no||'Production request'} automatically approved and released to production.`);
+    }else{
+      toast(`${r?.request_no||'Production request'} saved as ${actual}.`);
+    }
+  }catch(e){console.error(e);toast(e.message)}
+};
 
 function pcApprovalsHTML(){
   if(!pcHas('production_control_approve'))return '<div class="pc-card">You do not have approval permission.</div>';

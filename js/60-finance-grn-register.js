@@ -37,7 +37,12 @@
       <td><b>${escText(g.customerName||r?.customerName||'-')}</b><div class="small">${escText([r?.size,r?.material,r?.layout].filter(Boolean).join(' ')||g.item||'-')}</div></td>
       <td><b>${fmt(g.receivedQty)} ${escText(g.unit||'Rolls')}</b><div class="small">Variance: ${fmt(g.variance)} · ${escText(g.varianceStatus||'Confirmed')}</div></td>
       <td>${materialRate(r)==null?'<span class="small">Not configured</span>':'LKR '+fmt(materialRate(r))+' / m²'}</td>
-      <td><button type="button" class="btn green sm" data-grn-pdf="${escText(g.id)}">Costing PDF</button></td>
+      <td>
+        <div style="display:inline-flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn primary sm" data-grn-view-pdf="${escText(g.id)}">View PDF</button>
+          <button type="button" class="btn green sm" data-grn-pdf="${escText(g.id)}">Costing PDF</button>
+        </div>
+      </td>
     </tr>`).join('')}</tbody></table></div>`:'<div class="empty">No confirmed GRNs matching the filter. Complete Stores Receive / Count first.</div>';
     byId('scFinancePagerV60').innerHTML=`<span>${rows.length?((page-1)*pageSize+1):0}–${Math.min(page*pageSize,rows.length)} of ${rows.length}</span><button type="button" class="btn ghost sm" data-finance-page="prev" ${page===1?'disabled':''}>Previous</button><span>Page ${page} / ${totalPages}</span><button type="button" class="btn ghost sm" data-finance-page="next" ${page>=totalPages?'disabled':''}>Next</button>`;
     const stamp=byId('scFinanceStampV60');if(stamp)stamp.textContent='Last updated '+new Date().toLocaleTimeString();
@@ -186,11 +191,66 @@
     return pages;
   }
 
-  window.scFinanceCostingPdfV60=async function(id){
+  let activeFinancePdfBlobUrl = null;
+  function ensureFinancePdfModalV60(){
+    if(byId('scFinancePdfModalV60'))return;
+    document.body.insertAdjacentHTML('beforeend',`
+      <div id="scFinancePdfModalV60" class="modal">
+        <div class="modal-card" style="max-width:960px;width:95vw;height:90vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+          <div class="modal-head" style="padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <b id="scFinancePdfModalTitleV60" style="font-size:15px;color:#0f172a">Finance Costing PDF Preview</b>
+              <div id="scFinancePdfModalMetaV60" class="small" style="color:#64748b"></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="scFinancePdfDownloadBtnV60" type="button" class="btn green sm">Download</button>
+              <button id="scFinancePdfNewTabBtnV60" type="button" class="btn ghost sm">Open in New Tab</button>
+              <button class="closex" type="button" onclick="closeFinancePdfModalV60()">×</button>
+            </div>
+          </div>
+          <div class="modal-body" style="flex:1;padding:0;overflow:hidden;background:#525659">
+            <iframe id="scFinancePdfIframeV60" style="width:100%;height:100%;border:none;" title="Finance Costing PDF Preview"></iframe>
+          </div>
+        </div>
+      </div>
+    `);
+  }
+  function openFinancePdfModalV60(grnNo, blobUrl, filename){
+    ensureFinancePdfModalV60();
+    if(activeFinancePdfBlobUrl && activeFinancePdfBlobUrl !== blobUrl){
+      try{URL.revokeObjectURL(activeFinancePdfBlobUrl)}catch(_){}
+    }
+    activeFinancePdfBlobUrl = blobUrl;
+    const titleEl = byId('scFinancePdfModalTitleV60');
+    if(titleEl) titleEl.textContent = 'Costing Report · ' + String(grnNo);
+    const metaEl = byId('scFinancePdfModalMetaV60');
+    if(metaEl) metaEl.textContent = filename;
+    const iframe = byId('scFinancePdfIframeV60');
+    if(iframe) iframe.src = blobUrl;
+    const dlBtn = byId('scFinancePdfDownloadBtnV60');
+    if(dlBtn) dlBtn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      a.click();
+    };
+    const tabBtn = byId('scFinancePdfNewTabBtnV60');
+    if(tabBtn) tabBtn.onclick = () => window.open(blobUrl, '_blank');
+    byId('scFinancePdfModalV60').classList.add('show');
+  }
+  window.closeFinancePdfModalV60 = function(){
+    const modal = byId('scFinancePdfModalV60');
+    if(modal) modal.classList.remove('show');
+    const iframe = byId('scFinancePdfIframeV60');
+    if(iframe) iframe.src = 'about:blank';
+  };
+
+  window.scFinanceCostingPdfV60=async function(id, mode='download'){
     if(!allowed())return toast('Finance access required');
     const g=grns().find(x=>String(x.id)===String(id));if(!g||!financeReady(g))return toast('GRN not ready for Finance');
     const r=jobFor(g),jbr=await loadJbrFor(r);
     const node=document.createElement('div');node.style='position:fixed;left:-12000px;top:0;z-index:-1';document.body.append(node);
+    toast(mode==='view'?'Preparing PDF preview...':'Generating PDF download...');
     try{
       const report=document.createElement('div');report.innerHTML=htmlReport(g,r,jbr);
       const pages=paginateFinanceReportV60(report.firstElementChild,node);
@@ -204,7 +264,14 @@
         // Each 760x1060px page fits fully in the A4 printable area, without image offsets/cropping.
         pdf.addImage(canvas.toDataURL('image/jpeg',0.93),'JPEG',10,10,190,265);
       }
-      pdf.save('Finance_'+String(g.grnNo||g.id).replace(/[^a-z0-9_-]/gi,'-')+'.pdf');
+      const filename='Finance_'+String(g.grnNo||g.id).replace(/[^a-z0-9_-]/gi,'-')+'.pdf';
+      if(mode==='view'){
+        const blob=pdf.output('blob');
+        const blobUrl=URL.createObjectURL(blob);
+        openFinancePdfModalV60(g.grnNo||g.id, blobUrl, filename);
+      } else {
+        pdf.save(filename);
+      }
     }catch(e){console.error('Finance PDF',e);toast('Finance PDF error: '+(e.message||e))}finally{node.remove()}
   };
   function replaceStoresButtons(){
@@ -226,7 +293,8 @@
     finance.innerHTML=`<div class="panel"><div class="panel-title"><span>Finance · GRN Costing Reports</span><button type="button" class="btn sm" style="background:white;color:#087e82" onclick="renderFinanceV1059(true)">Refresh</button></div><div class="panel-body"><div class="notice">Each completed Stores / GRN receipt appears here automatically. Generate a separate costing PDF for each GRN. Records awaiting a factory variance explanation stay pending in Stores.</div><div id="scFinanceCountersV60" class="sc-finance-summary-v60"></div><input class="search" id="scFinanceSearchV60" placeholder="Search GRN, production order, customer or item" aria-label="Search Finance GRNs" style="max-width:610px;width:100%;margin:14px 0"/><div id="scFinanceStampV60" class="small" style="margin-bottom:9px"></div><div id="scFinanceRowsV60"></div><div id="scFinancePagerV60" class="sc-finance-pager-v60"></div></div></div>`;
     const input=byId('scFinanceSearchV60');input?.addEventListener('input',()=>{page=1;paintFinance()});
     finance.addEventListener('click',evt=>{
-      const pdf=evt.target.closest('[data-grn-pdf]');if(pdf){scFinanceCostingPdfV60(pdf.dataset.grnPdf);return}
+      const viewPdf=evt.target.closest('[data-grn-view-pdf]');if(viewPdf){scFinanceCostingPdfV60(viewPdf.dataset.grnViewPdf,'view');return}
+      const pdf=evt.target.closest('[data-grn-pdf]');if(pdf){scFinanceCostingPdfV60(pdf.dataset.grnPdf,'download');return}
       const pageButton=evt.target.closest('[data-finance-page]');if(pageButton){page+=pageButton.dataset.financePage==='next'?1:-1;paintFinance()}
     });
     window.renderFinanceV1059=function(){paintFinance();return Promise.resolve()};

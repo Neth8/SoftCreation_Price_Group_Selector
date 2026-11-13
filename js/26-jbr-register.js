@@ -197,32 +197,40 @@
     return {maxFull:maxFullRolls,auto,valid:validReading&&validSetup&&remainingFeed<0.0001};
   }
 
+  let jbrCalcRunningV1055 = false;
   function jbrCalcV1055(){
-    if(typeof jbrRunEntriesV1140!=='undefined'&&jbrRunEntriesV1140.length)jbrRefreshCalculatedLengthsV2026();
-    const jbrWidth=Number($('jbrWidthV1055')?.value||0);
-    const jbrLengthM=Number($('jbrLengthV1055')?.value||0);
-    const labelWidth=Number($('jbrLabelWidthV1055')?.value||0);
-    const labelHeight=Number($('jbrLabelHeightV1055')?.value||0);
-    const gap=Number($('jbrGapV1055')?.value||0);
-    const pcsPerRoll=Number($('jbrPcsV1055')?.value||0);
+    if(jbrCalcRunningV1055)return null;
+    jbrCalcRunningV1055 = true;
+    try{
+      if(typeof jbrRunEntriesV1140!=='undefined'&&jbrRunEntriesV1140.length)jbrRefreshCalculatedLengthsV2026();
+      const jbrWidth=Number($('jbrWidthV1055')?.value||0);
+      const jbrLengthM=Number($('jbrLengthV1055')?.value||0);
+      const labelWidth=Number($('jbrLabelWidthV1055')?.value||0);
+      const labelHeight=Number($('jbrLabelHeightV1055')?.value||0);
+      const gap=Number($('jbrGapV1055')?.value||0);
+      const pcsPerRoll=Number($('jbrPcsV1055')?.value||0);
 
-    const lanes=(jbrWidth>0&&labelWidth>0)?Math.floor(jbrWidth/labelWidth):0;
-    const pitch=labelHeight>0?labelHeight+Math.max(0,gap):0;
-    const labelsPerLane=(jbrLengthM>0&&pitch>0)?Math.floor((jbrLengthM*1000)/pitch):0;
-    const theoreticalLabels=lanes*labelsPerLane;
-    const theoreticalRolls=pcsPerRoll>0?Math.floor(theoreticalLabels/pcsPerRoll):0;
+      const lanes=(jbrWidth>0&&labelWidth>0)?Math.floor(jbrWidth/labelWidth):0;
+      const pitch=labelHeight>0?labelHeight+Math.max(0,gap):0;
+      const labelsPerLane=(jbrLengthM>0&&pitch>0)?Math.floor((jbrLengthM*1000)/pitch):0;
+      const theoreticalLabels=lanes*labelsPerLane;
+      const theoreticalRolls=pcsPerRoll>0?Math.floor(theoreticalLabels/pcsPerRoll):0;
 
-    if($('jbrLanesV1055'))$('jbrLanesV1055').textContent=money(lanes);
-    if($('jbrPitchV1055'))$('jbrPitchV1055').textContent=pitch?`${money(pitch)} mm`:'0';
-    if($('jbrLabelsLaneV1055'))$('jbrLabelsLaneV1055').textContent=money(labelsPerLane);
-    if($('jbrTheoreticalLabelsV1055'))$('jbrTheoreticalLabelsV1055').textContent=money(theoreticalLabels);
-    if($('jbrTheoreticalRollsV1055'))$('jbrTheoreticalRollsV1055').textContent=money(theoreticalRolls);
+      if($('jbrLanesV1055'))$('jbrLanesV1055').textContent=money(lanes);
+      if($('jbrPitchV1055'))$('jbrPitchV1055').textContent=pitch?`${money(pitch)} mm`:'0';
+      if($('jbrLabelsLaneV1055'))$('jbrLabelsLaneV1055').textContent=money(labelsPerLane);
+      if($('jbrTheoreticalLabelsV1055'))$('jbrTheoreticalLabelsV1055').textContent=money(theoreticalLabels);
+      if($('jbrTheoreticalRollsV1055'))$('jbrTheoreticalRollsV1055').textContent=money(theoreticalRolls);
 
-    jbrAutoActualV1120(theoreticalRolls);
-    try{window.jbrFlatUpdateV2?.()}catch(_){}
-    try{jbrActualLengthPreviewV1066()}catch(_){}
+      jbrAutoActualV1120(theoreticalRolls);
+      try{window.jbrFlatUpdateV2?.()}catch(_){}
+      const calcResult = {jbrWidth,jbrLengthM,labelWidth,labelHeight,gap,pcsPerRoll,lanes,pitch,labelsPerLane,theoreticalLabels,theoreticalRolls};
+      try{if(typeof window.jbrActualLengthPreviewV1066==='function')window.jbrActualLengthPreviewV1066(calcResult)}catch(_){}
 
-    return {jbrWidth,jbrLengthM,labelWidth,labelHeight,gap,pcsPerRoll,lanes,pitch,labelsPerLane,theoreticalLabels,theoreticalRolls};
+      return calcResult;
+    }finally{
+      jbrCalcRunningV1055 = false;
+    }
   }
   window.jbrCalcV1055=jbrCalcV1055;
   // V1.1.40: production-run reading may span several JBRs. No database schema change.
@@ -312,17 +320,22 @@
   };
 
   async function jbrFetchV1055(path,options={}){
-    const res=await fetch(JBR_REST_V1056+path,{
-      ...options,
-      headers:jbrHeadersV1056(options.headers||{})
-    });
-    if(!res.ok){
-      const body=await res.text().catch(()=>res.statusText);
-      throw new Error(`Supabase ${res.status}: ${body.slice(0,500)}`);
-    }
-    if(res.status===204)return null;
-    const text=await res.text();
-    return text?JSON.parse(text):null;
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),12000);
+    try{
+      const res=await fetch(JBR_REST_V1056+path,{
+        ...options,
+        signal:ctrl.signal,
+        headers:jbrHeadersV1056(options.headers||{})
+      });
+      if(!res.ok){
+        const body=await res.text().catch(()=>res.statusText);
+        throw new Error(`Supabase ${res.status}: ${body.slice(0,500)}`);
+      }
+      if(res.status===204)return null;
+      const text=await res.text();
+      return text?JSON.parse(text):null;
+    }finally{clearTimeout(timer)}
   }
 
   async function jbrLoadV1055(productKey,force=false){
