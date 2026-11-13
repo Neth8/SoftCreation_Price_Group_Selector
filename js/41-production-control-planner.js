@@ -301,6 +301,9 @@ window.pcOpenAlreadyAddedModal=function(soId,lineIndex){
   pcEnsureAlreadyAddedModal();
   const so=(state.salesOrders||[]).find(s=>String(s.id)===String(soId));
   if(!so)return toast('Sales order not found');
+  if(pcIsSoftcreationOrder({customer:so.customerName})){
+    return toast('SoftCreation orders cannot be marked as Already Added.');
+  }
   const l=so.lines?.[lineIndex];
   if(!l)return toast('Order line not found');
 
@@ -618,8 +621,9 @@ function pcPlannerGroupHTML(g){
   pcSyncSelectedOrderKeys(g);
   const availOrders=(g.orders||[]).filter(o=>o.available>0);
   const allChecked=availOrders.length>0&&availOrders.every(o=>pcSelectedOrderKeys.has(pcOrderSelectionKey(o)));
+  const selectedDemand=pcSelectedDemand(g);
 
-  return `<div class="pc-demand-title"><div><b>${pcEsc(pcLineLabel(g))}</b><small>${pcEsc(g.key)}</small></div><span class="pc-pill blue">${pcMoney(g.demand)} rolls open demand</span></div>
+  return `<div class="pc-demand-title"><div><b>${pcEsc(pcLineLabel(g))}</b><small>${pcEsc(g.key)}</small></div><span class="pc-pill blue">${pcMoney(selectedDemand)} rolls selected to plan${selectedDemand!==g.demand?` (${pcMoney(g.demand)} total open)`:''}</span></div>
   <div class="pc-scroll"><table class="pc-table"><thead><tr>
     <th style="width:70px;text-align:center">
       <label style="cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-size:12px;margin:0" title="Toggle Select All">
@@ -651,9 +655,9 @@ function pcPlannerGroupHTML(g){
     }
 
     let actionCell='';
-    if(toPlan>0){
+    if(!isSC && toPlan>0){
       actionCell=`<button type="button" class="btn amber sm" style="font-size:11px;padding:2px 8px;white-space:nowrap;background:#d97706;border-color:#b45309;color:#fff" onclick="pcOpenAlreadyAddedModal(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)})">Already Added</button>`;
-    }else if(o.coveredBySoftCreationSoNo){
+    }else if(!isSC && o.coveredBySoftCreationSoNo){
       actionCell=`<div style="display:flex;align-items:center;gap:4px;justify-content:center"><span class="tag amber sm" style="font-size:10px;padding:2px 6px">Already Added in ${pcEsc(o.coveredBySoftCreationSoNo)}</span><button type="button" class="btn ghost sm" style="padding:1px 5px;font-size:10px" onclick="pcRevertAlreadyAdded(decodeURIComponent('${encodeURIComponent(String(o.sourceSoId))}'),${Number(o.lineIndex)})" title="Restore demand to planner">Undo</button></div>`;
     }else{
       actionCell=`<span style="color:#94a3b8;font-size:11px">—</span>`;
@@ -677,9 +681,18 @@ function pcPlannerGroupHTML(g){
   }).join('')||'<tr><td colspan="9">No outstanding SO demand. Stock replenishment can still be planned.</td></tr>'}</tbody></table></div>`;
 }
 function pcIntelligenceHTML(g){
- const soOpen=g.orders.reduce((n,o)=>n+o.grossOpen,0);
- const allocated=g.orders.reduce((n,o)=>n+o.allocated,0);
- const selectedDemand=pcSelectedDemand(g),selectedRecommended=pcSelectedRecommended(g),scAvailable=g.orders.filter(pcIsSoftcreationOrder).reduce((n,o)=>n+pcNum(o.available),0);
+ const chosen=pcSelectedOrders(g);
+ const selectedDemand=pcSelectedDemand(g),selectedRecommended=pcSelectedRecommended(g);
+ 
+ const soOpen=chosen.reduce((n,o)=>n+pcNum(o.grossOpen),0);
+ const totalSoOpen=g.orders.reduce((n,o)=>n+pcNum(o.grossOpen),0);
+ 
+ const allocated=chosen.reduce((n,o)=>n+pcNum(o.allocated),0);
+ const totalAllocated=g.orders.reduce((n,o)=>n+pcNum(o.allocated),0);
+ 
+ const scAvailable=chosen.filter(pcIsSoftcreationOrder).reduce((n,o)=>n+pcNum(o.available),0);
+ const totalScAvailable=g.orders.filter(pcIsSoftcreationOrder).reduce((n,o)=>n+pcNum(o.available),0);
+
  const defaultExtra=Math.max(0,selectedRecommended-selectedDemand);
  const extraVal=pcSavedExtraQty!==null?pcSavedExtraQty:defaultExtra;
  const reasonVal=pcSavedOverrideReason!==null?pcSavedOverrideReason:'';
@@ -692,14 +705,17 @@ function pcIntelligenceHTML(g){
  <p class="pc-muted">See the current Sales Order requirement, then add extra production only if needed.</p>
  ${g.pipeline>0||allocated>0?`<div class="pc-live-production-alert-v20261030" role="alert"><strong>⚠ PRODUCTION ALREADY ASSIGNED / IN PROGRESS</strong><span>${pcMoney(g.pipeline)} rolls in existing production pipeline · ${pcMoney(allocated)} rolls assigned to Sales Orders. Check outstanding demand before requesting more.</span></div>`:''}
  <div class="pc-simple-stats-v1142">
- <div class="pc-kpi-softcreation pc-sc-item-card"><small>SoftCreation (Pvt) Ltd · Outstanding</small><strong>${pcMoney(scAvailable)} rolls</strong><span>Included in the overall demand (not additional demand)</span></div>
- <div class="pc-kpi-open-nov11"><small>Current open Sales Orders</small><strong>${pcMoney(soOpen)} rolls</strong><span>Matches the Open column in Build a production request</span></div>
- <div class="pc-kpi-assigned-nov11"><small>Already assigned to production</small><strong>${pcMoney(allocated)} rolls</strong><span>Matches the Already PR column</span></div>
- <div class="pc-kpi-to-plan-nov11"><small>Sales Orders still to produce</small><strong>${pcMoney(g.demand)} rolls</strong><span>Matches the To Plan column</span></div>
+ <div class="pc-kpi-softcreation pc-sc-item-card"><small>SoftCreation (Pvt) Ltd · Selected</small><strong>${pcMoney(scAvailable)} rolls</strong><span>${scAvailable!==totalScAvailable?`${pcMoney(totalScAvailable)} rolls total in group`:'Included in selected demand'}</span></div>
+ <div class="pc-kpi-open-nov11"><small>Selected open Sales Orders</small><strong>${pcMoney(soOpen)} rolls</strong><span>${soOpen!==totalSoOpen?`${pcMoney(totalSoOpen)} rolls total open`:'Matches Open column'}</span></div>
+ <div class="pc-kpi-assigned-nov11"><small>Already assigned to production</small><strong>${pcMoney(allocated)} rolls</strong><span>${allocated!==totalAllocated?`${pcMoney(totalAllocated)} rolls total assigned`:'Matches Already PR column'}</span></div>
+ <div class="pc-kpi-to-plan-nov11"><small>Sales Orders still to produce</small><strong>${pcMoney(selectedDemand)} rolls</strong><span>${selectedDemand!==g.demand?`${pcMoney(g.demand)} rolls total to produce`:'Matches To Plan column'}</span></div>
  <div class="pc-kpi-pipeline-nov11"><small>Existing production pipeline</small><strong>${pcMoney(g.pipeline)} rolls</strong><span>Includes production outside these SO allocations</span></div>
  </div>
  <div class="pc-simple-note-v1142"><b>Selected order lines:</b> ${pcEsc(pcSelectionSummary(g))}<br>Suggested production for this selection: <b>${pcMoney(selectedRecommended)} rolls</b> (includes stock cover / safety stock / HO stock settings).</div>
- ${g.orders.length?`<details class="pc-order-details-v1142"><summary>View ${g.orders.length} current Sales Order line(s)</summary><div>${g.orders.map(o=>`<div><b>${pcEsc(o.sourceSoNo)}</b> • ${pcEsc(o.customer)} <span>Open ${pcMoney(o.grossOpen)} • Already assigned ${pcMoney(o.allocated)} • To plan ${pcMoney(o.available)}</span></div>`).join('')}</div></details>`:''}
+ ${g.orders.length?`<details class="pc-order-details-v1142"><summary>View ${chosen.length} selected Sales Order line(s) (${g.orders.length} total)</summary><div>${g.orders.map(o=>{
+   const isTicked=chosen.some(c=>c.sourceSoId===o.sourceSoId&&c.lineIndex===o.lineIndex);
+   return `<div style="${isTicked?'':'opacity:0.6'}">${isTicked?'✓ ':'— '}<b>${pcEsc(o.sourceSoNo)}</b> • ${pcEsc(o.customer)} <span>Open ${pcMoney(o.grossOpen)} • Already assigned ${pcMoney(o.allocated)} • To plan ${pcMoney(o.available)}</span></div>`;
+ }).join('')}</div></details>`:''}
  <div class="pc-simple-entry-v1142">
  <div class="field"><label>Sales Order quantity to include (rolls)</label><input id="pcSalesQty" type="number" readonly value="${selectedDemand}"></div>
  <div class="field"><label>Additional production required (rolls)</label><input id="pcExtraQty" type="number" min="0" step="1" value="${extraVal}" oninput="pcUpdateSimpleQtyV1142()"></div>
