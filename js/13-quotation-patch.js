@@ -282,10 +282,10 @@
       const q=(el('itemSearch')?.value||'').toLowerCase();
       resetOnQuery('item',q);
       const matching=all.filter(i=>[i.desc,i.size,i.material,i.layout,i.pcs].join(' ').toLowerCase().includes(q));
-      const info=pageSlice('item',matching,25);
+      const info=pageSlice('item',matching,24);
       state.items=info.slice;
       try{baseRenderItems()}finally{state.items=all}
-      appendPager('itemList','item',info,[25,50,100]);
+      appendPager('itemList','item',info,[24,48,96]);
     };
     window.renderItems=optimizedRenderItems;
     try{renderItems=optimizedRenderItems}catch(e){}

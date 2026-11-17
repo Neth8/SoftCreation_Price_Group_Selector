@@ -2554,94 +2554,154 @@
       ? `
         <div class="bp-so-history-list-v1030">
           ${rows.map(so=>{
-            const status=
-              portalSOStatusInfoV1032(so);
-
-            const tracking=
-              portalSOTrackingSummaryV1032(so);
-
-            const updated=
-              status.lastUpdated
-                ? new Date(status.lastUpdated).toLocaleString('en-GB')
-                : '';
+            const status=portalSOStatusInfoV1032(so);
+            const tracking=portalSOTrackingSummaryV1032(so);
+            const updated=status.lastUpdated ? new Date(status.lastUpdated).toLocaleString('en-GB') : '';
+            const receipts=so.receiptAttachments?.length ? so.receiptAttachments : (so.receiptAttachment ? [so.receiptAttachment] : []);
+            const receiptCount=receipts.length;
+            const linesCount=Number(so.lines?.length || 0);
+            const canCancel=(!so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true && (currentUser?.role==='admin' || so.ownerUser===currentUser?.username));
+            const canEdit=(currentUser?.role === 'admin' && !window.scSOIsCancelledV57?.(so) && so.recoveredStoresOrder !== true && so.readOnly !== true);
 
             return `
               <div class="bp-so-history-card-v1032">
 
-                <div class="bp-so-status-banner-v1032 ${status.cls}">
-                  <div>
-                    <span>ORDER STATUS</span>
-                    <b>${esc(status.label)}</b>
+                <!-- 1. Header Bar: SO #, Customer, Date, Status, Total -->
+                <div class="bp-so-card-header-v1032">
+                  <div class="bp-so-card-head-left">
+                    <span class="bp-so-no-badge">${esc(so.soNo||'Sales Order')}</span>
+                    ${status.label==='CANCELLED'?'<span class="sc-so-cancelled-chip-v4">CANCELLED</span>':''}
+                    <span class="bp-so-meta-pill">📅 ${esc(so.date||'')}</span>
+                    <span class="bp-so-meta-pill">📦 ${linesCount} item${linesCount===1?'':'s'}</span>
                   </div>
 
-                  <small>
-                    ${updated?`Updated ${esc(updated)}`:'Live fulfilment status'}
-                  </small>
+                  <div class="bp-so-card-head-right">
+                    <div class="bp-so-status-badge ${status.cls}">
+                      <span class="bp-so-status-dot"></span>
+                      <b>${esc(status.label)}</b>
+                    </div>
+                    <div class="bp-so-total-box">
+                      <span class="bp-so-total-lbl">TOTAL AMOUNT</span>
+                      <b class="bp-so-total-val">LKR ${money(so.total||0)}</b>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="portal-item bp-so-history-row-v1030">
-                  <div>
-                    <b>${esc(so.soNo||'Sales Order')}</b>${status.label==='CANCELLED'?'<span class="sc-so-cancelled-chip-v4">CANCELLED</span>':''}
-
-                    <div class="small">
-                      ${esc(so.date||'')}
-                      • ${esc(so.customerName||'')}
-                      • ${Number(so.lines?.length||0)} item${Number(so.lines?.length||0)===1?'':'s'}
+                <!-- 2. Three-Column Structured Details Grid -->
+                <div class="bp-so-card-body-v1032">
+                  <!-- Block 1: Customer & Fulfilment Details -->
+                  <div class="bp-so-info-block">
+                    <div class="bp-so-block-label">CUSTOMER & FULFILMENT</div>
+                    <div class="bp-so-cust-name">${esc(so.customerName||'Unknown Customer')}</div>
+                    <div class="bp-so-cust-sub">
+                      ${so.customerPhone?`<span>📞 ${esc(so.customerPhone)}</span>`:''}
+                      ${so.deliveryMethod||so.deliveryMode?`<span>🚚 Delivery: <b>${esc(so.deliveryMethod||so.deliveryMode)}</b></span>`:''}
+                      <span>👤 Prepared By: <b>${esc(so.ownerUser||'Admin')}</b></span>
                     </div>
+                  </div>
 
-                    <div class="small">
-                      <b>LKR ${money(so.total||0)}</b>
-                      ${so.erpSONo?` • ERP ${esc(so.erpSONo)}`:''}
-                      ${so.customerRef?` • PO/Ref ${esc(so.customerRef)}`:''}
-                    </div>
-
-                    ${
-                      tracking.length
-                        ? `
-                          <div class="bp-so-live-tracking-v1032">
-                            ${tracking.map(x=>`<span>${esc(x)}</span>`).join('')}
-                          </div>
-                        `
-                        : ''
-                    }
-
-                    ${so.invoiceAttachment ? `<div class="bp-so-po-saved-v1032">📄 Invoice PDF: ${esc(so.invoiceAttachment.fileName||'Invoice.pdf')}</div>` : ''}
-                    ${
-                      so.poAttachment
-                        ? `
-                          <div class="bp-so-po-saved-v1032">
-                            📎 ${esc(so.poAttachment.fileName||'PO attachment')}
-                          </div>
-                        `
-                        : ''
-                    }
-                    ${(so.receiptAttachments?.length || so.receiptAttachment) ? `
-                      <div class="bp-so-po-saved-v1032" style="background:#ecfdf5;border:1px solid #a7f3d0;color:#047857">
-                        💳 Receipt: ${esc(so.receiptAttachments?.[0]?.fileName || so.receiptAttachment?.fileName || 'Payment receipt')}
-                        ${(so.receiptAttachments?.length > 1) ? ` (+${so.receiptAttachments.length - 1} more)` : ''}
+                  <!-- Block 2: ERP & Order References -->
+                  <div class="bp-so-info-block">
+                    <div class="bp-so-block-label">REFERENCES & ERP SYNC</div>
+                    <div class="bp-so-refs-list">
+                      <div class="bp-so-ref-row">
+                        <span class="bp-so-ref-key">ERP SO Ref:</span>
+                        ${so.erpSONo ? `<span class="bp-so-erp-chip synced">${esc(so.erpSONo)}</span>` : `<span class="bp-so-erp-chip pending">Pending Sync</span>`}
                       </div>
+                      <div class="bp-so-ref-row">
+                        <span class="bp-so-ref-key">Customer PO/Ref:</span>
+                        <b>${esc(so.customerRef || '—')}</b>
+                      </div>
+                      ${updated ? `<div class="bp-so-updated-hint">🕒 Status updated: ${esc(updated)}</div>` : ''}
+                    </div>
+                  </div>
+
+                  <!-- Block 3: Attached Documents Pills -->
+                  <div class="bp-so-info-block">
+                    <div class="bp-so-block-label">ATTACHED DOCUMENTS</div>
+                    <div class="bp-so-docs-list">
+                      ${so.poAttachment ? `
+                        <button class="bp-so-doc-btn has-file" type="button" onclick="bpSoViewPOAttachmentV1032('${so.id}')" title="Click to view Customer PO file">
+                          <span class="bp-so-doc-icon">📎</span>
+                          <span class="bp-so-doc-name">${esc(so.poAttachment.fileName||'Customer PO')}</span>
+                          <span class="bp-so-doc-action">View</span>
+                        </button>
+                      ` : `
+                        <div class="bp-so-doc-btn empty-file">
+                          <span class="bp-so-doc-icon">📎</span>
+                          <span class="bp-so-doc-name">No Customer PO</span>
+                        </div>
+                      `}
+
+                      ${so.invoiceAttachment ? `
+                        <button class="bp-so-doc-btn has-file" type="button" onclick="bpSoViewInvoiceAttachmentV20261104('${so.id}')" title="Click to view Invoice PDF">
+                          <span class="bp-so-doc-icon">📄</span>
+                          <span class="bp-so-doc-name">${esc(so.invoiceAttachment.fileName||'Invoice.pdf')}</span>
+                          <span class="bp-so-doc-action">View</span>
+                        </button>
+                      ` : `
+                        <div class="bp-so-doc-btn empty-file">
+                          <span class="bp-so-doc-icon">📄</span>
+                          <span class="bp-so-doc-name">No Invoice PDF</span>
+                        </div>
+                      `}
+
+                      ${receiptCount > 0 ? `
+                        <button class="bp-so-doc-btn has-receipt" type="button" onclick="bpSoViewReceiptAttachment('${so.id}', 0)" title="Click to view Payment Receipt">
+                          <span class="bp-so-doc-icon">💳</span>
+                          <span class="bp-so-doc-name">${esc(receiptCount===1 ? (receipts[0]?.fileName||'Payment Receipt') : `${receiptCount} Payment Receipts`)}</span>
+                          <span class="bp-so-doc-action">View</span>
+                        </button>
+                      ` : `
+                        <div class="bp-so-doc-btn empty-file">
+                          <span class="bp-so-doc-icon">💳</span>
+                          <span class="bp-so-doc-name">No Payment Receipt</span>
+                        </div>
+                      `}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 3. Tracking Summary Bar (if any tracking data exists) -->
+                ${tracking.length ? `
+                  <div class="bp-so-tracking-bar-v1032">
+                    <span class="bp-so-tracking-lbl">🚚 FULFILMENT TRACKING:</span>
+                    <div class="bp-so-tracking-pills">
+                      ${tracking.map(x=>`<span class="bp-so-track-pill">${esc(x)}</span>`).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <!-- 4. Grouped Action Footer -->
+                <div class="bp-so-card-footer-v1032">
+                  <div class="bp-so-footer-quick-docs">
+                    <button class="btn ghost sm bp-so-receipt-action-btn" type="button" onclick="bpSoOpenAttachReceiptModal('${so.id}')">
+                      💳 + Attach Receipt
+                    </button>
+                    ${receiptCount > 1 ? `
+                      <button class="btn ghost sm" type="button" style="color:#047857;border-color:#10b981" onclick="bpSoOpenAttachReceiptModal('${so.id}')">
+                        Manage Receipts (${receiptCount})
+                      </button>
                     ` : ''}
                   </div>
 
-                  <div class="bp-so-history-actions-v1032">
-                    ${(so.receiptAttachments?.length || so.receiptAttachment) ? `<button class="btn ghost sm" type="button" style="color:#047857;border-color:#10b981" onclick="bpSoViewReceiptAttachment('${so.id}', 0)">💳 Receipt</button>` : ''}
-                    <button class="btn ghost sm" type="button" style="color:#087f83" onclick="bpSoOpenAttachReceiptModal('${so.id}')">+ Receipt</button>
-                    ${so.invoiceAttachment?`<button class="btn ghost sm" type="button" onclick="bpSoViewInvoiceAttachmentV20261104('${so.id}')">Invoice PDF</button>`:''}
-                    ${
-                      so.poAttachment
-                        ? `<button class="btn ghost sm" type="button" onclick="bpSoViewPOAttachmentV1032('${so.id}')">PO File</button>`
-                        : ''
-                    }
-
-                    <button class="btn ghost sm" type="button" onclick="bpSoViewOrderV1030('${so.id}')">View</button>
-                    ${(!so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true && (currentUser?.role==='admin' || so.ownerUser===currentUser?.username)) ? `<button class="btn red sm" type="button" onclick="scOpenCancelOrderV2('${so.id}')">Cancel Order</button>` : ''}
-                    ${
-                      (currentUser?.role === 'admin' && !window.scSOIsCancelledV57?.(so) && so.recoveredStoresOrder !== true && so.readOnly !== true)
-                        ? `<button class="btn amber sm" type="button" onclick="adminOpenEditSalesOrderV1030('${so.id}')">Edit</button>`
-                        : ''
-                    }
+                  <div class="bp-so-footer-main-actions bp-so-history-row-v1030">
+                    <button class="btn primary sm" type="button" onclick="bpSoViewOrderV1030('${so.id}')">
+                      View Order
+                    </button>
+                    ${canEdit ? `
+                      <button class="btn amber sm" type="button" onclick="adminOpenEditSalesOrderV1030('${so.id}')">
+                        Edit
+                      </button>
+                    ` : ''}
+                    ${canCancel ? `
+                      <button class="btn red sm" type="button" onclick="scOpenCancelOrderV2('${so.id}')">
+                        Cancel Order
+                      </button>
+                    ` : ''}
                   </div>
                 </div>
+
               </div>
             `;
           }).join('')}

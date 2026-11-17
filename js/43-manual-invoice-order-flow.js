@@ -25,7 +25,7 @@ const MI_COMPANIES = {
     email: 'info@softcreation.lk',
     web: 'www.softcreation.lk',
     placeOfSupply: 'No. 29, South Circular Road, Kurunegala.',
-    color: '#087f83'
+    color: '#000000'
   },
   translanka: {
     key: 'translanka',
@@ -38,7 +38,7 @@ const MI_COMPANIES = {
     email: 'info@translanka.lk',
     web: 'www.translankanexus.com',
     placeOfSupply: 'No. 29, South Circular Road, Kurunegala.',
-    color: '#065f46'
+    color: '#000000'
   }
 };
 
@@ -161,7 +161,6 @@ function miInstallUI(){
           <button data-mi-page="editor" onclick="miNewInvoice()">New / Edit Invoice</button>
           <button data-mi-page="pending" onclick="miGo('pending')">ERP Pending <span id="miPendingBadge" class="mi-badge">0</span></button>
           <button data-mi-page="updated" onclick="miGo('updated')">ERP Updated <span id="miUpdatedBadge" class="mi-badge">0</span></button>
-          <button data-mi-page="translanka_erp" onclick="miGo('translanka_erp')">Translanka ERP <span id="miTranslankaBadge" class="mi-badge" style="background:#065f46;color:#fff">0</span></button>
           <button data-mi-page="history" onclick="miGo('history')">Invoice History</button>
         </div>
         <div id="miBody"></div>
@@ -282,12 +281,9 @@ function miRender(){
   const pending=invoices.filter(x=>x.erpStatus!=='updated');
   const updated=invoices.filter(x=>x.erpStatus==='updated');
   const translankaAll=invoices.filter(x=>x.company==='translanka');
-  const translankaPending=translankaAll.filter(x=>x.erpStatus!=='updated');
-  const translankaUpdated=translankaAll.filter(x=>x.erpStatus==='updated');
 
   if(mi$('miPendingBadge'))mi$('miPendingBadge').textContent=pending.length;
   if(mi$('miUpdatedBadge'))mi$('miUpdatedBadge').textContent=updated.length;
-  if(mi$('miTranslankaBadge'))mi$('miTranslankaBadge').textContent=translankaPending.length;
 
   const body=mi$('miBody');
   if(!body)return;
@@ -296,7 +292,6 @@ function miRender(){
   else if(miPage==='viewer')body.innerHTML=miViewerHTML();
   else if(miPage==='pending')body.innerHTML=miListPageHTML('ERP Pending','Manual invoices awaiting GRN / ERP update.',pending,'miPendingSearch');
   else if(miPage==='updated')body.innerHTML=miListPageHTML('ERP Updated — Locked','Final records. View and download only.',updated,'miUpdatedSearch');
-  else if(miPage==='translanka_erp')body.innerHTML=miTranslankaPageHTML(translankaAll,translankaPending,translankaUpdated);
   else body.innerHTML=miListPageHTML('Invoice History','Complete searchable manual invoice register.',invoices,'miHistorySearch');
   if(miPage==='editor')setTimeout(miAfterEditorRender,0);
   if(miPage==='viewer')setTimeout(miAfterViewerRender,0);
@@ -484,11 +479,57 @@ window.miNewTranslankaInvoice=function(){
     }
   },50);
 };
+let miCompanyFilter = 'all';
+
+window.miSetCompanyFilter = function(comp, searchId){
+  miCompanyFilter = comp;
+  const wrap = mi$(searchId + 'Subtabs');
+  if(wrap){
+    wrap.querySelectorAll('.mi-subtab-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.company === comp);
+    });
+  }
+  miRenderFiltered(searchId);
+};
+
 function miListPageHTML(title,sub,list,searchId){
+  const allCount = list.length;
+  const scCount = list.filter(x => x.company !== 'translanka').length;
+  const tlCount = list.filter(x => x.company === 'translanka').length;
+
+  let displayList = list;
+  if(miCompanyFilter === 'softcreation'){
+    displayList = list.filter(x => x.company !== 'translanka');
+  } else if(miCompanyFilter === 'translanka'){
+    displayList = list.filter(x => x.company === 'translanka');
+  }
+
   return `<div class="mi-card">
-    <div class="mi-card-head"><div><h3>${miEsc(title)}</h3><p>${miEsc(sub)}</p></div>${title.startsWith('ERP Pending')&&miCan('manual_invoice_create')?'<button class="btn primary" onclick="miNewInvoice()">+ New Invoice</button>':''}</div>
+    <div class="mi-card-head">
+      <div><h3>${miEsc(title)}</h3><p>${miEsc(sub)}</p></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${title.startsWith('ERP Pending')&&miCan('manual_invoice_create')?`
+          <button class="btn primary sm" onclick="miNewInvoice()">+ New SoftCreation Invoice</button>
+          <button class="btn green sm" onclick="miNewTranslankaInvoice()">+ New Translanka Invoice</button>
+        `:''}
+      </div>
+    </div>
+
+    <!-- Company sub-tabs for separate filtering -->
+    <div class="mi-company-subtabs" id="${searchId}Subtabs">
+      <button type="button" class="mi-subtab-btn ${miCompanyFilter==='all'?'active':''}" data-company="all" onclick="miSetCompanyFilter('all','${searchId}')">
+        All Invoices <span class="mi-subtab-badge">${allCount}</span>
+      </button>
+      <button type="button" class="mi-subtab-btn sc ${miCompanyFilter==='softcreation'?'active':''}" data-company="softcreation" onclick="miSetCompanyFilter('softcreation','${searchId}')">
+        🏢 SoftCreation <span class="mi-subtab-badge sc">${scCount}</span>
+      </button>
+      <button type="button" class="mi-subtab-btn tl ${miCompanyFilter==='translanka'?'active':''}" data-company="translanka" onclick="miSetCompanyFilter('translanka','${searchId}')">
+        🌐 Translanka Nexus <span class="mi-subtab-badge tl">${tlCount}</span>
+      </button>
+    </div>
+
     <div class="mi-toolbar"><input id="${searchId}" class="search" placeholder="Search invoice, ERP customer, phone, item or ERP reference..." oninput="miRenderFiltered('${searchId}')"></div>
-    <div id="${searchId}List">${miTableHTML(list,'')}</div>
+    <div id="${searchId}List">${miTableHTML(displayList,'')}</div>
   </div>`;
 }
 window.miRenderFiltered=function(searchId){
@@ -496,6 +537,13 @@ window.miRenderFiltered=function(searchId){
   let list=miInvoices();
   if(searchId==='miPendingSearch')list=list.filter(x=>x.erpStatus!=='updated');
   if(searchId==='miUpdatedSearch')list=list.filter(x=>x.erpStatus==='updated');
+
+  if(miCompanyFilter==='softcreation'){
+    list=list.filter(x=>x.company!=='translanka');
+  } else if(miCompanyFilter==='translanka'){
+    list=list.filter(x=>x.company==='translanka');
+  }
+
   if(q)list=list.filter(inv=>[
     inv.invoiceNo,inv.customerName,inv.customerPhone,inv.customerEmail,inv.erpCustomerId,
     inv.erpCustomerCode,inv.erpRef,inv.supplierBill,...(inv.items||[]).flatMap(i=>[i.code,i.desc])
@@ -714,7 +762,7 @@ function miEditorHTML(){
 
 function miAfterEditorRender(){
   const inv=miEditingId?miInvoice(miEditingId):null;
-  if(mi$('miCompany'))mi$('miCompany').value=inv?.company||(miPage==='translanka_erp'?'translanka':'softcreation');
+  if(mi$('miCompany'))mi$('miCompany').value=inv?.company||(miCompanyFilter==='translanka'?'translanka':'softcreation');
   mi$('miInvoiceNo').value=inv?.invoiceNo||'';
   mi$('miInvoiceDate').value=inv?.invoiceDate||miToday();
   mi$('miSupplyDate').value=inv?.supplyDate||miToday();
@@ -1265,7 +1313,7 @@ ${comp.key==='translanka'?`
   <img src="assets/icons/translankanexus.png" alt="Translanka Nexus" style="max-height:56pt;max-width:138pt;object-fit:contain;">
 </div>`:''}
       <div class="mi-company-header-mask">
-        <div class="mi-company-title" style="color:${comp.color}">${miEsc(comp.name)}</div>
+        <div class="mi-company-title" style="color:#000000;font-weight:700">${miEsc(comp.name)}</div>
         <div class="mi-company-line">Address : ${miEsc(comp.address)}</div>
         <div class="mi-company-line">Tel : ${miEsc(comp.tel)}</div>
         <div class="mi-company-line mi-company-contact">

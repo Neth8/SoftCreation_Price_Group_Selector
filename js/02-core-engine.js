@@ -1943,7 +1943,55 @@ $('custSourceFile').addEventListener('change',previewCustomerSourceFile);
 $('custPasteZone').addEventListener('paste',e=>{const file=[...(e.clipboardData?.items||[])].find(x=>x.type.startsWith('image/'))?.getAsFile();if(!file)return toast('Clipboard does not contain an image');pastedCustomerFile=new File([file],`snip_${Date.now()}.png`,{type:file.type||'image/png'});const u=URL.createObjectURL(pastedCustomerFile);$('custSourcePreview').innerHTML=`<img src="${u}" alt="Pasted screenshot">`;$('custSourcePreview').classList.add('show');$('custReadStatus').className='customer-read-status ok';$('custReadStatus').textContent='Screenshot pasted. Click Generate Customer Details.';e.preventDefault();toast('Screenshot pasted successfully')});
 
 function creditCalc(){const cash=Number($('itmCash').value||0),m=Number($('itmCreditMarkup').value||0);$('itmCreditPrice').value=(cash*(1+m/100)).toFixed(2)};$('itmCash').addEventListener('input',creditCalc);$('itmCreditMarkup').addEventListener('input',creditCalc);
-function renderItems(){const q=($('itemSearch')?.value||'').toLowerCase(),arr=scSortedLabelItemsV20261105().filter(i=>[i.desc,i.size,i.material,i.layout,i.pcs].join(' ').toLowerCase().includes(q));$('itemList').innerHTML=!arr.length?'<div class="empty">No items found.</div>':`<table class="table"><thead><tr><th>Description</th><th>Specification</th><th>Cash</th><th>Credit %</th><th>Credit Price</th><th>Packing</th><th></th></tr></thead><tbody>${arr.map((i,n)=>{const cp=Number(i.creditPrice||Number(i.cash||0)*(1+Number(i.creditMarkup||0)/100));const imgSrc=i.imageUrl||i.image||'';return `<tr><td><div style="display:flex;align-items:center;gap:8px">${imgSrc?`<img src="${esc(imgSrc)}" style="width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1" loading="lazy" alt="">`:''}<div><b>${n+1}. ${esc(i.desc)}</b></div></div></td><td>${esc([i.size,i.material,i.layout,i.pcs?i.pcs+' PCS':''].filter(Boolean).join(' '))}</td><td>LKR ${money(i.cash)}</td><td>${money(i.creditMarkup)}%</td><td><b>LKR ${money(cp)}</b></td><td>${esc(i.packing||'-')}</td><td><button class="btn ghost sm" onclick="openItemModal('${i.id}')">Edit</button></td></tr>`}).join('')}</tbody></table>`}
+
+function scMasterImageOrPlaceholder(src, type, altTitle){
+  if(src){
+    return `<img class="device-master-image" loading="lazy" decoding="async" src="${esc(src)}" alt="${esc(altTitle||type)}">`;
+  }
+  let iconSvg = '';
+  let label = 'No Image Attached';
+  if(type === 'label'){
+    label = 'No Label Image';
+    iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="7" y1="9" x2="7" y2="15"/><line x1="10" y1="9" x2="10" y2="15"/><line x1="13" y1="9" x2="13" y2="15"/><line x1="17" y1="9" x2="17" y2="15"/></svg>`;
+  } else if(type === 'ribbon' || type === 'product'){
+    label = 'No Product Image';
+    iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/></svg>`;
+  } else {
+    label = 'No Device Image';
+    iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="12" rx="2"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/></svg>`;
+  }
+  return `<div class="device-master-image-placeholder">${iconSvg}<span>${label}</span></div>`;
+}
+
+function renderItems(){
+  const q=($('itemSearch')?.value||'').toLowerCase(),
+        arr=scSortedLabelItemsV20261105().filter(i=>[i.desc,i.size,i.material,i.layout,i.pcs].join(' ').toLowerCase().includes(q));
+  const box=$('itemList');
+  if(!box)return;
+  if(!arr.length){
+    box.innerHTML='<div class="empty" style="grid-column:1/-1">No items found.</div>';
+    return;
+  }
+  box.innerHTML=arr.map(i=>{
+    const cp=Number(i.creditPrice||Number(i.cash||0)*(1+Number(i.creditMarkup||0)/100));
+    const imgSrc=i.imageUrl||i.image||'';
+    const imgHtml=scMasterImageOrPlaceholder(imgSrc,'label',i.desc||'Label Item');
+    const spec=[i.size,i.material,i.layout,i.pcs?i.pcs+' PCS':''].filter(Boolean).join(' • ');
+    return `<div class="device-card sc-item-master-card">
+      ${imgHtml}
+      <b style="font-size:13px">${esc(i.desc||'ELP')}</b>
+      <div class="small sc-item-spec">${esc(spec||'Standard Specification')}</div>
+      <div class="sc-item-pricing-strip">
+        <div><span>Cash:</span> <b>LKR ${money(i.cash)}</b></div>
+        <div><span>Credit (${money(i.creditMarkup)}%):</span> <b>LKR ${money(cp)}</b></div>
+      </div>
+      <div class="small" style="margin-top:6px;color:#64748b">Packing: ${esc(i.packing||'-')}</div>
+      <div class="actions" style="margin-top:auto;padding-top:10px">
+        <button class="btn ghost sm" type="button" onclick="openItemModal('${i.id}')">Edit Item</button>
+      </div>
+    </div>`;
+  }).join('');
+}
 function openItemModal(id=''){
   if(!id)return toast('Create labels from the pricing calculator');
   const i=state.items.find(x=>x.id===id);
@@ -2002,7 +2050,28 @@ function renderProfitReport(){const id=$('profitDoc')?.value,doc=state.docs.find
 async function downloadProfitReportPDF(){const id=$('profitDoc').value,doc=state.docs.find(x=>x.id===id);if(!doc)return toast('Select a document first');renderProfitReport();const okC=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas),okP=await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf);if(!okC||!okP)return toast('PDF libraries unavailable');const host=document.createElement('div');host.style='position:fixed;left:-9999px;top:0;width:794px;background:white;padding:35px;color:#172f36';host.innerHTML=`<h1 style="color:#078f92">SoftCreation Profit Report</h1>${$('profitReport').innerHTML}<div style="margin-top:18px;font-size:10px;color:#687b82">Confidential Admin Report • Generated ${new Date().toLocaleString()} • ${esc(currentUser?.display||'')}</div>`;document.body.appendChild(host);try{const canvas=await html2canvas(host,{scale:2,backgroundColor:'#fff'}),{jsPDF}=window.jspdf,pdf=new jsPDF({unit:'mm',format:'a4'}),img=canvas.toDataURL('image/png'),w=190,h=canvas.height*190/canvas.width;let y=0,left=h;pdf.addImage(img,'PNG',10,10,w,h);left-=277;while(left>0){y-=287;pdf.addPage();pdf.addImage(img,'PNG',10,y+10,w,h);left-=287}pdf.save(`Profit_${doc.serial.replace(/[\\/:*?"<>|]/g,'-')}.pdf`);audit('DOWNLOAD_PROFIT_REPORT',doc.serial);saveState()}finally{host.remove()}}
 
 function devicePrice(d,qty){const q=Number(qty||1),disc=q<=5?d.d1:q<=10?d.d2:q<=20?d.d3:d.d4;return Number(d.price||0)*(1-Number(disc||0)/100)}
-function renderDevices(){const q=($('deviceSearch')?.value||'').toLowerCase(),arr=state.devices.filter(d=>[d.name,d.model,d.brand,d.features].join(' ').toLowerCase().includes(q));$('deviceList').innerHTML=arr.length?arr.map(d=>`<div class="device-card">${d.image?`<img src="${d.image}" style="width:100%;height:120px;object-fit:contain">`:''}<b>${esc(d.name)}</b><div>${esc(d.brand||'')} ${esc(d.model||'')}</div><div class="small">Stock: ${money(d.stock)} • Base: LKR ${money(d.price)}</div><div class="actions"><button class="btn ghost sm" onclick="openDeviceModal('${d.id}')">Edit</button></div></div>`).join(''):'<div class="empty">No devices added.</div>'}
+function renderDevices(){
+  const q=($('deviceSearch')?.value||'').toLowerCase(),
+        arr=state.devices.filter(d=>[d.name,d.model,d.brand,d.features].join(' ').toLowerCase().includes(q));
+  const box=$('deviceList');
+  if(!box)return;
+  box.innerHTML=arr.length?arr.map(d=>{
+    const src=d.image||'';
+    const imgHtml=scMasterImageOrPlaceholder(src,'device',d.name||'Device');
+    return `<div class="device-card sc-item-master-card">
+      ${imgHtml}
+      <b style="font-size:13px">${esc(d.name)}</b>
+      <div class="small sc-item-spec">${esc(d.brand||'')} ${esc(d.model||'')}</div>
+      <div class="sc-item-pricing-strip">
+        <div><span>Stock:</span> <b>${money(d.stock)} units</b></div>
+        <div><span>Base Price:</span> <b>LKR ${money(d.price)}</b></div>
+      </div>
+      <div class="actions" style="margin-top:auto;padding-top:10px">
+        <button class="btn ghost sm" type="button" onclick="openDeviceModal('${d.id}')">Edit</button>
+      </div>
+    </div>`;
+  }).join(''):'<div class="empty" style="grid-column:1/-1">No devices added.</div>';
+}
 function openDeviceModal(id=''){const d=state.devices.find(x=>x.id===id)||{};$('devId').value=d.id||'';$('devName').value=d.name||'';$('devModel').value=d.model||'';$('devSerial').value=d.serial||'';$('devBrand').value=d.brand||'';$('devPrice').value=d.price??'';$('devStock').value=d.stock??'';$('devFeatures').value=d.features||'';$('devD1').value=d.d1??0;$('devD2').value=d.d2??5;$('devD3').value=d.d3??10;$('devD4').value=d.d4??15;$('devImage').value='';$('deleteDeviceBtn').style.display=id?'inline-block':'none';$('deviceModal').classList.add('show')}
 function fileDataUrl(file){return new Promise((res,rej)=>{if(!file)return res('');const r=new FileReader();r.onerror=()=>rej(r.error);r.onload=()=>{const im=new Image();im.onerror=()=>res(r.result);im.onload=()=>{const max=700,scale=Math.min(1,max/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*scale);cv.height=Math.round(im.height*scale);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);res(cv.toDataURL('image/jpeg',.82))};im.src=r.result};r.readAsDataURL(file)})}
 async function saveDevice(){const id=$('devId').value;if(id&&!protectedEdit('save device changes'))return;const old=state.devices.find(x=>x.id===id)||{},file=$('devImage').files[0],image=file?await fileDataUrl(file):old.image||'';const d={...old,id:id||uid('dev'),name:$('devName').value.trim(),model:$('devModel').value.trim(),serial:$('devSerial').value.trim(),brand:$('devBrand').value.trim(),price:Number($('devPrice').value||0),stock:Number($('devStock').value||0),features:$('devFeatures').value.trim(),d1:Number($('devD1').value||0),d2:Number($('devD2').value||0),d3:Number($('devD3').value||0),d4:Number($('devD4').value||0),image};if(!d.name||!d.model)return toast('Device name and model are required');const i=state.devices.findIndex(x=>x.id===d.id);if(i>=0)state.devices[i]=d;else state.devices.push(d);audit(i>=0?'EDIT_DEVICE':'ADD_DEVICE',`${d.name} ${d.model}`);saveState();renderDevices();closeModal('deviceModal');toast('Device saved')}
@@ -2071,7 +2140,29 @@ function deleteCategory(){if(!protectedEdit('delete price category'))return;cons
 
 function productLabel(p){return p.type==='ribbon'?`${p.width}mm x ${p.length}m ${p.material} Ribbon ${p.color}`:`${p.width}mm x ${p.diameter}mm ${p.paperType} POS Paper Roll ${p.coating}`}
 function productPrice(p,c){return Number(p.cost)>0&&c?Number(p.cost)*categoryFactor(c):Number(p.price||0)}
-function renderProducts(){const q=($('productSearch')?.value||'').toLowerCase(),a=(state.productItems||[]).filter(p=>productLabel(p).toLowerCase().includes(q));$('productList').innerHTML=a.length?a.map(p=>{const src=p.imageUrl||p.image||'';return `<div class="device-card">${src?`<img class="device-master-image" loading="lazy" decoding="async" src="${esc(src)}" style="width:100%;max-height:120px;object-fit:contain;border-radius:8px;margin-bottom:8px;background:#f8fafc" alt="">`:''}<b>${esc(productLabel(p))}</b><div class="small">Supplier: ${esc(p.supplier||'-')} • Cost LKR ${money(p.cost)} • Base LKR ${money(p.price)}</div><div class="small">Categories: ${(p.categoryIds||[]).map(id=>esc(state.priceCategories.find(c=>c.id===id)?.name||'')).join(', ')||'All'}</div><button class="btn ghost sm" onclick="openProductModal('${p.id}')">Edit</button></div>`;}).join(''):'<div class="empty">No ribbon or paper roll items.</div>'}
+function renderProducts(){
+  const q=($('productSearch')?.value||'').toLowerCase(),
+        a=(state.productItems||[]).filter(p=>productLabel(p).toLowerCase().includes(q));
+  const box=$('productList');
+  if(!box)return;
+  box.innerHTML=a.length?a.map(p=>{
+    const src=p.imageUrl||p.image||'';
+    const imgHtml=scMasterImageOrPlaceholder(src,'ribbon',productLabel(p));
+    return `<div class="device-card sc-item-master-card">
+      ${imgHtml}
+      <b style="font-size:13px">${esc(productLabel(p))}</b>
+      <div class="small sc-item-spec">Supplier: ${esc(p.supplier||'-')}</div>
+      <div class="sc-item-pricing-strip">
+        <div><span>Cost:</span> <b>LKR ${money(p.cost)}</b></div>
+        <div><span>Base Price:</span> <b>LKR ${money(p.price)}</b></div>
+      </div>
+      <div class="small" style="margin-top:6px;color:#64748b">Categories: ${(p.categoryIds||[]).map(id=>esc(state.priceCategories.find(c=>c.id===id)?.name||'')).join(', ')||'All'}</div>
+      <div class="actions" style="margin-top:auto;padding-top:10px">
+        <button class="btn ghost sm" type="button" onclick="openProductModal('${p.id}')">Edit</button>
+      </div>
+    </div>`;
+  }).join(''):'<div class="empty" style="grid-column:1/-1">No ribbon or paper roll items.</div>';
+}
 function productTypeUI(){const ribbon=$('prodType').value==='ribbon';$('ribbonFields').style.display=ribbon?'grid':'none';$('paperFields').style.display=ribbon?'none':'grid'}
 function openProductModal(id=''){
   if(!protectedEdit(id?'edit product master':'add product master'))return;
