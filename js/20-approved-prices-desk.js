@@ -1472,6 +1472,179 @@
     toast('Receipt removed');
   };
 
+  function renderSoListV1030() {
+    renderMySalesOrdersV1030();
+    try { renderSalesOrders91?.(); } catch(_) {}
+  }
+
+  window.bpSoDownloadReceiptAttachment = async function(soId, receiptIndex = 0) {
+    const so = (state.salesOrders || []).find(x => x.id === soId);
+    if (!so) return toast('Sales Order not found');
+    const list = so.receiptAttachments?.length ? so.receiptAttachments : (so.receiptAttachment ? [so.receiptAttachment] : []);
+    const asset = list[receiptIndex] || list[0];
+    if (!asset?.path) return toast('No payment receipt attached');
+
+    try {
+      const url = `${SO_PO_PROJECT_URL_V1032}/storage/v1/object/${asset.bucket || SO_RECEIPT_BUCKET_V20261117}/${soPOEncodedPathV1032(asset.path)}`;
+      const response = await fetch(url, { headers: soPOHeadersV1032() });
+      if (!response.ok) throw new Error(`Receipt fetch failed (${response.status})`);
+      const blob = await response.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = asset.fileName || `${so.soNo || 'SO'}_Receipt.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast('Receipt downloaded');
+    } catch(err) {
+      toast(err?.message || 'Receipt could not be downloaded');
+    }
+  };
+
+  /* Quick Courier Delivery Charge & Tracking Modal (Ordexa & Mobile App Sync) */
+  window.spgsOpenEditCourierModal = function(soId) {
+    const so = (state.salesOrders || []).find(x => x.id === soId);
+    if (!so) return toast('Sales Order not found');
+
+    let modal = $('spgsCourierFeeModal');
+    if (!modal) {
+      document.body.insertAdjacentHTML('beforeend', `
+        <div id="spgsCourierFeeModal" class="modal">
+          <div class="modal-card" style="width:min(580px,96vw)">
+            <div class="modal-head" style="background:#f0f9ff;border-bottom:1px solid #bae6fd">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:24px">🚚</span>
+                <div>
+                  <b id="spgsCourierModalTitle" style="color:#0369a1;font-size:16px">Set Courier Delivery Fee & Tracking</b>
+                  <div id="spgsCourierModalMeta" class="small" style="color:#0284c7"></div>
+                </div>
+              </div>
+              <button class="closex" type="button" onclick="closeModal('spgsCourierFeeModal')">×</button>
+            </div>
+            <div id="spgsCourierModalBody" class="modal-body" style="padding:20px"></div>
+          </div>
+        </div>
+      `);
+      modal = $('spgsCourierFeeModal');
+    }
+
+    const itemsTotal = Number(so.total || 0);
+    const curCharge = Number(so.courierCharge || 0);
+    const curName = so.courierName || 'Domex Courier';
+    const curTrk = so.courierTrackingNo || so.trackingNo || '';
+
+    $('spgsCourierModalTitle').textContent = `Courier Fee & Tracking — ${so.soNo}`;
+    $('spgsCourierModalMeta').textContent = `Customer: ${so.customerName || 'N/A'} • Placed: ${so.date || ''}`;
+
+    $('spgsCourierModalBody').innerHTML = `
+      <form onsubmit="event.preventDefault(); spgsSaveCourierModal('${so.id}')">
+        <datalist id="spgsCourierDatalist">
+          <option value="Domex Courier">
+          <option value="Pronto Lanka">
+          <option value="Koombiyo Delivery">
+          <option value="Certis Lanka">
+          <option value="Fardar Express">
+          <option value="PickMe Flash">
+          <option value="Prompt Xpress">
+          <option value="Direct Delivery">
+        </datalist>
+
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:700">Order Items Subtotal</div>
+            <div style="font-size:16px;font-weight:700;color:#0f172a">LKR ${money(itemsTotal)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:700">Total Items</div>
+            <div style="font-size:14px;font-weight:600;color:#475569">${(so.lines || []).length} item line(s)</div>
+          </div>
+        </div>
+
+        <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="field" style="grid-column:span 2">
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px">Courier Service Provider</label>
+            <input id="spgsCourierInputName" list="spgsCourierDatalist" value="${esc(curName)}" placeholder="e.g. Domex Courier" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px">
+          </div>
+          <div class="field">
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px">Courier Delivery Fee (LKR)</label>
+            <input id="spgsCourierInputCharge" type="number" min="0" step="1" value="${curCharge}" placeholder="0" oninput="spgsCalcCourierModalTotal(${itemsTotal})" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;color:#0369a1">
+          </div>
+          <div class="field">
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px">Tracking Number / Waybill</label>
+            <input id="spgsCourierInputTracking" value="${esc(curTrk)}" placeholder="e.g. LK-DM-DEX-032681067" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px">
+          </div>
+        </div>
+
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-bottom:18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#166534;margin-bottom:4px">
+            <span>Items Subtotal:</span>
+            <span>LKR ${money(itemsTotal)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#0284c7;margin-bottom:6px">
+            <span>+ Courier Delivery Fee:</span>
+            <span id="spgsCourierPreviewFee">LKR ${money(curCharge)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #86efac;padding-top:6px;font-size:16px;font-weight:800;color:#14532d">
+            <span>Grand Total To Pay:</span>
+            <span id="spgsCourierPreviewGrandTotal">LKR ${money(itemsTotal + curCharge)}</span>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px">
+          <button class="btn ghost" type="button" onclick="closeModal('spgsCourierFeeModal')">Cancel</button>
+          <button class="btn primary" type="submit" style="background:#0284c7;border-color:#0284c7;color:#fff">💾 Save Courier Charge</button>
+        </div>
+      </form>
+    `;
+
+    modal.classList.add('show');
+  };
+
+  window.spgsCalcCourierModalTotal = function(itemsTotal) {
+    const feeInput = $('spgsCourierInputCharge');
+    const fee = Math.max(0, Number(feeInput?.value || 0));
+    if ($('spgsCourierPreviewFee')) $('spgsCourierPreviewFee').textContent = `LKR ${money(fee)}`;
+    if ($('spgsCourierPreviewGrandTotal')) $('spgsCourierPreviewGrandTotal').textContent = `LKR ${money(itemsTotal + fee)}`;
+  };
+
+  window.spgsSaveCourierModal = function(soId) {
+    const so = (state.salesOrders || []).find(x => x.id === soId);
+    if (!so) return toast('Sales Order not found');
+
+    const name = String($('spgsCourierInputName')?.value || '').trim();
+    const charge = Math.max(0, Number($('spgsCourierInputCharge')?.value || 0));
+    const trk = String($('spgsCourierInputTracking')?.value || '').trim();
+
+    so.courierCharge = charge;
+    so.courierName = name;
+    so.courierTrackingNo = trk;
+    if (trk) so.trackingNo = trk;
+    so.updatedAt = new Date().toISOString();
+
+    so.history = so.history || [];
+    so.history.push({
+      action: `Courier delivery charge set: LKR ${money(charge)} (${name || 'Courier'}${trk ? ' • ' + trk : ''})`,
+      by: currentUser?.display || currentUser?.username || 'Staff',
+      username: currentUser?.username || 'staff',
+      at: so.updatedAt
+    });
+
+    saveState();
+    if (typeof window.spgsCloudSaveNow === 'function') {
+      window.spgsCloudSaveNow();
+    }
+
+    closeModal('spgsCourierFeeModal');
+    renderMySalesOrdersV1030();
+    try { renderSalesOrders91?.(); } catch(_) {}
+    if ($('bpSoViewModalV1030')?.classList.contains('show')) {
+      bpSoViewOrderV1030(so.id);
+    }
+
+    toast(`Courier fee (LKR ${money(charge)}) updated for ${so.soNo}!`);
+  };
+
   window.bpSoPOFileChangedV1032=function(input){
     const file=input?.files?.[0]||null;
 
@@ -2562,6 +2735,9 @@
             const linesCount=Number(so.lines?.length || 0);
             const canCancel=(!so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true && (currentUser?.role==='admin' || so.ownerUser===currentUser?.username));
             const canEdit=(currentUser?.role === 'admin' && !window.scSOIsCancelledV57?.(so) && so.recoveredStoresOrder !== true && so.readOnly !== true);
+            const itemTotal = Number(so.total || 0);
+            const courierCharge = Number(so.courierCharge || 0);
+            const grandTotal = itemTotal + courierCharge;
 
             return `
               <div class="bp-so-history-card-v1032">
@@ -2581,8 +2757,9 @@
                       <b>${esc(status.label)}</b>
                     </div>
                     <div class="bp-so-total-box">
-                      <span class="bp-so-total-lbl">TOTAL AMOUNT</span>
-                      <b class="bp-so-total-val">LKR ${money(so.total||0)}</b>
+                      <span class="bp-so-total-lbl">${courierCharge > 0 ? 'TOTAL TO PAY' : 'TOTAL AMOUNT'}</span>
+                      <b class="bp-so-total-val" ${courierCharge > 0 ? 'style="color:#098aca"' : ''}>LKR ${money(grandTotal)}</b>
+                      ${courierCharge > 0 ? `<small style="display:block;font-size:10px;color:#64748b;font-weight:600">Items: LKR ${money(itemTotal)} + Courier: LKR ${money(courierCharge)}</small>` : ''}
                     </div>
                   </div>
                 </div>
@@ -2663,10 +2840,11 @@
                 </div>
 
                 <!-- 3. Tracking Summary Bar (if any tracking data exists) -->
-                ${tracking.length ? `
+                ${(tracking.length || so.courierTrackingNo || so.courierName) ? `
                   <div class="bp-so-tracking-bar-v1032">
-                    <span class="bp-so-tracking-lbl">🚚 FULFILMENT TRACKING:</span>
+                    <span class="bp-so-tracking-lbl">🚚 COURIER & FULFILMENT TRACKING:</span>
                     <div class="bp-so-tracking-pills">
+                      ${so.courierTrackingNo ? `<span class="bp-so-track-pill" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd">📦 ${esc(so.courierName||'Courier')}: <b>${esc(so.courierTrackingNo)}</b>${courierCharge > 0 ? ` (LKR ${money(courierCharge)})` : ''}</span>` : ''}
                       ${tracking.map(x=>`<span class="bp-so-track-pill">${esc(x)}</span>`).join('')}
                     </div>
                   </div>
@@ -2690,6 +2868,9 @@
                       View Order
                     </button>
                     ${canEdit ? `
+                      <button class="btn ghost sm" type="button" style="color:#098aca;border-color:#7dd3fc" onclick="spgsOpenEditCourierModal('${so.id}')" title="Set Courier Delivery Charge & Tracking">
+                        🚚 Courier Fee
+                      </button>
                       <button class="btn amber sm" type="button" onclick="adminOpenEditSalesOrderV1030('${so.id}')">
                         Edit
                       </button>
@@ -2867,6 +3048,18 @@
         </div>
 
         <div>
+          <span>Courier Service</span>
+          <b>${esc(so.courierName||'-')}</b>
+          ${so.courierTrackingNo ? `<small style="color:#0369a1;display:block">Waybill: <b>${esc(so.courierTrackingNo)}</b></small>` : ''}
+        </div>
+
+        <div>
+          <span>Courier Delivery Fee</span>
+          <b style="${Number(so.courierCharge||0) > 0 ? 'color:#0284c7' : ''}">${Number(so.courierCharge||0) > 0 ? `LKR ${money(so.courierCharge)}` : 'LKR 0.00 (Free / Not Set)'}</b>
+          ${currentUser?.role === 'admin' ? `<button class="btn ghost sm" type="button" style="margin-top:4px;color:#098aca;border-color:#7dd3fc" onclick="spgsOpenEditCourierModal('${so.id}')">✏️ Edit Courier Fee</button>` : ''}
+        </div>
+
+        <div>
           <span>Invoice PDF</span>
           ${so.invoiceAttachment ? `<b>${esc(so.invoiceAttachment.fileName||'Invoice.pdf')}</b><button class="btn ghost sm" type="button" onclick="bpSoViewInvoiceAttachmentV20261104('${so.id}')">Open Invoice</button>` : '<b>Not attached</b>'}
         </div>
@@ -2963,9 +3156,21 @@
         </table>
       </div>
 
-      <div class="sumline">
-        <span>Sales Order Total</span>
-        <strong>LKR ${money(so.total||0)}</strong>
+      <div class="sumline" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div>
+          <span style="font-size:12px;color:#64748b">Items Subtotal: </span>
+          <strong style="font-size:14px">LKR ${money(so.total||0)}</strong>
+        </div>
+        ${Number(so.courierCharge||0) > 0 ? `
+          <div>
+            <span style="font-size:12px;color:#64748b">Courier Delivery Fee (${esc(so.courierName||'Courier')}): </span>
+            <strong style="font-size:14px;color:#0284c7">LKR ${money(so.courierCharge)}</strong>
+          </div>
+        ` : ''}
+        <div style="border-top:1px solid #cbd5e1;padding-top:4px;margin-top:2px">
+          <span style="font-size:14px;font-weight:700">Total Amount to Pay: </span>
+          <strong style="font-size:18px;color:#047857">LKR ${money(Number(so.total||0) + Number(so.courierCharge||0))}</strong>
+        </div>
       </div>
 
       <div class="section">
@@ -3132,6 +3337,9 @@
 
     // Deep clone
     adminEditingSO = JSON.parse(JSON.stringify(so));
+    adminEditingSO.courierCharge = Number(so.courierCharge || 0);
+    adminEditingSO.courierName = so.courierName || '';
+    adminEditingSO.courierTrackingNo = so.courierTrackingNo || so.trackingNo || '';
     adminEditingSO.lines = (adminEditingSO.lines || []).map(l => ({
       ...l,
       qty: Number(l.qty || 0),
@@ -3196,6 +3404,12 @@
     renderAdminEditSOModalV1030();
     const modal = $('adminSoEditModalV1030');
     if (modal) modal.classList.add('show');
+  };
+
+  window.adminEditUpdateCourierCharge = function(val) {
+    if (!adminEditingSO) return;
+    adminEditingSO.courierCharge = Math.max(0, Number(val || 0));
+    renderAdminEditSOModalV1030();
   };
 
   window.adminEditUpdateField = function(field, val) {
@@ -3326,7 +3540,9 @@
     $('adminSoEditTitleV1030').textContent = `Edit Sales Order — ${adminEditingSO.soNo}`;
     $('adminSoEditMetaV1030').textContent = `Customer: ${adminEditingSO.customerName} • Created by: ${adminEditingSO.ownerDisplay || adminEditingSO.ownerUser || 'User'} (${adminEditingSO.date})`;
 
-    const grandTotal = adminEditingSO.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.price || 0), 0);
+    const itemsTotal = adminEditingSO.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.price || 0), 0);
+    const courierFee = Number(adminEditingSO.courierCharge || 0);
+    const grandTotal = itemsTotal + courierFee;
 
     const customerOptionsHtml = (state.customers || [])
       .filter(c => c && c.name)
@@ -3385,9 +3601,41 @@
         </table>
       </div>
 
-      <div class="sumline">
-        <span>Updated Order Total</span>
-        <strong>LKR ${money(grandTotal)}</strong>
+      <div class="section" style="margin-top:16px;display:flex;align-items:center;gap:8px">
+        <span>🚚 Courier Delivery & Tracking (Ordexa & Mobile App Sync)</span>
+      </div>
+      <div class="grid" style="background:rgba(2,132,199,0.04);border:1px solid rgba(2,132,199,0.2);border-radius:10px;padding:12px;margin-bottom:14px">
+        <div class="field">
+          <label>Courier Service Provider</label>
+          <input list="adminCourierList" value="${esc(adminEditingSO.courierName || '')}" placeholder="e.g. Domex Courier, Pronto Lanka" oninput="adminEditUpdateField('courierName', this.value)">
+          <datalist id="adminCourierList">
+            <option value="Domex Courier">
+            <option value="Pronto Lanka">
+            <option value="Koombiyo Delivery">
+            <option value="Certis Lanka">
+            <option value="Fardar Express">
+            <option value="PickMe Flash">
+            <option value="Prompt Xpress">
+            <option value="Direct Delivery">
+          </datalist>
+        </div>
+        <div class="field">
+          <label>Courier Delivery Fee (LKR)</label>
+          <input type="number" min="0" step="1" value="${adminEditingSO.courierCharge ?? 0}" placeholder="0" oninput="adminEditUpdateCourierCharge(this.value)">
+        </div>
+        <div class="field full">
+          <label>Courier Tracking Number / Waybill</label>
+          <input value="${esc(adminEditingSO.courierTrackingNo || '')}" placeholder="e.g. LK-DM-DEX-032681067" oninput="adminEditUpdateField('courierTrackingNo', this.value)">
+        </div>
+      </div>
+
+      <div class="sumline" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+        <div style="font-size:12px;color:var(--sc-muted, #64748b)">Items Subtotal: <b>LKR ${money(itemsTotal)}</b></div>
+        <div style="font-size:12px;color:#0284c7">Courier Delivery Fee: <b>LKR ${money(courierFee)}</b></div>
+        <div style="font-size:16px;border-top:1px solid #cbd5e1;padding-top:4px">
+          <span>Total Amount to Pay:</span>
+          <strong style="color:#0f172a;margin-left:8px">LKR ${money(grandTotal)}</strong>
+        </div>
       </div>
 
       <div class="section" style="margin-top:16px">Delivery Customers & Item Allocation</div>
@@ -3528,6 +3776,12 @@
     so.note = adminEditingSO.note || '';
     so.lines = adminEditingSO.lines;
     so.total = adminEditingSO.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.price || 0), 0);
+    so.courierCharge = Math.max(0, Number(adminEditingSO.courierCharge || 0));
+    so.courierName = String(adminEditingSO.courierName || '').trim();
+    so.courierTrackingNo = String(adminEditingSO.courierTrackingNo || '').trim();
+    if (so.courierTrackingNo) {
+      so.trackingNo = so.courierTrackingNo;
+    }
     so.deliveries = adminEditingSO.deliveries.filter(d => d.allocations.some(a => Number(a.qty) > 0));
 
     const first = so.deliveries[0];
@@ -3602,6 +3856,9 @@
     }
 
     saveState();
+    if (typeof window.spgsCloudSaveNow === 'function') {
+      window.spgsCloudSaveNow();
+    }
     if (typeof audit === 'function') {
       audit('ADMIN_EDIT_SALES_ORDER', `${so.soNo} updated by ${currentUser?.username || 'admin'}`);
     }
