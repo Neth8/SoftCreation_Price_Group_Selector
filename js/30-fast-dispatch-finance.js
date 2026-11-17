@@ -9,11 +9,10 @@
   const dispatchGroupCacheV1063=new Map();
 
   function usageApiKeyV1060(){
-    let key=localStorage.getItem(USAGE_KEY_STORE_V1060)||'';
-    if(!key){
-      key=prompt('SoftCreation cloud setup\n\nPaste the FULL Supabase anon / publishable key for qyxgamverzdmhtvezbft:')||'';
-      key=key.trim();
-      if(key)localStorage.setItem(USAGE_KEY_STORE_V1060,key);
+    let key=(localStorage.getItem(USAGE_KEY_STORE_V1060)||'').trim();
+    if(!key || key.indexOf('eyJ')===-1){
+      key=window.SPGS_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5eGdhbXZlcnpkbWh0dmV6YmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NjUwMDgsImV4cCI6MjA4MzQ0MTAwOH0.HQhMiD8DwMHMoHj0JtVIXCXhJArfiNnwMfz3a8Z5jyk';
+      try{ localStorage.setItem(USAGE_KEY_STORE_V1060,key); }catch(e){}
     }
     return key;
   }

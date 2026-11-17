@@ -21,8 +21,10 @@
   const SO_ITEM_PAGE_SIZE_V1032=5;
   const SO_PO_BUCKET_V1032='sales-order-po-files';
   const SO_INVOICE_BUCKET_V20261104='sales-order-invoice-pdfs';
+  const SO_RECEIPT_BUCKET_V20261117='sales-order-payment-receipts';
   const SO_PO_PROJECT_URL_V1032='https://qyxgamverzdmhtvezbft.supabase.co';
   const SO_PO_MAX_BYTES_V1032=10*1024*1024;
+  const SO_RECEIPT_MAX_BYTES_V20261117=15*1024*1024;
   const DIRECT='Direct delivery to dealer customers';
   const MIXED='Mixed delivery';
 
@@ -35,6 +37,7 @@
   let soItemPageV1032=1;
   let soPOFilePendingV1032=null;
   let soInvoiceFilePendingV20261104=null;
+  let soReceiptFilePendingV20261117=null;
   let soRealtimeTimerV1032=0;
   let lastSOEligibleCustomerId='';
 
@@ -420,6 +423,19 @@
                 <button class="btn red sm" type="button" onclick="bpSoRemovePendingInvoiceV20261104()">Remove</button>
               </div>
               <small class="muted">PDF only, maximum 10 MB. Invoice is optional and stored separately from the PO.</small>
+            </div>
+          </div>
+          <div class="field full">
+            <label>Payment Receipt (optional, PDF or Image)</label>
+            <div class="bp-so-po-attach-v1032">
+              <input id="bpSoReceiptFileV20261117" type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" onchange="bpSoReceiptFileChangedV20261117(this)">
+              <button class="btn ghost sm" type="button" onclick="$('bpSoReceiptFileV20261117').click()">+ Attach Payment Receipt</button>
+              <div id="bpSoReceiptFileStatusV20261117" class="bp-so-po-file-status-v1032">No receipt attached.</div>
+              <div id="bpSoReceiptFileActionsV20261117" class="bp-so-po-file-actions-v1032" style="display:none">
+                <button class="btn ghost sm" type="button" onclick="bpSoViewPendingReceiptV20261117()">Preview Selected</button>
+                <button class="btn red sm" type="button" onclick="bpSoRemovePendingReceiptV20261117()">Remove</button>
+              </div>
+              <small class="muted">PDF, PNG, JPG, WEBP, max 15 MB. Admin and accounting can verify payment receipt.</small>
             </div>
           </div>
           <div class="field full">
@@ -912,9 +928,9 @@
      Private Supabase Storage bucket: sales-order-po-files
      ------------------------------------------------------- */
   function soPOBrowserKeyV1032(){
-    const key=(localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
-    if(!key){
-      throw new Error('Supabase browser key is not configured on this device.');
+    let key=(localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
+    if(!key || key.indexOf('eyJ')===-1){
+      key=window.SPGS_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5eGdhbXZlcnpkbWh0dmV6YmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NjUwMDgsImV4cCI6MjA4MzQ0MTAwOH0.HQhMiD8DwMHMoHj0JtVIXCXhJArfiNnwMfz3a8Z5jyk';
     }
     return key;
   }
@@ -1151,6 +1167,311 @@
     }catch(err){toast(err?.message||'Invoice could not be opened');}
   };
 
+  /* ---------------------------------------------------------------------
+     v20261117 — Sales Order Payment Receipt Attachment & Storage (PDF + Images)
+     Private/Public Supabase Storage bucket: sales-order-payment-receipts
+     --------------------------------------------------------------------- */
+  function validateSOReceiptFileV20261117(file){
+    if(!file)return;
+    if(file.size > SO_RECEIPT_MAX_BYTES_V20261117){
+      throw new Error('Payment receipt must be 15 MB or smaller.');
+    }
+    const ext=String(file.name||'').split('.').pop().toLowerCase();
+    const allowed=['pdf','png','jpg','jpeg','webp','gif'];
+    if(!allowed.includes(ext)){
+      throw new Error('Payment receipt must be a PDF or image (PNG, JPG, JPEG, WEBP).');
+    }
+  }
+
+  function renderPendingSOReceiptV20261117(){
+    const file=soReceiptFilePendingV20261117;
+    const status=$('bpSoReceiptFileStatusV20261117');
+    const actions=$('bpSoReceiptFileActionsV20261117');
+    if(!status)return;
+
+    if(!file){
+      status.textContent='No receipt attached.';
+      status.className='bp-so-po-file-status-v1032';
+      if(actions)actions.style.display='none';
+      return;
+    }
+
+    const kb=Math.max(1,Math.round(file.size/1024));
+    status.textContent=`Attached: ${file.name} (${kb} KB)`;
+    status.className='bp-so-po-file-status-v1032 ready';
+    if(actions)actions.style.display='flex';
+  }
+
+  window.bpSoReceiptFileChangedV20261117=function(input){
+    const file=input?.files?.[0]||null;
+    try{
+      validateSOReceiptFileV20261117(file);
+      soReceiptFilePendingV20261117=file;
+    }catch(err){
+      if(input)input.value='';
+      soReceiptFilePendingV20261117=null;
+      toast(err.message||'Invalid receipt file');
+    }
+    renderPendingSOReceiptV20261117();
+  };
+
+  window.bpSoRemovePendingReceiptV20261117=function(){
+    soReceiptFilePendingV20261117=null;
+    if($('bpSoReceiptFileV20261117'))$('bpSoReceiptFileV20261117').value='';
+    renderPendingSOReceiptV20261117();
+  };
+
+  window.bpSoViewPendingReceiptV20261117=function(){
+    const file=soReceiptFilePendingV20261117;
+    if(!file)return toast('No receipt selected');
+    const url=URL.createObjectURL(file);
+    window.open(url,'_blank','noopener');
+    setTimeout(()=>URL.revokeObjectURL(url),10*60*1000);
+  };
+
+  async function uploadSOReceiptFileV20261117(soId,file,note=''){
+    validateSOReceiptFileV20261117(file);
+    const ext=String(file?.name||'').split('.').pop().toLowerCase()||'bin';
+    const nonce=(crypto?.randomUUID?.()||uid('rec')).replace(/[^a-zA-Z0-9_-]/g,'');
+    const safeName=soPOSafePartV1032(String(file?.name||`receipt.${ext}`).replace(/\.[^.]+$/,''));
+    const path=`receipts/${soPOSafePartV1032(soId)}/${Date.now()}_${nonce}_${safeName}.${ext}`;
+    const url=`${SO_PO_PROJECT_URL_V1032}/storage/v1/object/${SO_RECEIPT_BUCKET_V20261117}/${soPOEncodedPathV1032(path)}`;
+
+    const response=await fetch(url,{
+      method:'POST',
+      headers:soPOHeadersV1032({
+        'Content-Type':file.type||'application/octet-stream',
+        'cache-control':'max-age=3600',
+        'x-upsert':'false'
+      }),
+      body:file
+    });
+
+    if(!response.ok){
+      const detail=await response.text().catch(()=>response.statusText);
+      throw new Error(`Receipt upload failed (${response.status}): ${String(detail).slice(0,250)}. Run 02_PAYMENT_RECEIPTS_AND_ITEM_IMAGES.sql in Supabase SQL Editor.`);
+    }
+
+    const publicUrl=`${SO_PO_PROJECT_URL_V1032}/storage/v1/object/public/${SO_RECEIPT_BUCKET_V20261117}/${soPOEncodedPathV1032(path)}`;
+    const receiptObj={
+      id:uid('rcpt'),
+      soId,
+      storage:'supabase',
+      bucket:SO_RECEIPT_BUCKET_V20261117,
+      path,
+      fileName:file.name||'Payment Receipt',
+      mime:file.type||'',
+      bytes:Number(file.size||0),
+      publicUrl,
+      note:note||'',
+      uploadedAt:new Date().toISOString(),
+      uploadedBy:currentUser?.display||currentUser?.username||'User',
+      uploadedByUsername:currentUser?.username||''
+    };
+
+    // Sync to Supabase table in background
+    try{
+      const so=(state.salesOrders||[]).find(x=>x.id===soId);
+      const restUrl=`${SO_PO_PROJECT_URL_V1032}/rest/v1/spgs_sales_order_receipts`;
+      fetch(restUrl,{
+        method:'POST',
+        headers:soPOHeadersV1032({
+          'Content-Type':'application/json',
+          'Prefer':'return=minimal'
+        }),
+        body:JSON.stringify({
+          id:receiptObj.id,
+          so_id:soId,
+          so_no:so?.soNo||'',
+          file_name:receiptObj.fileName,
+          file_path:receiptObj.path,
+          bucket:receiptObj.bucket,
+          mime_type:receiptObj.mime,
+          file_bytes:receiptObj.bytes,
+          public_url:receiptObj.publicUrl,
+          note:receiptObj.note,
+          attached_by:receiptObj.uploadedBy,
+          attached_by_username:receiptObj.uploadedByUsername
+        })
+      }).catch(e=>console.warn('Receipt DB sync notice:',e));
+    }catch(e){}
+
+    return receiptObj;
+  }
+
+  window.bpSoViewReceiptAttachment=async function(soId,receiptIndex=0){
+    const so=(state.salesOrders||[]).find(x=>x.id===soId);
+    if(!so)return toast('Sales Order not found');
+    const list=so.receiptAttachments?.length?so.receiptAttachments:(so.receiptAttachment?[so.receiptAttachment]:[]);
+    const asset=list[receiptIndex]||list[0];
+    if(!asset?.path)return toast('No payment receipt attached');
+
+    const popup=window.open('about:blank','_blank');
+    try{
+      const url=`${SO_PO_PROJECT_URL_V1032}/storage/v1/object/${asset.bucket||SO_RECEIPT_BUCKET_V20261117}/${soPOEncodedPathV1032(asset.path)}`;
+      const response=await fetch(url,{headers:soPOHeadersV1032()});
+      if(!response.ok)throw new Error(`Receipt fetch failed (${response.status})`);
+      const blob=await response.blob();
+      const objectUrl=URL.createObjectURL(blob);
+      if(popup)popup.location=objectUrl;
+      else window.open(objectUrl,'_blank','noopener');
+      setTimeout(()=>URL.revokeObjectURL(objectUrl),10*60*1000);
+    }catch(err){
+      if(popup)popup.close();
+      toast(err?.message||'Receipt could not be opened');
+    }
+  };
+
+  /* Modal for attaching receipts to existing sales orders */
+  function bpSoEnsureAttachReceiptModal(){
+    if(document.getElementById('bpSoAttachReceiptModal'))return;
+    document.body.insertAdjacentHTML('beforeend',`
+      <div id="bpSoAttachReceiptModal" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-card" style="max-width:540px">
+          <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center">
+            <b>Attach Payment Receipt to Sales Order</b>
+            <button class="closex" type="button" onclick="bpSoCloseAttachReceiptModal()">×</button>
+          </div>
+          <div class="modal-body" style="padding:16px 20px">
+            <input type="hidden" id="bpSoReceiptModalSoId">
+            <div id="bpSoReceiptModalMeta" class="notice" style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;line-height:1.6"></div>
+            <div id="bpSoReceiptModalExistingList" style="margin:12px 0"></div>
+            <div class="field" style="margin-top:14px">
+              <label><b>Select Receipt File (PDF or Image) *</b></label>
+              <input id="bpSoReceiptModalFileInput" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" style="width:100%">
+              <div class="hint" style="color:#64748b;font-size:11px;margin-top:4px">Accepts PDF, PNG, JPG, JPEG, WEBP. Maximum 15 MB.</div>
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label><b>Payment / Transfer Reference Note</b></label>
+              <input id="bpSoReceiptModalNote" placeholder="e.g. Bank Transfer Ref 88291, Cheque #4928" style="width:100%">
+            </div>
+            <div id="bpSoReceiptModalStatus" style="margin-top:10px;font-size:12px"></div>
+            <div class="actions" style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px">
+              <button type="button" class="btn ghost" onclick="bpSoCloseAttachReceiptModal()">Cancel</button>
+              <button type="button" class="btn green" id="bpSoReceiptModalUploadBtn" onclick="bpSoConfirmUploadReceiptModal()">Upload & Save Receipt</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  window.bpSoOpenAttachReceiptModal=function(soId){
+    bpSoEnsureAttachReceiptModal();
+    const so=(state.salesOrders||[]).find(x=>x.id===soId);
+    if(!so)return toast('Sales order not found');
+
+    document.getElementById('bpSoReceiptModalSoId').value=soId;
+    document.getElementById('bpSoReceiptModalFileInput').value='';
+    document.getElementById('bpSoReceiptModalNote').value='';
+    document.getElementById('bpSoReceiptModalStatus').innerHTML='';
+
+    const meta=document.getElementById('bpSoReceiptModalMeta');
+    meta.innerHTML=`<b>Sales Order: ${esc(so.soNo||so.id)}</b> • Customer: <b>${esc(so.customerName||'')}</b><br>Total: <b>LKR ${money(so.total||0)}</b> • Date: ${esc(so.date||'')}`;
+
+    bpSoRenderReceiptModalExistingList(so);
+    document.getElementById('bpSoAttachReceiptModal')?.classList.add('show');
+  };
+
+  function bpSoRenderReceiptModalExistingList(so){
+    const listEl=document.getElementById('bpSoReceiptModalExistingList');
+    if(!listEl)return;
+    const list=so.receiptAttachments?.length?so.receiptAttachments:(so.receiptAttachment?[so.receiptAttachment]:[]);
+    if(!list.length){
+      listEl.innerHTML='<div style="font-size:12px;color:#64748b;padding:6px 0">No receipts attached yet.</div>';
+      return;
+    }
+    listEl.innerHTML=`
+      <div style="font-weight:700;font-size:12px;margin-bottom:6px;color:#334155">Attached Receipts (${list.length}):</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${list.map((r,idx)=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;padding:8px 12px;border-radius:8px">
+            <div>
+              <b>💳 ${esc(r.fileName||'Receipt')}</b>
+              ${r.note?`<div style="font-size:11px;color:#64748b">Note: ${esc(r.note)}</div>`:''}
+              <div style="font-size:10px;color:#94a3b8">Uploaded by ${esc(r.uploadedBy||'')} • ${r.uploadedAt?(new Date(r.uploadedAt)).toLocaleDateString():''}</div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn ghost sm" type="button" onclick="bpSoViewReceiptAttachment('${so.id}',${idx})">View</button>
+              ${currentUser?.role==='admin'?`<button class="btn red sm" type="button" onclick="bpSoDeleteReceipt('${so.id}','${r.id||idx}')">×</button>`:''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  window.bpSoCloseAttachReceiptModal=function(){
+    document.getElementById('bpSoAttachReceiptModal')?.classList.remove('show');
+  };
+
+  window.bpSoConfirmUploadReceiptModal=async function(){
+    const soId=document.getElementById('bpSoReceiptModalSoId')?.value;
+    const so=(state.salesOrders||[]).find(x=>x.id===soId);
+    if(!so)return toast('Sales order not found');
+
+    const fileInput=document.getElementById('bpSoReceiptModalFileInput');
+    const file=fileInput?.files?.[0];
+    if(!file)return toast('Please select a receipt file to upload');
+
+    const note=document.getElementById('bpSoReceiptModalNote')?.value.trim()||'';
+    const statusEl=document.getElementById('bpSoReceiptModalStatus');
+    const btn=document.getElementById('bpSoReceiptModalUploadBtn');
+
+    try{
+      btn.disabled=true;
+      if(statusEl)statusEl.innerHTML='<span style="color:#0284c7">Uploading receipt to Supabase...</span>';
+
+      const receiptObj=await uploadSOReceiptFileV20261117(soId,file,note);
+
+      so.receiptAttachments=so.receiptAttachments||[];
+      so.receiptAttachments.push(receiptObj);
+      so.receiptAttachment=receiptObj;
+
+      so.history=so.history||[];
+      so.history.push({
+        action:'Payment Receipt Attached',
+        by:currentUser?.display||currentUser?.username||'User',
+        username:currentUser?.username||'user',
+        at:new Date().toISOString(),
+        note:`Receipt: ${receiptObj.fileName}${note?` (${note})`:''}`
+      });
+
+      audit('SALES_ORDER_PAYMENT_RECEIPT',`${so.soNo} • ${receiptObj.fileName}`);
+      saveState();
+
+      if(statusEl)statusEl.innerHTML='<span style="color:#16a34a">✓ Receipt uploaded and linked successfully!</span>';
+      toast(`Receipt attached to ${so.soNo}`);
+      bpSoRenderReceiptModalExistingList(so);
+      fileInput.value='';
+      document.getElementById('bpSoReceiptModalNote').value='';
+
+      renderSoListV1030();
+      setTimeout(()=>{
+        bpSoCloseAttachReceiptModal();
+      },900);
+    }catch(err){
+      if(statusEl)statusEl.innerHTML=`<span style="color:#dc2626">Upload error: ${esc(err?.message||'Failed')}</span>`;
+      toast(err?.message||'Upload failed');
+    }finally{
+      btn.disabled=false;
+    }
+  };
+
+  window.bpSoDeleteReceipt=function(soId,receiptId){
+    if(currentUser?.role!=='admin')return toast('Admin approval required to delete receipts');
+    if(!confirm('Delete this payment receipt attachment?'))return;
+    const so=(state.salesOrders||[]).find(x=>x.id===soId);
+    if(!so)return;
+
+    so.receiptAttachments=(so.receiptAttachments||[]).filter((r,idx)=>r.id!==receiptId && String(idx)!==String(receiptId));
+    so.receiptAttachment=so.receiptAttachments[0]||null;
+    saveState();
+    bpSoRenderReceiptModalExistingList(so);
+    renderSoListV1030();
+    toast('Receipt removed');
+  };
+
   window.bpSoPOFileChangedV1032=function(input){
     const file=input?.files?.[0]||null;
 
@@ -1205,7 +1526,11 @@
     const so=(state.salesOrders||[]).find(x=>x.id===soId);
     if(!so)return;
 
-    if(currentUser?.role!=='admin' && so.ownerUser!==currentUser?.username){
+    const canViewPO = currentUser?.role==='admin' ||
+      currentUser?.role==='manager' ||
+      so.ownerUser===currentUser?.username ||
+      (typeof hasPerm==='function' && (hasPerm('products_view')||hasPerm('products_view_jobs')||hasPerm('production_control_view')||hasPerm('delivery_orders_view')));
+    if(!canViewPO){
       return toast('This PO attachment is not available to this user');
     }
 
@@ -1844,6 +2169,16 @@
         invoiceAttachment=await uploadSOInvoiceV20261104(soId,soInvoiceFilePendingV20261104);
       }
 
+      let receiptAttachment=null;
+      if(soReceiptFilePendingV20261117){
+        const receiptStatus=$('bpSoReceiptFileStatusV20261117');
+        if(receiptStatus){
+          receiptStatus.textContent='Uploading payment receipt...';
+          receiptStatus.className='bp-so-po-file-status-v1032 uploading';
+        }
+        receiptAttachment=await uploadSOReceiptFileV20261117(soId,soReceiptFilePendingV20261117);
+      }
+
       const so={
         id:soId,
         soNo:nextSONoV1030(),
@@ -1852,6 +2187,8 @@
         customerRef:$('bpSoRefV1030')?.value.trim()||'',
         poAttachment,
         invoiceAttachment,
+        receiptAttachment,
+        receiptAttachments:receiptAttachment?[receiptAttachment]:[],
 
         customerId:customer.id,
         customerName:customer.name,
@@ -1968,6 +2305,9 @@
           `${so.soNo} • ${poAttachment.fileName}`
         );
       }
+      if(receiptAttachment){
+        audit('SALES_ORDER_PAYMENT_RECEIPT',`${so.soNo} • ${receiptAttachment.fileName}`);
+      }
 
       saveState();
 
@@ -1977,6 +2317,7 @@
       soItemPageV1032=1;
       soPOFilePendingV1032=null;
       soInvoiceFilePendingV20261104=null;
+      soReceiptFilePendingV20261117=null;
 
       [
         'bpSoNeedDateV1030',
@@ -1993,6 +2334,8 @@
       renderPendingSOPOV1032();
       if($('bpSoInvoiceFileV20261104'))$('bpSoInvoiceFileV20261104').value='';
       renderPendingSOInvoiceV20261104();
+      if($('bpSoReceiptFileV20261117'))$('bpSoReceiptFileV20261117').value='';
+      renderPendingSOReceiptV20261117();
 
       if($('bpSoDateV1030')){
         $('bpSoDateV1030').value=today();
@@ -2044,13 +2387,14 @@
   };
 
   window.bpSoClearV1030=function(){
-    if((soCart.length||soPOFilePendingV1032||soInvoiceFilePendingV20261104) && !confirm('Clear the current Sales Order items, attachments and delivery allocations?'))return;
+    if((soCart.length||soPOFilePendingV1032||soInvoiceFilePendingV20261104||soReceiptFilePendingV20261117) && !confirm('Clear the current Sales Order items, attachments and delivery allocations?'))return;
 
     soCart=[];
     soDeliveries=[];
     soItemPageV1032=1;
     soPOFilePendingV1032=null;
     soInvoiceFilePendingV20261104=null;
+    soReceiptFilePendingV20261117=null;
 
     ['bpSoNeedDateV1030','bpSoRefV1030','bpSoNoteV1030'].forEach(id=>{
       if($(id))$(id).value='';
@@ -2063,6 +2407,8 @@
     renderPendingSOPOV1032();
     if($('bpSoInvoiceFileV20261104'))$('bpSoInvoiceFileV20261104').value='';
     renderPendingSOInvoiceV20261104();
+    if($('bpSoReceiptFileV20261117'))$('bpSoReceiptFileV20261117').value='';
+    renderPendingSOReceiptV20261117();
     ensureDeliveryBaseV1030();
     bpSoRefreshV1030();
   };
@@ -2269,9 +2615,17 @@
                         `
                         : ''
                     }
+                    ${(so.receiptAttachments?.length || so.receiptAttachment) ? `
+                      <div class="bp-so-po-saved-v1032" style="background:#ecfdf5;border:1px solid #a7f3d0;color:#047857">
+                        💳 Receipt: ${esc(so.receiptAttachments?.[0]?.fileName || so.receiptAttachment?.fileName || 'Payment receipt')}
+                        ${(so.receiptAttachments?.length > 1) ? ` (+${so.receiptAttachments.length - 1} more)` : ''}
+                      </div>
+                    ` : ''}
                   </div>
 
                   <div class="bp-so-history-actions-v1032">
+                    ${(so.receiptAttachments?.length || so.receiptAttachment) ? `<button class="btn ghost sm" type="button" style="color:#047857;border-color:#10b981" onclick="bpSoViewReceiptAttachment('${so.id}', 0)">💳 Receipt</button>` : ''}
+                    <button class="btn ghost sm" type="button" style="color:#087f83" onclick="bpSoOpenAttachReceiptModal('${so.id}')">+ Receipt</button>
                     ${so.invoiceAttachment?`<button class="btn ghost sm" type="button" onclick="bpSoViewInvoiceAttachmentV20261104('${so.id}')">Invoice PDF</button>`:''}
                     ${
                       so.poAttachment
@@ -2469,6 +2823,21 @@
               `
               : '<b>Not attached</b>'
           }
+        </div>
+
+        <div>
+          <span>Payment Receipt</span>
+          ${
+            (so.receiptAttachments?.length || so.receiptAttachment)
+              ? `
+                <b>${esc(so.receiptAttachments?.[0]?.fileName || so.receiptAttachment?.fileName || 'Attached receipt')}</b>
+                <button class="btn ghost sm" type="button" onclick="bpSoViewReceiptAttachment('${so.id}', 0)">
+                  Open / Download
+                </button>
+              `
+              : '<b>Not attached</b>'
+          }
+          <button class="btn ghost sm" type="button" style="margin-left:6px;color:#087f83" onclick="bpSoOpenAttachReceiptModal('${so.id}')">+ Attach Receipt</button>
         </div>
 
       </div>

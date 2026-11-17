@@ -1,0 +1,223 @@
+/* ==========================================================================
+   SoftCreation SPGS - Universal Mobile, Tablet & Android Responsiveness
+   Compatible with all screen sizes:
+   - Mobile phones (320px - 480px)
+   - Small & large tablets (600px - 1024px)
+   - Desktops & wide screens (1200px+)
+   ========================================================================== */
+
+/* Safe area insets for Android notches and navigation gesture bars */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+body {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overflow-x: hidden;
+}
+
+/* Touch targets: Make buttons easily tappable on touch screens */
+@media (pointer: coarse) {
+  button, 
+  .btn, 
+  .navbtn, 
+  .theme-toggle, 
+  .user-profile-btn,
+  .printer-hub-btn-v1124,
+  .app-refresh-btn-v1079 {
+    min-height: 38px;
+  }
+
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents auto-zoom on iOS & Android WebViews */
+  }
+}
+
+/* Responsive Table Wrapper */
+.table-wrap, 
+.mi-table-wrap, 
+.panel-body, 
+#quoteList, 
+#piList, 
+#customerList, 
+#itemList, 
+#deviceList, 
+#miBody {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Company chip indicators */
+.mi-company-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.mi-company-chip.softcreation {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+.mi-company-chip.translanka {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+/* Customer Category Badge */
+.cust-cat-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+/* Tablets (max-width: 992px) */
+@media (max-width: 992px) {
+  .mi-editor-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .mi-preview-card {
+    display: none; /* Hide floating preview on smaller screens to prioritize form editing */
+  }
+  .mi-subnav {
+    overflow-x: auto;
+    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Mobile Screens (max-width: 768px) */
+@media (max-width: 768px) {
+  /* Modals full-screen adaptive */
+  .modal-card {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 92vh !important;
+    margin: 4vh auto !important;
+    border-radius: 12px !important;
+    padding: 14px !important;
+    overflow-y: auto !important;
+  }
+
+  .grid, .grid2, .grid3, .mi-grid2, .mi-grid3 {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .topbar {
+    padding: 8px 12px !important;
+  }
+
+  .brandtext {
+    display: none; /* Keep clean monogram on small mobile */
+  }
+
+  .panel-title {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .listbar {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .listbar input.search,
+  .listbar select {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .actions button, .actions .btn {
+    flex: 1 1 auto;
+    min-width: 120px;
+  }
+
+  .mi-kpis {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+}
+
+/* Very Small Mobile Phones (max-width: 480px) */
+@media (max-width: 480px) {
+  .mi-kpis {
+    grid-template-columns: 1fr !important;
+  }
+
+  .topbar-actions button .printer-hub-text-v1124,
+  .topbar-actions button .app-refresh-text-v1079 {
+    display: none;
+  }
+
+  .user-profile-copy {
+    display: none;
+  }
+
+  .user-avatar {
+    margin: 0;
+  }
+}
+
+/* ==========================================================================
+   Android WebView Login Screen Fix:
+   Resolves text repaint lag inside backdrop-filter containers on Android.
+   Disables expensive backdrop-filter on the login screen/box and promotes inputs
+   to their own compositing layer with translateZ(0) so typing appears immediately.
+   ========================================================================== */
+.login-screen {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: linear-gradient(135deg, #043f48, #079c9f) !important;
+}
+
+.login-box {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: #ffffff !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+}
+
+html[data-theme="dark"] .login-box {
+  background: #17262c !important;
+}
+
+.login-box .field input {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  position: relative;
+  z-index: 10;
+  -webkit-appearance: none;
+  opacity: 1 !important;
+  color: inherit !important;
+}
+
+

@@ -130,7 +130,7 @@
       const t=docTotals(d);
       const replacement=d.replacedBy?byId.get(d.replacedBy):null;
       const source=d.sourceQuoteId?byId.get(d.sourceQuoteId):null;
-      const generatedPI=isQ?piBySource.get(d.id):null;
+      const generatedPI=isQ?(piBySource.get(d.id)||(state.docs||[]).find(x=>x.type==='PI'&&(x.sourceQuoteId===d.id||x.sourceQuoteSerial===d.serial||(x.core===d.core&&x.category===d.category&&x.core)))):null;
 
       let status='';
       let actions='';
@@ -160,7 +160,7 @@
           : `<button class="btn ghost sm" onclick="viewDocument('${d.id}')">Open</button>
              <button class="btn green sm" onclick="downloadSavedPDF('${d.id}')">PDF</button>
              <button class="btn amber sm" onclick="reviseQuote('${d.id}')">Revise</button>
-             <button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button>
+             ${!generatedPI?`<button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button>`:''}
              <button class="btn red sm" onclick="requestDeleteDoc('${d.id}')">×</button>`;
 
         return `<tr class="${locked?'locked-row':''}">

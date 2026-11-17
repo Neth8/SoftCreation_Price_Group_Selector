@@ -29,15 +29,12 @@
 
       arr.forEach(d=>{
         const hasPI=(state.docs||[]).some(
-          x=>x?.type==='PI' && x?.sourceQuoteId===d?.id
+          x=>x?.type==='PI' && (x?.sourceQuoteId===d?.id || x?.sourceQuoteSerial===d?.serial || (x?.core===d?.core && x?.category===d?.category && x?.core))
         );
 
         if(!hasPI)return;
 
-        const button=
-          `<button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button>`;
-
-        out=out.split(button).join('');
+        out=out.replace(new RegExp(`\\s*<button[^>]*onclick=["']convertQuote\\('${d.id}'\\)["'][^>]*>\\s*PI\\s*<\\/button>`, 'g'), '');
       });
 
       return out;

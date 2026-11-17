@@ -14,6 +14,34 @@ const MI_WORKSPACE='softcreation_main';
 const MI_KEY_STORE='spgs_supabase_browser_key_v1';
 const MI_TEMPLATE='assets/images/manual-invoice-template.png';
 
+const MI_COMPANIES = {
+  softcreation: {
+    key: 'softcreation',
+    name: 'SoftCreation (Pvt) Ltd.',
+    tin: '103723353',
+    address: 'No.29, South Circular Road, Kurunegala.',
+    addressLines: ['No.29, South Circular Road,', 'Kurunegala.'],
+    tel: '071 77 44 555',
+    email: 'info@softcreation.lk',
+    web: 'www.softcreation.lk',
+    placeOfSupply: 'No. 29, South Circular Road, Kurunegala.',
+    color: '#087f83'
+  },
+  translanka: {
+    key: 'translanka',
+    name: 'Translanka Nexus (Pvt) Ltd.',
+    logo: 'assets/icons/translankanexus.png',
+    tin: '104839210',
+    address: 'No.29, South Circular Road, Kurunegala.',
+    addressLines: ['No.29, South Circular Road,', 'Kurunegala.'],
+    tel: '071 77 44 555 / 037 22 22 888',
+    email: 'info@translanka.lk',
+    web: 'www.translankanexus.com',
+    placeOfSupply: 'No. 29, South Circular Road, Kurunegala.',
+    color: '#065f46'
+  }
+};
+
 const MI_FEATURES=[
   ['manual_invoice_view','Manual Invoices — Access'],
   ['manual_invoice_create','Manual Invoices — Create / Edit'],
@@ -133,6 +161,7 @@ function miInstallUI(){
           <button data-mi-page="editor" onclick="miNewInvoice()">New / Edit Invoice</button>
           <button data-mi-page="pending" onclick="miGo('pending')">ERP Pending <span id="miPendingBadge" class="mi-badge">0</span></button>
           <button data-mi-page="updated" onclick="miGo('updated')">ERP Updated <span id="miUpdatedBadge" class="mi-badge">0</span></button>
+          <button data-mi-page="translanka_erp" onclick="miGo('translanka_erp')">Translanka ERP <span id="miTranslankaBadge" class="mi-badge" style="background:#065f46;color:#fff">0</span></button>
           <button data-mi-page="history" onclick="miGo('history')">Invoice History</button>
         </div>
         <div id="miBody"></div>
@@ -171,9 +200,18 @@ async function miLoad(){
   miDb={invoices:invoices||[],lines:lines||[],payments:payments||[],audit:audit||[]};
 }
 function miInvoiceObject(row){
+  let comp = row.company || '';
+  const rawNote = String(row.internal_note || '');
+  if(!comp){
+    if(rawNote.includes('[COMPANY:translanka]') || rawNote.toLowerCase().includes('translanka')) comp = 'translanka';
+    else comp = 'softcreation';
+  }
+  const cleanNote = rawNote.replace(/\[COMPANY:(softcreation|translanka)\]\s*/ig, '').trim();
+
   return {
     ...row,
     id:row.id,
+    company: comp || 'softcreation',
     invoiceNo:row.invoice_no,
     invoiceDate:row.invoice_date,
     supplyDate:row.supply_date,
@@ -191,7 +229,8 @@ function miInvoiceObject(row){
     supplierBill:row.supplier_bill_ref||'',
     courierRef:row.courier_ref||'',
     erpRef:row.erp_ref||'',
-    internalNote:row.internal_note||'',
+    internalNote:cleanNote,
+    rawInternalNote:rawNote,
     erpStatus:row.erp_status||'pending',
     createdAt:row.created_at,
     updatedAt:row.updated_at,
@@ -242,35 +281,209 @@ function miRender(){
   const invoices=miInvoices();
   const pending=invoices.filter(x=>x.erpStatus!=='updated');
   const updated=invoices.filter(x=>x.erpStatus==='updated');
+  const translankaAll=invoices.filter(x=>x.company==='translanka');
+  const translankaPending=translankaAll.filter(x=>x.erpStatus!=='updated');
+  const translankaUpdated=translankaAll.filter(x=>x.erpStatus==='updated');
+
   if(mi$('miPendingBadge'))mi$('miPendingBadge').textContent=pending.length;
   if(mi$('miUpdatedBadge'))mi$('miUpdatedBadge').textContent=updated.length;
+  if(mi$('miTranslankaBadge'))mi$('miTranslankaBadge').textContent=translankaPending.length;
+
   const body=mi$('miBody');
   if(!body)return;
-  if(miPage==='dashboard')body.innerHTML=miDashboardHTML(invoices,pending,updated);
+  if(miPage==='dashboard')body.innerHTML=miDashboardHTML(invoices,pending,updated,translankaAll);
   else if(miPage==='editor')body.innerHTML=miEditorHTML();
   else if(miPage==='viewer')body.innerHTML=miViewerHTML();
   else if(miPage==='pending')body.innerHTML=miListPageHTML('ERP Pending','Manual invoices awaiting GRN / ERP update.',pending,'miPendingSearch');
   else if(miPage==='updated')body.innerHTML=miListPageHTML('ERP Updated — Locked','Final records. View and download only.',updated,'miUpdatedSearch');
+  else if(miPage==='translanka_erp')body.innerHTML=miTranslankaPageHTML(translankaAll,translankaPending,translankaUpdated);
   else body.innerHTML=miListPageHTML('Invoice History','Complete searchable manual invoice register.',invoices,'miHistorySearch');
   if(miPage==='editor')setTimeout(miAfterEditorRender,0);
   if(miPage==='viewer')setTimeout(miAfterViewerRender,0);
 }
-function miDashboardHTML(all,pending,updated){
+function miDashboardHTML(all,pending,updated,translankaAll=[]){
   const outstanding=all.reduce((s,x)=>s+miBalance(x),0);
   const paid=all.reduce((s,x)=>s+miPaid(x),0);
+  const translankaPending=translankaAll.filter(x=>x.erpStatus!=='updated');
   return `
     <div class="mi-kpis">
       <div class="mi-stat"><span>ERP Pending</span><b>${pending.length}</b><small>Editable until ERP update</small></div>
       <div class="mi-stat"><span>ERP Updated</span><b>${updated.length}</b><small>Locked final records</small></div>
+      <div class="mi-stat" style="border-left:4px solid #065f46"><span>Translanka ERP</span><b style="color:#065f46">${translankaPending.length}</b><small>${translankaAll.length} total Translanka invoices</small></div>
       <div class="mi-stat"><span>Outstanding</span><b>Rs. ${miMoney(outstanding)}</b><small>Across manual invoices</small></div>
       <div class="mi-stat"><span>Payments Received</span><b>Rs. ${miMoney(paid)}</b><small>Recorded collections</small></div>
     </div>
     <div class="mi-card">
-      <div class="mi-card-head"><div><h3>Manual Invoice Workflow</h3><p>For direct-supplier / non-stock sales that are later reconciled to GRN and ERP.</p></div><button class="btn primary" onclick="miNewInvoice()">+ New Manual Invoice</button></div>
-      <div class="mi-flow"><span>ERP Customer</span><i>→</i><span>Manual Invoice</span><i>→</i><span>Payments</span><i>→</i><span>GRN / ERP</span><i>→</i><span>ERP Updated & Locked</span></div>
+      <div class="mi-card-head"><div><h3>Manual Invoice Workflow</h3><p>For direct-supplier / non-stock sales that are later reconciled to GRN and ERP.</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn primary" onclick="miNewInvoice()">+ New Manual Invoice</button>
+          <button class="btn green" onclick="miNewTranslankaInvoice()">+ Translanka Invoice</button>
+        </div>
+      </div>
+      <div class="mi-flow"><span>ERP Customer</span><i>→</i><span>Manual Invoice (SoftCreation / Translanka)</span><i>→</i><span>Payments</span><i>→</i><span>GRN / Company ERP</span><i>→</i><span>ERP Updated & Locked</span></div>
     </div>
     <div class="mi-card"><h3>Recent Invoices</h3>${miTableHTML(all.slice(0,6),'')}</div>`;
 }
+function miTranslankaPageHTML(all, pending, updated){
+  const totalVal=all.reduce((s,x)=>s+miTotal(x),0);
+  const pendingVal=pending.reduce((s,x)=>s+miTotal(x),0);
+  const updatedVal=updated.reduce((s,x)=>s+miTotal(x),0);
+  return `
+    <div class="mi-translanka-banner" style="background:linear-gradient(135deg, #064e3b 0%, #047857 100%);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:16px;box-shadow:0 4px 14px rgba(4,120,87,0.18)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:24px">🏢</span>
+            <div>
+              <h2 style="margin:0;font-size:18px;font-weight:700;color:#fff">Translanka (Pvt) Ltd. — ERP Control Center</h2>
+              <div style="margin-top:2px;font-size:12px;opacity:0.9">Dedicated ERP reconciliation and status management for Translanka ERP system.</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${miCan('manual_invoice_create')?`<button class="btn sm" style="background:#fff;color:#065f46;font-weight:700;border:none;box-shadow:0 2px 6px rgba(0,0,0,0.1)" onclick="miNewTranslankaInvoice()">+ New Translanka Invoice</button>`:''}
+          <button class="btn sm ghost" style="color:#fff;border-color:rgba(255,255,255,0.5)" onclick="miRefresh(true)">Refresh Live</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mi-kpis" style="margin-bottom:16px">
+      <div class="mi-stat" style="border-left:4px solid #f59e0b">
+        <span>Translanka ERP Pending</span>
+        <b style="color:#b45309">${pending.length}</b>
+        <small>Rs. ${miMoney(pendingVal)} awaiting Translanka ERP sync</small>
+      </div>
+      <div class="mi-stat" style="border-left:4px solid #10b981">
+        <span>Translanka ERP Updated</span>
+        <b style="color:#047857">${updated.length}</b>
+        <small>Rs. ${miMoney(updatedVal)} reconciled and locked</small>
+      </div>
+      <div class="mi-stat" style="border-left:4px solid #087f83">
+        <span>Total Translanka Invoices</span>
+        <b>${all.length}</b>
+        <small>Total billings Rs. ${miMoney(totalVal)}</small>
+      </div>
+    </div>
+
+    <div class="mi-card">
+      <div class="mi-card-head">
+        <div>
+          <h3>Translanka Invoice Register</h3>
+          <p>Filter by Translanka ERP status or search by invoice number, customer or ERP ref.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="miTranslankaFilter" onchange="miFilterTranslankaTable()" style="padding:6px 12px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;font-size:12px;font-weight:600;cursor:pointer">
+            <option value="pending" selected>Pending Translanka ERP (${pending.length})</option>
+            <option value="updated">Updated in Translanka ERP (${updated.length})</option>
+            <option value="all">All Translanka Invoices (${all.length})</option>
+          </select>
+        </div>
+      </div>
+      <div class="mi-toolbar">
+        <input id="miTranslankaSearch" class="search" placeholder="Search Translanka invoice, customer, ERP reference..." oninput="miFilterTranslankaTable()">
+      </div>
+      <div id="miTranslankaList">${miTranslankaTableHTML(pending)}</div>
+    </div>
+  `;
+}
+window.miFilterTranslankaTable=function(){
+  const filter=mi$('miTranslankaFilter')?.value||'pending';
+  const q=String(mi$('miTranslankaSearch')?.value||'').trim().toLowerCase();
+  let list=miInvoices().filter(x=>x.company==='translanka');
+  if(filter==='pending')list=list.filter(x=>x.erpStatus!=='updated');
+  else if(filter==='updated')list=list.filter(x=>x.erpStatus==='updated');
+  if(q){
+    list=list.filter(inv=>[
+      inv.invoiceNo,inv.customerName,inv.customerPhone,inv.customerEmail,
+      inv.erpRef,inv.supplierBill,...(inv.items||[]).flatMap(i=>[i.code,i.desc])
+    ].join(' ').toLowerCase().includes(q));
+  }
+  const host=mi$('miTranslankaList');
+  if(host)host.innerHTML=miTranslankaTableHTML(list);
+};
+function miTranslankaTableHTML(list){
+  if(!list.length)return '<div class="mi-empty">No Translanka invoices found in this view.</div>';
+  return `<div class="mi-table-wrap"><table class="mi-table"><thead><tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Total</th><th>Paid</th><th>Balance</th><th>ERP Status</th><th>Translanka ERP Ref</th><th>Actions</th></tr></thead><tbody>${list.map(inv=>{
+    const ps=miPayStatus(inv);
+    const updated=inv.erpStatus==='updated';
+    return `<tr>
+      <td><b>${miEsc(inv.invoiceNo)}</b><span class="mi-company-chip translanka">Translanka</span></td>
+      <td>${miEsc(inv.invoiceDate||'')}</td>
+      <td><b>${miEsc(inv.customerName)}</b><small>${miEsc(inv.customerPhone||inv.customerEmail||'')}</small></td>
+      <td class="num">${miMoney(miTotal(inv))}</td>
+      <td class="num">${miMoney(miPaid(inv))}</td>
+      <td class="num strong">${miMoney(miBalance(inv))}</td>
+      <td><span class="mi-status ${updated?'updated':'pending'}">${updated?'ERP Updated':'ERP Pending'}</span></td>
+      <td><span style="font-size:12px;font-weight:600;color:${inv.erpRef?'#065f46':'#94a3b8'}">${miEsc(inv.erpRef||'Pending Ref')}</span></td>
+      <td>
+        <div class="mi-actions">
+          <button class="btn ghost sm" onclick="miViewInvoice('${inv.id}')">View</button>
+          <button class="btn ghost sm" onclick="miPrintInvoice('${inv.id}')">Print / PDF</button>
+          ${!updated&&miCan('manual_invoice_create')?`<button class="btn amber sm" onclick="miRequestEdit('${inv.id}')">Edit</button>`:''}
+          ${!updated&&miCan('manual_invoice_finalize')?`<button class="btn green sm" onclick="miMarkTranslankaERPUpdated('${inv.id}')">Mark Translanka ERP</button>`:''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+window.miMarkTranslankaERPUpdated=async function(id){
+  const inv=miInvoice(id);
+  if(!inv)return toast('Invoice not found');
+  if(inv.erpStatus==='updated')return toast('Invoice is already marked as ERP Updated');
+  if(!miCan('manual_invoice_finalize'))return requirePerm('manual_invoice_finalize','mark Translanka ERP Updated');
+
+  const ref=prompt(`Enter Translanka ERP Reference / Bill No. for invoice ${inv.invoiceNo}:`, inv.erpRef||'');
+  if(ref===null)return;
+  const refClean=ref.trim();
+
+  try{
+    if(refClean){
+      inv.erpRef=refClean;
+      const savePayload={
+        workspace:MI_WORKSPACE,
+        id:inv.id,
+        invoice_no:inv.invoiceNo,invoice_date:inv.invoiceDate,supply_date:inv.supplyDate,
+        additional_info:inv.additionalInfo,payment_mode:inv.paymentMode,
+        erp_customer_id:inv.erpCustomerId,erp_customer_code:inv.erpCustomerCode,
+        customer_name:inv.customerName,customer_tin:inv.customerTIN,customer_email:inv.customerEmail,
+        customer_phone:inv.customerPhone,customer_address:inv.customerAddress,
+        fulfilment_type:inv.fulfilmentType,supplier_source:inv.supplierSource,
+        supplier_bill_ref:inv.supplierBill,courier_ref:inv.courierRef,
+        erp_ref:refClean,
+        internal_note:'[COMPANY:translanka] '+(inv.internalNote||'')+' [Translanka ERP Updated: '+refClean+']',
+        user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},
+        lines:[...inv.items.map((x,i)=>({line_no:i+1,item_code:x.code,description:x.desc,qty:x.qty,unit_price:x.unitPrice})),
+          ...(inv.vatEnabled?[{line_no:inv.items.length+1,item_code:MI_VAT_CODE,description:'VAT 18% included (breakdown only)',qty:1,unit_price:0}]:[]),
+          ...(miDeliveryCharge(inv)>0?[{line_no:inv.items.length+(inv.vatEnabled?2:1),item_code:MI_DELIVERY_CODE,description:'Delivery Charge (excluded from item VAT)',qty:1,unit_price:miDeliveryCharge(inv)}]:[])],
+        payments:inv.payments.map(x=>({payment_date:x.date,amount:x.amount,method:x.method,reference_note:x.note||''}))
+      };
+      await miRpc('spgs_manual_invoice_save',{p_payload:savePayload});
+    }
+
+    await miRpc('spgs_manual_invoice_mark_erp_updated',{
+      p_invoice_id:id,
+      p_username:currentUser?.username||'',
+      p_display_name:currentUser?.display||currentUser?.username||''
+    });
+
+    await miLoad();
+    miRender();
+    toast(`${inv.invoiceNo} marked as Translanka ERP Updated!`);
+  }catch(e){
+    console.error(e);
+    toast(e.message||'Failed to update Translanka ERP status');
+  }
+};
+window.miNewTranslankaInvoice=function(){
+  miNewInvoice();
+  setTimeout(()=>{
+    const c=mi$('miCompany');
+    if(c){
+      c.value='translanka';
+      miRefreshEditor();
+    }
+  },50);
+};
 function miListPageHTML(title,sub,list,searchId){
   return `<div class="mi-card">
     <div class="mi-card-head"><div><h3>${miEsc(title)}</h3><p>${miEsc(sub)}</p></div>${title.startsWith('ERP Pending')&&miCan('manual_invoice_create')?'<button class="btn primary" onclick="miNewInvoice()">+ New Invoice</button>':''}</div>
@@ -299,7 +512,7 @@ function miTableHTML(list){
       ? `<button class="btn ghost sm" onclick="miViewInvoice('${inv.id}')">View</button><button class="btn ghost sm" onclick="miPrintInvoice('${inv.id}')">Download / PDF</button>`
       : `<button class="btn ghost sm" onclick="miViewInvoice('${inv.id}')">View</button>${miCan('manual_invoice_create')?`<button class="btn amber sm" onclick="miRequestEdit('${inv.id}')">Edit</button>`:''}${miCan('manual_invoice_finalize')?`<button class="btn green sm" onclick="miMarkERPUpdatedById('${inv.id}')">ERP Updated</button>`:''}`;
     return `<tr>
-      <td><b>${miEsc(inv.invoiceNo)}</b>${inv.erpRef?`<small>ERP: ${miEsc(inv.erpRef)}</small>`:''}</td>
+      <td><b>${miEsc(inv.invoiceNo)}</b><span class="mi-company-chip ${inv.company==='translanka'?'translanka':'softcreation'}">${inv.company==='translanka'?'Translanka Nexus':'SoftCreation'}</span>${inv.erpRef?`<small>ERP: ${miEsc(inv.erpRef)}</small>`:''}</td>
       <td>${miEsc(inv.invoiceDate||'')}</td>
       <td><b>${miEsc(inv.customerName)}</b><small>${miEsc(inv.erpCustomerCode||inv.erpCustomerId||'ERP')}</small><small>${miEsc(inv.customerPhone||'')}</small></td>
       <td class="num">${miMoney(miTotal(inv))}</td>
@@ -407,7 +620,17 @@ function miEditorHTML(){
   return `<div class="mi-editor-grid">
     <div>
       <div class="mi-card">
-        <div class="mi-card-head"><div><h3>${locked?'View Locked Invoice':inv?'Edit Manual Invoice':'New Manual Invoice'}</h3><p>Invoice format is fixed to the approved SoftCreation tax-invoice layout.</p></div>${locked?'<span class="mi-lock-chip">ERP UPDATED — LOCKED</span>':''}</div>
+        <div class="mi-card-head"><div><h3>${locked?'View Locked Invoice':inv?'Edit Manual Invoice':'New Manual Invoice'}</h3><p>Select company letterhead and invoice details.</p></div>${locked?'<span class="mi-lock-chip">ERP UPDATED — LOCKED</span>':''}</div>
+        <div class="field full" style="margin-bottom:12px">
+          <label style="font-weight:700">Company Letterhead *</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <select id="miCompany" onchange="miRefreshEditor()" ${locked?'disabled':''} style="flex:1;padding:8px 12px;font-size:14px;font-weight:600;border-radius:6px;border:1.5px solid #087f83;background:#f8fafc">
+              <option value="softcreation">SoftCreation (Pvt) Ltd. (Primary Company • TIN: 103723353)</option>
+              <option value="translanka">Translanka Nexus (Pvt) Ltd. (Secondary Company • TIN: 104839210)</option>
+            </select>
+            <span id="miCompanyBadge" class="mi-company-chip softcreation" style="padding:6px 12px;font-size:11px">SoftCreation</span>
+          </div>
+        </div>
         <div class="mi-grid3">
           <div class="field"><label>Invoice Number *</label><input id="miInvoiceNo" ${locked?'disabled':''}></div>
           <div class="field"><label>Invoice Date *</label><input id="miInvoiceDate" type="date" ${locked?'disabled':''}></div>
@@ -491,6 +714,7 @@ function miEditorHTML(){
 
 function miAfterEditorRender(){
   const inv=miEditingId?miInvoice(miEditingId):null;
+  if(mi$('miCompany'))mi$('miCompany').value=inv?.company||(miPage==='translanka_erp'?'translanka':'softcreation');
   mi$('miInvoiceNo').value=inv?.invoiceNo||'';
   mi$('miInvoiceDate').value=inv?.invoiceDate||miToday();
   mi$('miSupplyDate').value=inv?.supplyDate||miToday();
@@ -534,6 +758,7 @@ window.miAddItem=function(item={code:'',desc:'',qty:1,unitPrice:0},refresh=true)
 function miDraft(){
   return {
     id:miEditingId||'',
+    company:mi$('miCompany')?.value||'softcreation',
     invoiceNo:String(mi$('miInvoiceNo')?.value||'').trim(),
     invoiceDate:mi$('miInvoiceDate')?.value||'',
     supplyDate:mi$('miSupplyDate')?.value||'',
@@ -583,6 +808,12 @@ window.miRefreshEditor=function(){
     const a=r.querySelector('.mi-it-amount');if(a)a.value=miMoney(amount);
   });
   const inv=miDraft();
+  const selComp=inv.company||'softcreation';
+  const cBadge=mi$('miCompanyBadge');
+  if(cBadge){
+    cBadge.className='mi-company-chip '+selComp;
+    cBadge.textContent=selComp==='translanka'?'Translanka Nexus':'SoftCreation';
+  }
   if(mi$('miEditorSubtotal'))mi$('miEditorSubtotal').textContent='Rs. '+miMoney(miNetAmount(inv));
   if(mi$('miEditorVat'))mi$('miEditorVat').textContent='Rs. '+miMoney(miVatAmount(inv));
   if(mi$('miEditorDelivery'))mi$('miEditorDelivery').textContent='Rs. '+miMoney(miDeliveryCharge(inv));
@@ -647,7 +878,8 @@ window.miSaveInvoice=async function(silent=false){
     customer_phone:inv.customerPhone,customer_address:inv.customerAddress,
     fulfilment_type:inv.fulfilmentType,supplier_source:inv.supplierSource,
     supplier_bill_ref:inv.supplierBill,courier_ref:inv.courierRef,erp_ref:inv.erpRef,
-    internal_note:inv.internalNote,
+    internal_note:`[COMPANY:${inv.company||'softcreation'}] `+(inv.internalNote||''),
+    company:inv.company||'softcreation',
     user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},
     lines:[...inv.items.map((x,i)=>({line_no:i+1,item_code:x.code,description:x.desc,qty:x.qty,unit_price:x.unitPrice})),
       ...(inv.vatEnabled?[{line_no:inv.items.length+1,item_code:MI_VAT_CODE,description:'VAT 18% included (breakdown only)',qty:1,unit_price:0}]:[]),
@@ -988,12 +1220,14 @@ function miRenderInvoice(inv,hostId){
     ? `Additional Information if Any : ${miEsc(inv.additionalInfo)}`
     : 'Additional Information if Any :';
 
+  const comp = MI_COMPANIES[inv.company] || MI_COMPANIES.softcreation;
+
   const supplierBlock=`
     <div class="mi-dyn-party-cell mi-dyn-supplier">
-      <div class="mi-dyn-kv"><span>Supplier's TIN</span><i>:</i><b>103723353</b></div>
-      <div class="mi-dyn-kv"><span>Supplier's Name</span><i>:</i><b>SoftCreation (Pvt) Ltd.</b></div>
-      <div class="mi-dyn-kv mi-dyn-address-row"><span>Address</span><i>:</i><b>No.29, South Circular Road,<br>Kurunegala.</b></div>
-      <div class="mi-dyn-kv"><span>Telephone No</span><i>:</i><b>071 77 44 555</b></div>
+      <div class="mi-dyn-kv"><span>Supplier's TIN</span><i>:</i><b>${miEsc(comp.tin)}</b></div>
+      <div class="mi-dyn-kv"><span>Supplier's Name</span><i>:</i><b>${miEsc(comp.name)}</b></div>
+      <div class="mi-dyn-kv mi-dyn-address-row"><span>Address</span><i>:</i><b>${comp.addressLines.map(miEsc).join('<br>')}</b></div>
+      <div class="mi-dyn-kv"><span>Telephone No</span><i>:</i><b>${miEsc(comp.tel)}</b></div>
     </div>`;
 
   const buyerBlock=`
@@ -1026,13 +1260,17 @@ function miRenderInvoice(inv,hostId){
 
 <div class="mi-old-contact-mask" aria-hidden="true"></div>
 <div class="mi-company-header-clean-mask" aria-hidden="true"></div>
+${comp.key==='translanka'?`
+<div class="mi-translanka-logo-mask" style="position:absolute;top:16pt;left:20pt;width:142pt;height:62pt;background:#fff;z-index:9;display:flex;align-items:center;justify-content:flex-start;">
+  <img src="assets/icons/translankanexus.png" alt="Translanka Nexus" style="max-height:56pt;max-width:138pt;object-fit:contain;">
+</div>`:''}
       <div class="mi-company-header-mask">
-        <div class="mi-company-title">SoftCreation (Pvt) Ltd.</div>
-        <div class="mi-company-line">Address : No.29, South Circular Road, Kurunegala.</div>
-        <div class="mi-company-line">Tel : 071 77 44 555</div>
+        <div class="mi-company-title" style="color:${comp.color}">${miEsc(comp.name)}</div>
+        <div class="mi-company-line">Address : ${miEsc(comp.address)}</div>
+        <div class="mi-company-line">Tel : ${miEsc(comp.tel)}</div>
         <div class="mi-company-line mi-company-contact">
-          <span>Email : info@softcreation.lk</span>
-          <span>Web : www.softcreation.lk</span>
+          <span>Email : ${miEsc(comp.email)}</span>
+          <span>Web : ${miEsc(comp.web)}</span>
         </div>
       </div>
 
@@ -1054,7 +1292,7 @@ function miRenderInvoice(inv,hostId){
 
         <div class="mi-dyn-supply-row">
           <div><b>Date of Supply</b><i>:</i><span>${miFmtDate(inv.supplyDate)}</span></div>
-          <div><b>Place of Supply</b><i>:</i><span>No. 29, South Circular Road, Kurunegala.</span></div>
+          <div><b>Place of Supply</b><i>:</i><span>${miEsc(comp.placeOfSupply)}</span></div>
         </div>
 
         <div class="mi-dyn-additional">${addText}</div>

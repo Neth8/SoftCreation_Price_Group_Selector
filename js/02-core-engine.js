@@ -1414,7 +1414,7 @@ function docTable(arr,isQ){
     const t=docTotals(d),
       replacement=d.replacedBy?state.docs.find(x=>x.id===d.replacedBy):null,
       source=d.sourceQuoteId?state.docs.find(x=>x.id===d.sourceQuoteId):null,
-      generatedPI=isQ?state.docs.find(x=>x.type==='PI'&&x.sourceQuoteId===d.id):null;
+      generatedPI=isQ?state.docs.find(x=>x.type==='PI'&&(x.sourceQuoteId===d.id||x.sourceQuoteSerial===d.serial||(x.core===d.core&&x.category===d.category&&x.core))):null;
 
     let status='';
     if(d.replacedBy){
@@ -1429,7 +1429,7 @@ function docTable(arr,isQ){
 
     const pdfBtn=`<button class="btn green sm" onclick="downloadSavedPDF('${d.id}')">PDF</button>`;
     const qActions=isQ&&!d.replacedBy
-      ? `<button class="btn amber sm" onclick="reviseQuote('${d.id}')">Revise</button><button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button>`
+      ? `<button class="btn amber sm" onclick="reviseQuote('${d.id}')">Revise</button>${!generatedPI?`<button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button>`:''}`
       : '';
 
     return `<tr>
@@ -1448,7 +1448,56 @@ function docTable(arr,isQ){
     </tr>`;
   }).join('')}</tbody></table>`
 }
-function renderCustomers(){const q=($('customerSearch')?.value||'').toLowerCase(),arr=state.customers.filter(c=>[c.name,c.address,c.phone,c.email].join(' ').toLowerCase().includes(q));$('customerList').innerHTML=!arr.length?'<div class="empty">No customers found.</div>':`<table class="table"><thead><tr><th>Customer</th><th>Contact</th><th>Billing / Delivery</th><th>VAT</th><th>Price History</th><th></th></tr></thead><tbody>${arr.map(c=>`<tr><td><b>${esc(c.name)}</b><div class="small">${esc(c.contactPerson||'')}${c.contactPerson&&c.email?' • ':''}${esc(c.email||'')}</div></td><td>${esc(c.phone||'-')}<div class="small">${c.map?'<span class="tag">Google Location</span>':''}</div></td><td>${esc(c.address||'-')}<div class="small">Delivery: ${esc(c.delivery||'Same as billing')}</div></td><td>${esc(c.vat||'-')}</td><td>${(c.priceHistory||[]).length} saved prices<div class="small">${Object.keys(c.specialPrices||{}).length} special rules</div></td><td><button class="btn ghost sm" onclick="openCustomerModal('${c.id}')">Edit</button></td></tr>`).join('')}</tbody></table>`}
+const DEFAULT_CUSTOMER_CATEGORIES=['General','Wholesale','Retail','Corporate','Distributor','Dealer','VIP'];
+function getCustomerCategories(){
+  if(!Array.isArray(state.customerCategories)||!state.customerCategories.length){
+    state.customerCategories=[...DEFAULT_CUSTOMER_CATEGORIES];
+  }
+  (state.customers||[]).forEach(c=>{
+    if(c.category&&!state.customerCategories.includes(c.category))state.customerCategories.push(c.category);
+  });
+  return state.customerCategories;
+}
+window.refreshCustomerCategoryDropdowns=function(selected=''){
+  const cats=getCustomerCategories();
+  const filterSelect=$('custCategoryFilter');
+  if(filterSelect){
+    const curr=filterSelect.value;
+    filterSelect.innerHTML='<option value="">All Categories</option>'+cats.map(cat=>`<option value="${esc(cat)}" ${cat===curr?'selected':''}>${esc(cat)}</option>`).join('');
+  }
+  const modalSelect=$('custCategory');
+  if(modalSelect){
+    const sel=selected||modalSelect.value||'General';
+    modalSelect.innerHTML=cats.map(cat=>`<option value="${esc(cat)}" ${cat===sel?'selected':''}>${esc(cat)}</option>`).join('');
+  }
+};
+window.addNewCustomerCategoryPrompt=function(){
+  const name=prompt('Enter new Customer Category name (e.g. Government, Hospitality, Export, VIP):');
+  if(!name)return;
+  const clean=name.trim();
+  if(!clean)return;
+  const cats=getCustomerCategories();
+  if(!cats.some(c=>c.toLowerCase()===clean.toLowerCase())){
+    cats.push(clean);
+    saveState();
+  }
+  refreshCustomerCategoryDropdowns(clean);
+  const m=$('custCategory');
+  if(m)m.value=clean;
+  renderCustomers();
+  toast(`Customer category "${clean}" added`);
+};
+function renderCustomers(){
+  refreshCustomerCategoryDropdowns();
+  const q=($('customerSearch')?.value||'').toLowerCase();
+  const catFilter=($('custCategoryFilter')?.value||'').trim();
+  const arr=state.customers.filter(c=>{
+    const qMatch=[c.name,c.address,c.phone,c.email,c.category||'General'].join(' ').toLowerCase().includes(q);
+    const catMatch=!catFilter || (c.category||'General')===catFilter;
+    return qMatch && catMatch;
+  });
+  $('customerList').innerHTML=!arr.length?'<div class="empty">No customers found.</div>':`<table class="table"><thead><tr><th>Customer</th><th>Category</th><th>Contact</th><th>Billing / Delivery</th><th>VAT</th><th>Price History</th><th></th></tr></thead><tbody>${arr.map(c=>`<tr><td><b>${esc(c.name)}</b><div class="small">${esc(c.contactPerson||'')}${c.contactPerson&&c.email?' • ':''}${esc(c.email||'')}</div></td><td><span class="badge" style="background:#e0f2fe;color:#0369a1;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700">${esc(c.category||'General')}</span></td><td>${esc(c.phone||'-')}<div class="small">${c.map?'<span class="tag">Google Location</span>':''}</div></td><td>${esc(c.address||'-')}<div class="small">Delivery: ${esc(c.delivery||'Same as billing')}</div></td><td>${esc(c.vat||'-')}</td><td>${(c.priceHistory||[]).length} saved prices<div class="small">${Object.keys(c.specialPrices||{}).length} special rules</div></td><td><button class="btn ghost sm" onclick="openCustomerModal('${c.id}')">Edit</button></td></tr>`).join('')}</tbody></table>`;
+}
 function updateCustomerPaymentTermsUI(){
 
   const mode =
@@ -1511,6 +1560,8 @@ function updateCustomerVatUI(){
 function openCustomerModal(id=''){
   pastedCustomerFile=null;
   const c=state.customers.find(x=>x.id===id);
+  refreshCustomerCategoryDropdowns(c?.category||'General');
+  if($('custCategory'))$('custCategory').value=c?.category||'General';
   $('custId').value=c?.id||'';
   $('custName').value=c?.name||'';
   $('custContactPerson').value=c?.contactPerson||'';
@@ -1611,7 +1662,8 @@ async function saveCustomer(){
   if($('custVatFile').files[0])vatFile=await putFile($('custVatFile').files[0],'VAT Certificate');
   if($('custSourceFile').files[0]||pastedCustomerFile)sourceFile=await putFile($('custSourceFile').files[0]||pastedCustomerFile,'Customer Source');
   const c={...old,id,
-name:$('custName').value.trim(),
+    category:$('custCategory')?.value||old.category||'General',
+    name:$('custName').value.trim(),
 
 contactPerson:
   $('custContactPerson').value.trim(),
@@ -1891,7 +1943,7 @@ $('custSourceFile').addEventListener('change',previewCustomerSourceFile);
 $('custPasteZone').addEventListener('paste',e=>{const file=[...(e.clipboardData?.items||[])].find(x=>x.type.startsWith('image/'))?.getAsFile();if(!file)return toast('Clipboard does not contain an image');pastedCustomerFile=new File([file],`snip_${Date.now()}.png`,{type:file.type||'image/png'});const u=URL.createObjectURL(pastedCustomerFile);$('custSourcePreview').innerHTML=`<img src="${u}" alt="Pasted screenshot">`;$('custSourcePreview').classList.add('show');$('custReadStatus').className='customer-read-status ok';$('custReadStatus').textContent='Screenshot pasted. Click Generate Customer Details.';e.preventDefault();toast('Screenshot pasted successfully')});
 
 function creditCalc(){const cash=Number($('itmCash').value||0),m=Number($('itmCreditMarkup').value||0);$('itmCreditPrice').value=(cash*(1+m/100)).toFixed(2)};$('itmCash').addEventListener('input',creditCalc);$('itmCreditMarkup').addEventListener('input',creditCalc);
-function renderItems(){const q=($('itemSearch')?.value||'').toLowerCase(),arr=scSortedLabelItemsV20261105().filter(i=>[i.desc,i.size,i.material,i.layout,i.pcs].join(' ').toLowerCase().includes(q));$('itemList').innerHTML=!arr.length?'<div class="empty">No items found.</div>':`<table class="table"><thead><tr><th>Description</th><th>Specification</th><th>Cash</th><th>Credit %</th><th>Credit Price</th><th>Packing</th><th></th></tr></thead><tbody>${arr.map((i,n)=>{const cp=Number(i.creditPrice||Number(i.cash||0)*(1+Number(i.creditMarkup||0)/100));return `<tr><td><b>${n+1}. ${esc(i.desc)}</b></td><td>${esc([i.size,i.material,i.layout,i.pcs?i.pcs+' PCS':''].filter(Boolean).join(' '))}</td><td>LKR ${money(i.cash)}</td><td>${money(i.creditMarkup)}%</td><td><b>LKR ${money(cp)}</b></td><td>${esc(i.packing||'-')}</td><td><button class="btn ghost sm" onclick="openItemModal('${i.id}')">Edit</button></td></tr>`}).join('')}</tbody></table>`}
+function renderItems(){const q=($('itemSearch')?.value||'').toLowerCase(),arr=scSortedLabelItemsV20261105().filter(i=>[i.desc,i.size,i.material,i.layout,i.pcs].join(' ').toLowerCase().includes(q));$('itemList').innerHTML=!arr.length?'<div class="empty">No items found.</div>':`<table class="table"><thead><tr><th>Description</th><th>Specification</th><th>Cash</th><th>Credit %</th><th>Credit Price</th><th>Packing</th><th></th></tr></thead><tbody>${arr.map((i,n)=>{const cp=Number(i.creditPrice||Number(i.cash||0)*(1+Number(i.creditMarkup||0)/100));const imgSrc=i.imageUrl||i.image||'';return `<tr><td><div style="display:flex;align-items:center;gap:8px">${imgSrc?`<img src="${esc(imgSrc)}" style="width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1" loading="lazy" alt="">`:''}<div><b>${n+1}. ${esc(i.desc)}</b></div></div></td><td>${esc([i.size,i.material,i.layout,i.pcs?i.pcs+' PCS':''].filter(Boolean).join(' '))}</td><td>LKR ${money(i.cash)}</td><td>${money(i.creditMarkup)}%</td><td><b>LKR ${money(cp)}</b></td><td>${esc(i.packing||'-')}</td><td><button class="btn ghost sm" onclick="openItemModal('${i.id}')">Edit</button></td></tr>`}).join('')}</tbody></table>`}
 function openItemModal(id=''){
   if(!id)return toast('Create labels from the pricing calculator');
   const i=state.items.find(x=>x.id===id);
@@ -1902,15 +1954,39 @@ function openItemModal(id=''){
   if(i?.packing?.toLowerCase().includes('loose'))$('itmPacking').value='loose';
   $('itmPackingQty').value=String(p.qty||state.settings.packingQty||50);
   $('itmCash').value=i?.cash??'';$('itmCreditMarkup').value=i?.creditMarkup??state.settings.creditMarkup;$('itmVatIncl').value=i?.vatIncl||'yes';
-  creditCalc();$('deleteItemBtn').style.display=i?'inline-block':'none';$('itemModal').classList.add('show')
+  creditCalc();
+  const preview=$('itmImagePreview');
+  if(preview){
+    const src=i?.imageUrl||i?.image||'';
+    preview.innerHTML=src?`<img src="${esc(src)}" style="max-height:80px;border-radius:6px;border:1px solid #cbd5e1"><button type="button" class="btn red sm" onclick="clearItemImageV2026()">Remove Image</button>`:'';
+  }
+  if($('itmImage'))$('itmImage').value='';
+  $('deleteItemBtn').style.display=i?'inline-block':'none';$('itemModal').classList.add('show');
 }
-function saveItem(){
+async function saveItem(){
   if(!protectedEdit('save Label Master changes'))return;
   const id=$('itmId').value||uid('item');
   const mode=$('itmPacking').value;
   const qty=Number($('itmPackingQty').value||state.settings.packingQty||50);
   const packing=mode==='default'?packingLabel(state.settings.packing,state.settings.packingQty):packingLabel(mode,qty);
-  const i={id,desc:$('itmDesc').value.trim()||'Item',size:$('itmSize').value.trim(),material:$('itmMaterial').value.trim(),layout:$('itmLayout').value.trim(),pcs:$('itmPcs').value,unit:$('itmUnit').value,packing,cash:Number($('itmCash').value||0),creditMarkup:Number($('itmCreditMarkup').value||0),vatIncl:$('itmVatIncl').value};
+  const old=state.items.find(v=>v.id===id)||{};
+  let image=old.image||'';
+  let imageUrl=old.imageUrl||'';
+  let imagePath=old.imagePath||'';
+  const file=$('itmImage')?.files?.[0];
+  if(file){
+    try{
+      const res=await uploadMasterImageCloud('label', id, file);
+      image=res.url; imageUrl=res.url; imagePath=res.path;
+    }catch(e){
+      console.warn('Label image upload notice:', e);
+      try{
+        const dataUrl=await deviceImageReadFileDataUrlV1017(file);
+        image=dataUrl; imageUrl=dataUrl;
+      }catch(_){}
+    }
+  }
+  const i={id,desc:$('itmDesc').value.trim()||'Item',size:$('itmSize').value.trim(),material:$('itmMaterial').value.trim(),layout:$('itmLayout').value.trim(),pcs:$('itmPcs').value,unit:$('itmUnit').value,packing,cash:Number($('itmCash').value||0),creditMarkup:Number($('itmCreditMarkup').value||0),vatIncl:$('itmVatIncl').value,image,imageUrl,imagePath};
   const x=state.items.findIndex(v=>v.id===id);if(x>=0)state.items[x]=i;else state.items.push(i);
   saveState();refreshCustomerPick();renderItems();closeModal('itemModal');toast('Item saved')
 }
@@ -1995,10 +2071,53 @@ function deleteCategory(){if(!protectedEdit('delete price category'))return;cons
 
 function productLabel(p){return p.type==='ribbon'?`${p.width}mm x ${p.length}m ${p.material} Ribbon ${p.color}`:`${p.width}mm x ${p.diameter}mm ${p.paperType} POS Paper Roll ${p.coating}`}
 function productPrice(p,c){return Number(p.cost)>0&&c?Number(p.cost)*categoryFactor(c):Number(p.price||0)}
-function renderProducts(){const q=($('productSearch')?.value||'').toLowerCase(),a=(state.productItems||[]).filter(p=>productLabel(p).toLowerCase().includes(q));$('productList').innerHTML=a.length?a.map(p=>`<div class="device-card"><b>${esc(productLabel(p))}</b><div class="small">Supplier: ${esc(p.supplier||'-')} • Cost LKR ${money(p.cost)} • Base LKR ${money(p.price)}</div><div class="small">Categories: ${(p.categoryIds||[]).map(id=>esc(state.priceCategories.find(c=>c.id===id)?.name||'')).join(', ')||'All'}</div><button class="btn ghost sm" onclick="openProductModal('${p.id}')">Edit</button></div>`).join(''):'<div class="empty">No ribbon or paper roll items.</div>'}
+function renderProducts(){const q=($('productSearch')?.value||'').toLowerCase(),a=(state.productItems||[]).filter(p=>productLabel(p).toLowerCase().includes(q));$('productList').innerHTML=a.length?a.map(p=>{const src=p.imageUrl||p.image||'';return `<div class="device-card">${src?`<img class="device-master-image" loading="lazy" decoding="async" src="${esc(src)}" style="width:100%;max-height:120px;object-fit:contain;border-radius:8px;margin-bottom:8px;background:#f8fafc" alt="">`:''}<b>${esc(productLabel(p))}</b><div class="small">Supplier: ${esc(p.supplier||'-')} • Cost LKR ${money(p.cost)} • Base LKR ${money(p.price)}</div><div class="small">Categories: ${(p.categoryIds||[]).map(id=>esc(state.priceCategories.find(c=>c.id===id)?.name||'')).join(', ')||'All'}</div><button class="btn ghost sm" onclick="openProductModal('${p.id}')">Edit</button></div>`;}).join(''):'<div class="empty">No ribbon or paper roll items.</div>'}
 function productTypeUI(){const ribbon=$('prodType').value==='ribbon';$('ribbonFields').style.display=ribbon?'grid':'none';$('paperFields').style.display=ribbon?'none':'grid'}
-function openProductModal(id=''){if(!protectedEdit(id?'edit product master':'add product master'))return;const p=state.productItems.find(x=>x.id===id)||{};$('prodId').value=p.id||'';$('prodType').value=p.type||'ribbon';['Width','Length','Material','Color','Diameter','PaperType','Coating','Cost','Price','Supplier'].forEach(k=>{const el=$('prod'+k);if(el)el.value=p[k.charAt(0).toLowerCase()+k.slice(1)]??''});$('prodCategories').innerHTML=categoryChecks(p.categoryIds||[],'prodCat');enforceThree('prodCat');productTypeUI();$('productModal').classList.add('show')}
-function saveProduct(){if(!protectedEdit('save product master'))return;const id=$('prodId').value||uid('prod'),type=$('prodType').value,p={id,type,width:Number($('prodWidth').value),length:Number($('prodLength').value),material:$('prodMaterial').value.trim(),color:$('prodColor').value.trim(),diameter:Number($('prodDiameter').value),paperType:$('prodPaperType').value,coating:$('prodCoating').value,cost:Number($('prodCost').value),price:Number($('prodPrice').value),supplier:$('prodSupplier').value.trim(),categoryIds:checkedCategories('prodCat')};if(!(p.width>0)||(type==='ribbon'&&!(p.length>0))||(type==='paper'&&!(p.diameter>0)))return toast('Complete product dimensions');const i=state.productItems.findIndex(x=>x.id===id);if(i>=0)state.productItems[i]={...state.productItems[i],...p};else state.productItems.push(p);audit(i>=0?'EDIT_PRODUCT':'ADD_PRODUCT',productLabel(p));saveState();renderProducts();closeModal('productModal')}
+function openProductModal(id=''){
+  if(!protectedEdit(id?'edit product master':'add product master'))return;
+  const p=state.productItems.find(x=>x.id===id)||{};
+  $('prodId').value=p.id||'';$('prodType').value=p.type||'ribbon';
+  ['Width','Length','Material','Color','Diameter','PaperType','Coating','Cost','Price','Supplier'].forEach(k=>{const el=$('prod'+k);if(el)el.value=p[k.charAt(0).toLowerCase()+k.slice(1)]??''});
+  $('prodCategories').innerHTML=categoryChecks(p.categoryIds||[],'prodCat');
+  enforceThree('prodCat');
+  productTypeUI();
+  const preview=$('prodImagePreview');
+  if(preview){
+    const src=p?.imageUrl||p?.image||'';
+    preview.innerHTML=src?`<img src="${esc(src)}" style="max-height:80px;border-radius:6px;border:1px solid #cbd5e1"><button type="button" class="btn red sm" onclick="clearProductImageV2026()">Remove Image</button>`:'';
+  }
+  if($('prodImage'))$('prodImage').value='';
+  $('productModal').classList.add('show');
+}
+async function saveProduct(){
+  if(!protectedEdit('save product master'))return;
+  const id=$('prodId').value||uid('prod'),type=$('prodType').value;
+  const old=state.productItems.find(x=>x.id===id)||{};
+  let image=old.image||'';
+  let imageUrl=old.imageUrl||'';
+  let imagePath=old.imagePath||'';
+  const file=$('prodImage')?.files?.[0];
+  if(file){
+    try{
+      const res=await uploadMasterImageCloud('product', id, file);
+      image=res.url; imageUrl=res.url; imagePath=res.path;
+    }catch(e){
+      console.warn('Product image upload notice:', e);
+      try{
+        const dataUrl=await deviceImageReadFileDataUrlV1017(file);
+        image=dataUrl; imageUrl=dataUrl;
+      }catch(_){}
+    }
+  }
+  const p={id,type,width:Number($('prodWidth').value),length:Number($('prodLength').value),material:$('prodMaterial').value.trim(),color:$('prodColor').value.trim(),diameter:Number($('prodDiameter').value),paperType:$('prodPaperType').value,coating:$('prodCoating').value,cost:Number($('prodCost').value),price:Number($('prodPrice').value),supplier:$('prodSupplier').value.trim(),categoryIds:checkedCategories('prodCat'),image,imageUrl,imagePath};
+  if(!(p.width>0)||(type==='ribbon'&&!(p.length>0))||(type==='paper'&&!(p.diameter>0)))return toast('Complete product dimensions');
+  const i=state.productItems.findIndex(x=>x.id===id);
+  if(i>=0)state.productItems[i]={...state.productItems[i],...p};else state.productItems.push(p);
+  audit(i>=0?'EDIT_PRODUCT':'ADD_PRODUCT',productLabel(p));
+  saveState();
+  renderProducts();
+  closeModal('productModal');
+}
 function deleteProduct(){if(!protectedEdit('delete product master'))return;const id=$('prodId').value;if(!id||!confirm('Delete this product?'))return;state.productItems=state.productItems.filter(x=>x.id!==id);saveState();renderProducts();closeModal('productModal')}
 function openProductPicker(){if(!state.current)newDocument('Q','label');const customer=state.customers.find(c=>c.id===$('customerSelect').value),allowed=customer?.priceCategoryIds||[];$('productPickerList').innerHTML=(state.productItems||[]).map(p=>{let cats=(state.priceCategories||[]).filter(c=>c.active!==false&&(c.appliesTo||[]).includes('product')&&(!(p.categoryIds||[]).length||p.categoryIds.includes(c.id))&&userCategoryAllowed(c.id));if(allowed.length)cats=cats.filter(c=>allowed.includes(c.id));return `<div class="device-card"><b>${esc(productLabel(p))}</b><div class="actions"><select id="pc_${p.id}">${cats.map(c=>`<option value="${c.id}">${esc(c.name)} — LKR ${money(productPrice(p,c))}</option>`).join('')}${currentUser?.role==='admin'?`<option value="base">Base — LKR ${money(p.price)}</option>`:''}</select><input id="pq_${p.id}" type="number" min="1" value="1" style="width:80px"><button class="btn primary sm" onclick="addProductToQuote('${p.id}')">Add</button></div></div>`}).join('')||'<div class="empty">Add products to Product Master first.</div>';$('productPickerModal').classList.add('show')}
 function addProductToQuote(id){const p=state.productItems.find(x=>x.id===id),cid=$(`pc_${id}`)?.value,c=state.priceCategories.find(x=>x.id===cid);if(currentUser?.role!=='admin'&&(!c||!userCategoryAllowed(c.id)))return toast('No permitted price category is available');const qty=Math.max(1,Number($(`pq_${id}`).value||1)),price=cid==='base'?Number(p.price):productPrice(p,c);appendLine({itemId:p.id,desc:p.type==='ribbon'?'RIBBON':'PAPER ROLL',size:p.type==='ribbon'?`${p.width}mm x ${p.length}m`:`${p.width}mm x ${p.diameter}mm`,material:p.type==='ribbon'?`${p.material} / ${p.color}`:`${p.paperType} / ${p.coating}`,layout:'',pcs:'',qty,unit:'Rolls',price,use:true,priceTier:c?.name||'Base',costSnapshot:{kind:'product',capturedAt:new Date().toISOString(),costPerRoll:Number(p.cost||0),vatInputPerRoll:0,tier:c?.name||'Base',supplier:p.supplier||''}});saveState();closeModal('productPickerModal');toast('Product added')}
@@ -2008,7 +2127,7 @@ function enhanceV5UI(){
  const nav=document.querySelector('.nav'),settingsBtn=document.querySelector('[data-view="settings"]');[['categories','Price Categories'],['products','Ribbon / Paper']].forEach(([id,t])=>{const b=document.createElement('button');b.className='navbtn';b.dataset.view=id;b.textContent=t;b.onclick=()=>showView(id);nav.insertBefore(b,settingsBtn)});
  const settings=document.querySelector('#settings');settings.insertAdjacentHTML('beforebegin',`<section id="categories" class="view"><div class="panel"><div class="panel-title">Price Category Master <button class="btn ghost sm" onclick="openCategoryModal()">+ Add Category</button></div><div class="panel-body"><div class="notice">Category edits affect future prices only. Saved quotation prices and costs remain frozen.</div><table class="table"><thead><tr><th>Name</th><th>Margin</th><th>Cost Basis</th><th>Applies To</th><th>Status</th><th></th></tr></thead><tbody id="categoryList"></tbody></table></div></div></section><section id="products" class="view"><div class="panel"><div class="panel-title">Ribbon & Paper Roll Master <button class="btn ghost sm" onclick="openProductModal()">+ Add Product</button></div><div class="panel-body"><input id="productSearch" placeholder="Search ribbon / paper" oninput="renderProducts()"><div id="productList" class="device-grid" style="margin-top:12px"></div></div></div></section>`);
  document.body.insertAdjacentHTML('beforeend',`<div id="categoryModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Price Category</b><button class="closex" onclick="closeModal('categoryModal')">×</button></div><div class="modal-body"><input id="catId" type="hidden"><div class="grid"><div class="field"><label>Name</label><input id="catName"></div><div class="field"><label>Margin %</label><input id="catMargin" type="number" step="0.0001"></div><div class="field"><label>Cost Basis</label><select id="catBase"><option value="full">Full Excel Cost</option><option value="scale">Scale Excel Cost</option></select></div><div class="field"><label><input id="catApproval" type="checkbox"> Manager approval required</label></div><div class="field full"><label>Item Types</label><label><input id="cat_label" type="checkbox"> Label</label> <label><input id="cat_device" type="checkbox"> Device</label> <label><input id="cat_product" type="checkbox"> Ribbon/Paper</label></div><div class="field"><label><input id="catActive" type="checkbox"> Active</label></div></div><div class="actions"><button class="btn primary" onclick="saveCategory()">Save</button><button class="btn red" onclick="deleteCategory()">Delete</button></div></div></div></div>
- <div id="productModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Ribbon / Paper Roll Master</b><button class="closex" onclick="closeModal('productModal')">×</button></div><div class="modal-body"><input id="prodId" type="hidden"><div class="grid"><div class="field"><label>Type</label><select id="prodType" onchange="productTypeUI()"><option value="ribbon">Ribbon</option><option value="paper">Paper Roll</option></select></div><div class="field"><label>Width (mm)</label><input id="prodWidth" type="number"></div></div><div id="ribbonFields" class="grid"><div class="field"><label>Length (m)</label><input id="prodLength" type="number"></div><div class="field"><label>Ribbon Material</label><input id="prodMaterial" placeholder="Premium Wax"></div><div class="field"><label>Color</label><input id="prodColor" value="Black"></div></div><div id="paperFields" class="grid"><div class="field"><label>Diameter (mm)</label><input id="prodDiameter" type="number"></div><div class="field"><label>Paper Type</label><select id="prodPaperType"><option>Thermal</option><option>Non Thermal</option></select></div><div class="field"><label>Coating</label><select id="prodCoating"><option>Normal</option><option>Top Coated</option></select></div></div><div class="grid"><div class="field"><label>Unit Cost</label><input id="prodCost" type="number" step="0.01"></div><div class="field"><label>Base Sale Price</label><input id="prodPrice" type="number" step="0.01"></div><div class="field"><label>Supplier</label><input id="prodSupplier"></div><div class="field full"><label>Price Categories (max 3)</label><div id="prodCategories"></div></div></div><div class="actions"><button class="btn primary" onclick="saveProduct()">Save</button><button class="btn red" onclick="deleteProduct()">Delete</button></div></div></div></div><div id="productPickerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Add Ribbon / Paper Roll</b><button class="closex" onclick="closeModal('productPickerModal')">×</button></div><div id="productPickerList" class="modal-body"></div></div></div><div id="savedPricesModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Customer Saved Label Prices</b><button class="closex" onclick="closeModal('savedPricesModal')">×</button></div><div id="savedPricesBody" class="modal-body"></div></div></div>`);
+ <div id="productModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Ribbon / Paper Roll Master</b><button class="closex" onclick="closeModal('productModal')">×</button></div><div class="modal-body"><input id="prodId" type="hidden"><div class="grid"><div class="field"><label>Type</label><select id="prodType" onchange="productTypeUI()"><option value="ribbon">Ribbon</option><option value="paper">Paper Roll</option></select></div><div class="field"><label>Width (mm)</label><input id="prodWidth" type="number"></div></div><div id="ribbonFields" class="grid"><div class="field"><label>Length (m)</label><input id="prodLength" type="number"></div><div class="field"><label>Ribbon Material</label><input id="prodMaterial" placeholder="Premium Wax"></div><div class="field"><label>Color</label><input id="prodColor" value="Black"></div></div><div id="paperFields" class="grid"><div class="field"><label>Diameter (mm)</label><input id="prodDiameter" type="number"></div><div class="field"><label>Paper Type</label><select id="prodPaperType"><option>Thermal</option><option>Non Thermal</option></select></div><div class="field"><label>Coating</label><select id="prodCoating"><option>Normal</option><option>Top Coated</option></select></div></div><div class="grid"><div class="field"><label>Unit Cost</label><input id="prodCost" type="number" step="0.01"></div><div class="field"><label>Base Sale Price</label><input id="prodPrice" type="number" step="0.01"></div><div class="field"><label>Supplier</label><input id="prodSupplier"></div><div class="field full"><label>Price Categories (max 3)</label><div id="prodCategories"></div></div><div class="field full"><label>Product Image (Optional)</label><input id="prodImage" type="file" accept="image/*" onchange="previewProductImageV2026(this)"><div id="prodImagePreview" style="margin-top:6px;display:flex;align-items:center;gap:10px"></div></div></div><div class="actions"><button class="btn primary" onclick="saveProduct()">Save</button><button class="btn red" onclick="deleteProduct()">Delete</button></div></div></div></div><div id="productPickerModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Add Ribbon / Paper Roll</b><button class="closex" onclick="closeModal('productPickerModal')">×</button></div><div id="productPickerList" class="modal-body"></div></div></div><div id="savedPricesModal" class="modal"><div class="modal-card"><div class="modal-head"><b>Customer Saved Label Prices</b><button class="closex" onclick="closeModal('savedPricesModal')">×</button></div><div id="savedPricesBody" class="modal-body"></div></div></div>`);
  const it=document.querySelector('.item-tools');if(it&&![...it.querySelectorAll('button')].some(x=>/Ribbon\s*\/\s*Paper/i.test(x.textContent||''))){const b=document.createElement('button');b.className='btn ghost sm';b.type='button';b.textContent='Add Ribbon / Paper';b.onclick=openProductPicker;it.appendChild(b)}
  const cm=$('customerModal').querySelector('.modal-body');cm.insertAdjacentHTML('beforeend','<div class="section">PRICE CATEGORIES</div><div id="custCategoryChoices" class="grid"></div><div class="actions"><button class="btn ghost" type="button" onclick="viewCustomerSavedPrices()">View Saved Sizes & Prices</button></div>');
  const dg=$('deviceModal').querySelector('.grid');dg.insertAdjacentHTML('beforeend','<div class="field"><label>Supplier</label><input id="devSupplier"></div><div class="field"><label>Warranty Period</label><input id="devWarranty" placeholder="12 months"></div><div class="field full"><label>Price Categories (max 3)</label><div id="devCategories"></div></div>');
@@ -2197,10 +2316,120 @@ const DEVICE_IMAGE_MAX_EDGE_V1017=1200;
 const DEVICE_IMAGE_WEBP_QUALITY_V1017=.84;
 
 function deviceImageBrowserKeyV1017(){
-  const key=(localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
-  if(!key)throw new Error('Supabase browser key is not configured on this device. Sign in / configure cloud access first.');
+  let key=(localStorage.getItem('spgs_supabase_browser_key_v1')||'').trim();
+  if(!key || key.indexOf('eyJ')===-1){
+    key=window.SPGS_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5eGdhbXZlcnpkbWh0dmV6YmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NjUwMDgsImV4cCI6MjA4MzQ0MTAwOH0.HQhMiD8DwMHMoHj0JtVIXCXhJArfiNnwMfz3a8Z5jyk';
+  }
   return key;
 }
+
+const ITEM_IMAGE_BUCKET_V20261117 = 'item-images';
+
+async function uploadMasterImageCloud(kind, id, file){
+  const blob = await prepareDeviceImageWebpV1017(file);
+  const safeId = deviceImageSafeIdV1017(id || kind);
+  const path = `${kind}s/${safeId}/${Date.now()}.webp`;
+  const key = deviceImageBrowserKeyV1017();
+
+  // Try item-images bucket first, fallback to device-images
+  let bucket = ITEM_IMAGE_BUCKET_V20261117;
+  let url = `${DEVICE_IMAGE_PROJECT_URL_V1017}/storage/v1/object/${bucket}/${deviceImageEncodedPathV1017(path)}`;
+  let response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'image/webp',
+      'cache-control': 'max-age=31536000',
+      'x-upsert': 'false'
+    },
+    body: blob
+  });
+
+  if(!response.ok){
+    bucket = DEVICE_IMAGE_BUCKET_V1017;
+    url = `${DEVICE_IMAGE_PROJECT_URL_V1017}/storage/v1/object/${bucket}/${deviceImageEncodedPathV1017(path)}`;
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'image/webp',
+        'cache-control': 'max-age=31536000',
+        'x-upsert': 'false'
+      },
+      body: blob
+    });
+  }
+
+  if(!response.ok){
+    throw new Error(`Master image upload failed (${response.status})`);
+  }
+
+  const publicUrl = `${DEVICE_IMAGE_PROJECT_URL_V1017}/storage/v1/object/public/${bucket}/${deviceImageEncodedPathV1017(path)}`;
+
+  try {
+    fetch(`${DEVICE_IMAGE_PROJECT_URL_V1017}/rest/v1/spgs_item_images`, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        id: uid('img'),
+        item_id: id,
+        item_type: kind,
+        file_path: path,
+        bucket: bucket,
+        mime_type: 'image/webp',
+        file_bytes: blob.size,
+        public_url: publicUrl,
+        uploaded_by: currentUser?.display || currentUser?.username || 'User',
+        uploaded_by_username: currentUser?.username || ''
+      })
+    }).catch(e => console.warn('Item image log notice:', e));
+  } catch(_) {}
+
+  return { path, url: publicUrl, storage: 'supabase' };
+}
+
+window.previewItemImageV2026 = function(input){
+  const file = input?.files?.[0];
+  const p = $('itmImagePreview');
+  if(!p) return;
+  if(file){
+    const u = URL.createObjectURL(file);
+    p.innerHTML = `<img src="${u}" style="max-height:80px;border-radius:6px;border:1px solid #cbd5e1"><span style="font-size:11px;color:#059669">Selected: ${esc(file.name)}</span>`;
+  }
+};
+window.clearItemImageV2026 = function(){
+  const id = $('itmId')?.value;
+  const i = state.items.find(x => x.id === id);
+  if(i){ i.image = ''; i.imageUrl = ''; i.imagePath = ''; saveState(); }
+  if($('itmImage')) $('itmImage').value = '';
+  if($('itmImagePreview')) $('itmImagePreview').innerHTML = '';
+  toast('Item image removed');
+};
+
+window.previewProductImageV2026 = function(input){
+  const file = input?.files?.[0];
+  const p = $('prodImagePreview');
+  if(!p) return;
+  if(file){
+    const u = URL.createObjectURL(file);
+    p.innerHTML = `<img src="${u}" style="max-height:80px;border-radius:6px;border:1px solid #cbd5e1"><span style="font-size:11px;color:#059669">Selected: ${esc(file.name)}</span>`;
+  }
+};
+window.clearProductImageV2026 = function(){
+  const id = $('prodId')?.value;
+  const pr = state.productItems.find(x => x.id === id);
+  if(pr){ pr.image = ''; pr.imageUrl = ''; pr.imagePath = ''; saveState(); }
+  if($('prodImage')) $('prodImage').value = '';
+  if($('prodImagePreview')) $('prodImagePreview').innerHTML = '';
+  toast('Product image removed');
+};
 function deviceImageSafeIdV1017(value='device'){
   return String(value||'device').replace(/[^a-zA-Z0-9_.-]/g,'_');
 }
@@ -2667,7 +2896,7 @@ function openRevisionHistory(id){const d=state.docs.find(x=>x.id===id);if(!d)ret
 const reviseQuoteV79=reviseQuote;reviseQuote=function(id){if(!documentPasswordOK('revise this quotation'))return;const old=state.docs.find(x=>x.id===id);if(!old||old.type!=='Q'||old.replacedBy)return toast('Only the active quotation can be revised');const note=prompt('Briefly state what must be changed in this revision:');if(note===null)return;if(!note.trim())return toast('Enter a revision reason');const chain=quoteRevisionChain(old),nextRev=Math.max(...chain.map(x=>Number(x.rev||0)),0)+1,n=JSON.parse(JSON.stringify(old));n.id=uid('doc');n.rev=nextRev;n.serial=serialFor('Q',old.core,nextRev);n.revisionOf=old.id;n.revisionRootId=chain[0]?.id||old.id;n.revisionNote=note.trim();n.revisedAt=new Date().toISOString();n.revisedBy=currentUser?.display||currentUser?.username||'';n.revisedByUser=currentUser?.username||'';n.replacedBy=null;n.created=Date.now();delete n.revisionChanges;old.replacedBy=n.id;old.revisionClosedAt=n.revisedAt;old.revisionClosedBy=n.revisedBy;state.docs.unshift(n);audit('CREATE_REVISION',`${old.serial} → ${n.serial}: ${n.revisionNote}`);saveState();renderDocLists();openDocument(n.id);toast(`${n.serial} created. ${old.serial} is now view-only`)};
 const persistCurrentDocumentV79=persistCurrentDocument;persistCurrentDocument=async function(){const d=await persistCurrentDocumentV79();if(d?.revisionOf){const prior=state.docs.find(x=>x.id===d.revisionOf);d.revisionChanges=revisionDiff(prior,d);d.revisedAt=d.revisedAt||new Date().toISOString();d.revisedBy=d.revisedBy||currentUser?.display||currentUser?.username||'';audit('SAVE_REVISION',`${d.serial}: ${d.revisionChanges.join('; ')||'No commercial change recorded'}`);saveState()}return d};
 
-const docTableV79=docTable;docTable=function(arr,isQ){if(!isQ)return docTableV79(arr,isQ);if(!arr.length)return '<div class="empty">No quotations found.</div>';return `<table class="table"><thead><tr><th>Document</th><th>Customer</th><th>PO / Ref</th><th>Mode</th><th>Total</th><th>Status / Link</th><th>Actions</th></tr></thead><tbody>${arr.map(d=>{const t=docTotals(d),chain=quoteRevisionChain(d),replacement=d.replacedBy?state.docs.find(x=>x.id===d.replacedBy):null,generatedPI=state.docs.find(x=>x.type==='PI'&&x.sourceQuoteId===d.id),locked=!!d.replacedBy,status=locked?`<span class="tag replaced">REPLACED / LOCKED</span><div class="small">Current: ${esc(replacement?.serial||chain[chain.length-1]?.serial||'new revision')}</div>`:generatedPI?`<span class="tag pi-generated">PI GENERATED</span><div class="small">${esc(generatedPI.serial)}</div>`:`<span class="tag">ACTIVE${d.rev?` • R${d.rev}`:''}</span>`;const actions=locked?`<button class="btn ghost sm" onclick="viewDocument('${d.id}')">View</button>`:`<button class="btn ghost sm" onclick="viewDocument('${d.id}')">Open</button><button class="btn green sm" onclick="downloadSavedPDF('${d.id}')">PDF</button><button class="btn amber sm" onclick="reviseQuote('${d.id}')">Revise</button><button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button><button class="btn red sm" onclick="requestDeleteDoc('${d.id}')">×</button>`;return `<tr class="${locked?'locked-row':''}"><td><b>${esc(d.serial)}</b><div class="small">${fmtDate(d.date)} • ${esc(d.category||'label')}</div><div class="audit-badge">By: ${esc(d.createdBy||d.createdByUser||'Legacy')}</div>${d.revisionNote?`<div class="small">Revision: ${esc(d.revisionNote)}</div>`:''}</td><td><b>${esc(d.customer?.name||'')}</b><div class="small">${esc(d.customer?.phone||'')}</div></td><td>${esc(d.poRef||'-')}</td><td><span class="tag ${d.payMode==='cash'?'cash':'credit'}">${esc((d.payMode||'credit').toUpperCase())}</span>${d.vatMode==='vat18'?'<div class="small">VAT Breakdown</div>':''}</td><td><b>LKR ${money(t.gross)}</b></td><td>${status}${chain.length>1?`<div style="margin-top:5px"><button class="btn ghost sm" onclick="openRevisionHistory('${d.id}')">History (${chain.length})</button></div>`:''}</td><td>${actions}</td></tr>`}).join('')}</tbody></table>`};
+const docTableV79=docTable;docTable=function(arr,isQ){if(!isQ)return docTableV79(arr,isQ);if(!arr.length)return '<div class="empty">No quotations found.</div>';return `<table class="table"><thead><tr><th>Document</th><th>Customer</th><th>PO / Ref</th><th>Mode</th><th>Total</th><th>Status / Link</th><th>Actions</th></tr></thead><tbody>${arr.map(d=>{const t=docTotals(d),chain=quoteRevisionChain(d),replacement=d.replacedBy?state.docs.find(x=>x.id===d.replacedBy):null,generatedPI=state.docs.find(x=>x.type==='PI'&&(x.sourceQuoteId===d.id||x.sourceQuoteSerial===d.serial||(x.core===d.core&&x.category===d.category&&x.core))),locked=!!d.replacedBy,status=locked?`<span class="tag replaced">REPLACED / LOCKED</span><div class="small">Current: ${esc(replacement?.serial||chain[chain.length-1]?.serial||'new revision')}</div>`:generatedPI?`<span class="tag pi-generated">PI GENERATED</span><div class="small">${esc(generatedPI.serial)}</div>`:`<span class="tag">ACTIVE${d.rev?` • R${d.rev}`:''}</span>`;const actions=locked?`<button class="btn ghost sm" onclick="viewDocument('${d.id}')">View</button>`:`<button class="btn ghost sm" onclick="viewDocument('${d.id}')">Open</button><button class="btn green sm" onclick="downloadSavedPDF('${d.id}')">PDF</button><button class="btn amber sm" onclick="reviseQuote('${d.id}')">Revise</button>${!generatedPI?`<button class="btn navy sm" onclick="convertQuote('${d.id}')">PI</button>`:''}<button class="btn red sm" onclick="requestDeleteDoc('${d.id}')">×</button>`;return `<tr class="${locked?'locked-row':''}"><td><b>${esc(d.serial)}</b><div class="small">${fmtDate(d.date)} • ${esc(d.category||'label')}</div><div class="audit-badge">By: ${esc(d.createdBy||d.createdByUser||'Legacy')}</div>${d.revisionNote?`<div class="small">Revision: ${esc(d.revisionNote)}</div>`:''}</td><td><b>${esc(d.customer?.name||'')}</b><div class="small">${esc(d.customer?.phone||'')}</div></td><td>${esc(d.poRef||'-')}</td><td><span class="tag ${d.payMode==='cash'?'cash':'credit'}">${esc((d.payMode||'credit').toUpperCase())}</span>${d.vatMode==='vat18'?'<div class="small">VAT Breakdown</div>':''}</td><td><b>LKR ${money(t.gross)}</b></td><td>${status}${chain.length>1?`<div style="margin-top:5px"><button class="btn ghost sm" onclick="openRevisionHistory('${d.id}')">History (${chain.length})</button></div>`:''}</td><td>${actions}</td></tr>`}).join('')}</tbody></table>`};
 const viewDocumentV79=viewDocument;viewDocument=function(id){const r=viewDocumentV79(id),d=state.docs.find(x=>x.id===id),locked=!!d?.replacedBy;if($('viewerEditBtn'))$('viewerEditBtn').style.display=locked?'none':'inline-block';if($('viewerDeleteBtn'))$('viewerDeleteBtn').style.display=locked?'none':'inline-block';if($('viewerPdfBtn'))$('viewerPdfBtn').style.display=locked?'none':'inline-block';if(locked)$('viewerDocMeta').textContent+=` • REPLACED / VIEW ONLY • Current: ${state.docs.find(x=>x.id===d.replacedBy)?.serial||'new revision'}`;return r};
 enhanceRevisionHistoryV79();
 

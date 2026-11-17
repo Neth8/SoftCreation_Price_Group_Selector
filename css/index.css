@@ -6788,7 +6788,8 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 }
 
 @media print{
-  body.mi-printing #miPrintHost .mi-company-header-clean-mask{
+  body.mi-printing #miPrintHost .mi-company-header-clean-mask,
+  body.mi-printing #miPrintHost .mi-translanka-logo-mask{
     background:#fff!important;
     -webkit-print-color-adjust:exact;
     print-color-adjust:exact;

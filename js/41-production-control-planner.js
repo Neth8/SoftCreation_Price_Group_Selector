@@ -283,13 +283,24 @@ function pcEnsureAlreadyAddedModal(){
             <select id="pcAlreadyAddedScOrder" style="width:100%"></select>
             <div class="hint" style="color:#64748b;font-size:11px;margin-top:4px">Select the SoftCreation order that includes this customer requirement to prevent duplicate production.</div>
           </div>
+          <div class="field" style="margin-top:12px;border:1px dashed #cbd5e1;padding:10px 14px;border-radius:8px;background:#f8fafc">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <label style="margin:0;font-weight:700">Customer Purchase Order (PO)</label>
+              <span id="pcAlreadyAddedPOBadge" style="font-size:11px"></span>
+            </div>
+            <div id="pcAlreadyAddedPOExisting" style="font-size:12px;margin:4px 0"></div>
+            <div style="margin-top:6px">
+              <input id="pcAlreadyAddedPOFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" style="font-size:12px">
+            </div>
+            <div class="hint" style="color:#64748b;font-size:11px;margin-top:4px">Attach customer PO so production and stores can view and verify it when sending to factory.</div>
+          </div>
           <div class="field" style="margin-top:12px">
             <label><b>Remarks / Note</b></label>
             <textarea id="pcAlreadyAddedReason" placeholder="Optional explanation (e.g. Qty included in SoftCreation batch)..." style="width:100%;height:70px;box-sizing:border-box"></textarea>
           </div>
           <div class="actions" style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px">
             <button type="button" class="btn ghost" onclick="pcCloseAlreadyAddedModal()">Keep Open Demand</button>
-            <button type="button" class="btn amber" style="background:#d97706;border-color:#b45309;color:#fff" onclick="pcConfirmAlreadyAdded()">Confirm Already Added</button>
+            <button type="button" class="btn amber" id="pcAlreadyAddedConfirmBtn" style="background:#d97706;border-color:#b45309;color:#fff" onclick="pcConfirmAlreadyAdded()">Confirm Already Added</button>
           </div>
         </div>
       </div>
@@ -338,6 +349,23 @@ window.pcOpenAlreadyAddedModal=function(soId,lineIndex){
     Item: <b>${pcEsc(l.desc||'Item')} ${pcEsc(l.size||'')} ${pcEsc(l.material||'')}</b><br>
     Ordered: <b>${pcMoney(ordered)}</b> • Open Demand: <b>${pcMoney(available)} ${pcEsc(l.unit||'Rolls')}</b>
   `;
+
+  const poBadge=document.getElementById('pcAlreadyAddedPOBadge');
+  const poExisting=document.getElementById('pcAlreadyAddedPOExisting');
+  if(so.poAttachment){
+    if(poBadge)poBadge.innerHTML='<span style="color:#16a34a;font-weight:700">✓ PO Attached</span>';
+    if(poExisting)poExisting.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px">
+        <span>📄 ${pcEsc(so.poAttachment.fileName||'Customer PO')}</span>
+        <button type="button" class="btn ghost sm" onclick="pcViewPOAttachmentDirect('${pcEsc(so.poAttachment.bucket||'sales-order-po-files')}','${pcEsc(so.poAttachment.path)}')">View PO</button>
+      </div>`;
+  }else{
+    if(poBadge)poBadge.innerHTML='<span style="color:#64748b">No PO attached</span>';
+    if(poExisting)poExisting.innerHTML='<span style="color:#94a3b8">Attach customer PO file below (optional).</span>';
+  }
+  const fileInp=document.getElementById('pcAlreadyAddedPOFile');
+  if(fileInp)fileInp.value='';
+
   document.getElementById('pcAlreadyAddedModal')?.classList.add('show');
 };
 
@@ -345,7 +373,7 @@ window.pcCloseAlreadyAddedModal=function(){
   document.getElementById('pcAlreadyAddedModal')?.classList.remove('show');
 };
 
-window.pcConfirmAlreadyAdded=function(){
+window.pcConfirmAlreadyAdded=async function(){
   const soId=document.getElementById('pcAlreadyAddedSoId')?.value;
   const lineIndex=Number(document.getElementById('pcAlreadyAddedLineIndex')?.value);
   const scVal=String(document.getElementById('pcAlreadyAddedScOrder')?.value||'');
@@ -380,6 +408,48 @@ window.pcConfirmAlreadyAdded=function(){
     return toast('No open demand available to mark on this line.');
   }
 
+  const confirmBtn=document.getElementById('pcAlreadyAddedConfirmBtn');
+  if(confirmBtn)confirmBtn.disabled=true;
+
+  // Upload PO file if selected
+  const fileInp=document.getElementById('pcAlreadyAddedPOFile');
+  if(fileInp?.files?.[0]){
+    try{
+      const file=fileInp.files[0];
+      const nonce=(crypto?.randomUUID?.()||uid('po')).replace(/[^a-zA-Z0-9_-]/g,'');
+      const safePart=String(so.id).replace(/[^\w.-]+/g,'_');
+      const path=`sales-orders/${safePart}/${Date.now()}_${nonce}_${encodeURIComponent(file.name)}`;
+      const key=(localStorage.getItem('spgs_supabase_browser_key_v1')||window.SPGS_SUPABASE_ANON_KEY||'').trim();
+      const upUrl=`https://qyxgamverzdmhtvezbft.supabase.co/storage/v1/object/sales-order-po-files/${path}`;
+      const res=await fetch(upUrl,{
+        method:'POST',
+        headers:{
+          apikey:key,
+          Authorization:`Bearer ${key}`,
+          'Content-Type':file.type||'application/octet-stream',
+          'cache-control':'max-age=3600',
+          'x-upsert':'false'
+        },
+        body:file
+      });
+      if(res.ok){
+        so.poAttachment={
+          storage:'supabase',
+          bucket:'sales-order-po-files',
+          path,
+          fileName:file.name||'Customer PO',
+          mime:file.type||'',
+          bytes:Number(file.size||0),
+          uploadedAt:new Date().toISOString(),
+          uploadedBy:currentUser?.display||currentUser?.username||'User'
+        };
+        audit('SALES_ORDER_PO_ATTACHMENT',`${so.soNo} • ${so.poAttachment.fileName}`);
+      }
+    }catch(err){
+      console.warn('PO file upload error in Already Added modal:', err);
+    }
+  }
+
   const now=new Date().toISOString();
   const userName=currentUser?.display||currentUser?.username||'User';
 
@@ -392,6 +462,24 @@ window.pcConfirmAlreadyAdded=function(){
     l.coveredBySoftCreationSoId=scSoId;
     l.coveredBySoftCreationSoNo=scSoNo;
     l.alreadyAddedQty=available;
+
+    // Link customer PO to covering SoftCreation order
+    if(so.poAttachment){
+      const scSo=(state.salesOrders||[]).find(s=>String(s.id)===String(scSoId));
+      if(scSo){
+        scSo.linkedCustomerPOs=scSo.linkedCustomerPOs||[];
+        if(!scSo.linkedCustomerPOs.some(p=>p.sourceSoId===so.id)){
+          scSo.linkedCustomerPOs.push({
+            sourceSoId:so.id,
+            sourceSoNo:so.soNo,
+            customerName:so.customerName,
+            poAttachment:so.poAttachment,
+            linkedAt:now,
+            linkedBy:userName
+          });
+        }
+      }
+    }
   }
   l.cancellationHistory=l.cancellationHistory||[];
   l.cancellationHistory.push({
@@ -414,6 +502,7 @@ window.pcConfirmAlreadyAdded=function(){
   pcSelectedOrderKeys.delete(String(soId)+'|'+lineIndex);
 
   saveState();
+  if(confirmBtn)confirmBtn.disabled=false;
   pcCloseAlreadyAddedModal();
   pcRender();
   toast(scSoNo
@@ -895,9 +984,78 @@ function pcOpenDetailModalV20261030(id){
 function pcCloseDetailModalV20261030(){document.getElementById('pcDetailModalV20261030')?.remove();}
 window.pcCloseDetailModalV20261030=pcCloseDetailModalV20261030;
 
+window.pcViewPOAttachmentDirect=async function(bucket,path){
+  const key=(localStorage.getItem('spgs_supabase_browser_key_v1')||window.SPGS_SUPABASE_ANON_KEY||'').trim();
+  const baseRest=(typeof PC_REST!=='undefined'?PC_REST:'https://qyxgamverzdmhtvezbft.supabase.co/rest/v1').replace(/\/rest\/v1\/?$/,'');
+  const url=`${baseRest}/storage/v1/object/${encodeURIComponent(bucket)}/${String(path).split('/').filter(Boolean).map(encodeURIComponent).join('/')}`;
+  const popup=window.open('about:blank','_blank');
+  try{
+    const res=await fetch(url,{
+      headers:{
+        apikey:key,
+        Authorization:`Bearer ${key}`
+      }
+    });
+    if(!res.ok)throw new Error(`Could not fetch PO file (${res.status})`);
+    const blob=await res.blob();
+    const objUrl=URL.createObjectURL(blob);
+    if(popup)popup.location=objUrl;
+    else window.open(objUrl,'_blank','noopener');
+    setTimeout(()=>URL.revokeObjectURL(objUrl),10*60*1000);
+  }catch(err){
+    if(popup)popup.close();
+    toast(err.message||'PO file could not be opened');
+  }
+};
+
 function pcRequestDetailHTML(r){
   const lines=pcRequestLines(r.id),msgs=pcRequestMsgs(r.id),audit=pcRequestAudit(r.id),canApprove=pcHas('production_control_approve')&&r.status==='Pending Approval';
+
+  const allReqSoIds=lines.flatMap(l=>pcRequestAlloc(l.id).map(a=>a.source_so_id));
+  const attachedPOs=[];
+  allReqSoIds.forEach(soId=>{
+    const so=(state.salesOrders||[]).find(s=>String(s.id)===String(soId));
+    if(so){
+      if(so.poAttachment&&!attachedPOs.some(p=>p.path===so.poAttachment.path)){
+        attachedPOs.push({soNo:so.soNo,customer:so.customerName,...so.poAttachment});
+      }
+      if(so.linkedCustomerPOs?.length){
+        so.linkedCustomerPOs.forEach(lp=>{
+          if(lp.poAttachment&&!attachedPOs.some(p=>p.path===lp.poAttachment.path)){
+            attachedPOs.push({soNo:lp.sourceSoNo||so.soNo,customer:lp.customerName,isLinked:true,...lp.poAttachment});
+          }
+        });
+      }
+    }
+  });
+
   return `<div class="pc-card pc-detail"><div class="pc-card-head"><div><h3>${pcEsc(r.request_no)} · Evidence & Approval</h3><p>Required ${pcEsc(r.required_date||'-')} • ${pcEsc(r.material_mode||'')}</p></div><span class="pc-status ${String(r.status).toLowerCase().replace(/\s+/g,'-')}">${pcEsc(r.status)}</span></div>${canApprove?`<div class="pc-approval-actions"><strong>Manager decision required</strong><div><button class="btn green" onclick="pcApproveRequest('${r.id}')">Approve & Release to Production</button><button class="btn amber" onclick="pcOpenReturn('${r.id}')">Return with Reason</button></div></div>`:''}${r.return_reason?`<div class="notice"><b>Returned:</b> ${pcEsc(r.return_reason)}</div>`:''}
+  
+  <div class="pc-card" style="margin-bottom:14px;background:#f8fafc;border:1px solid #cbd5e1">
+    <div class="pc-card-head">
+      <div>
+        <h4 style="margin:0;color:#0f172a">Customer Purchase Orders (POs)</h4>
+        <p class="pc-muted" style="margin:2px 0 0">Verified customer POs attached to sales orders in this production request.</p>
+      </div>
+      <span class="pc-pill ${attachedPOs.length?'green':''}">${attachedPOs.length} attached PO(s)</span>
+    </div>
+    ${attachedPOs.length?`
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        ${attachedPOs.map(po=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e2e8f0;padding:8px 12px;border-radius:8px">
+            <div>
+              <b>📎 ${pcEsc(po.fileName||'Customer PO')}</b>
+              <div style="font-size:11px;color:#64748b">SO: <b>${pcEsc(po.soNo||'')}</b> • Customer: <b>${pcEsc(po.customer||'')}</b> ${po.isLinked?'<span style="color:#0284c7;font-weight:600">(Covered Customer Demand)</span>':''}</div>
+            </div>
+            <div>
+              <button type="button" class="btn ghost sm" onclick="pcViewPOAttachmentDirect('${pcEsc(po.bucket||'sales-order-po-files')}','${pcEsc(po.path)}')">Open / Download PO</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `:'<p class="pc-muted" style="margin-top:8px">No customer PO files attached to the included sales orders.</p>'}
+  </div>
+
   ${lines.map(l=>`<div class="pc-line-detail"><div class="pc-card-head"><div><b>${pcEsc(pcLineLabel({desc:l.description,size:l.size_label,material:l.material,layout:l.layout,pcs:l.pcs_per_roll}))}</b><small>${pcEsc(l.item_key)}</small></div><strong>${pcMoney(l.requested_qty)} ${pcEsc(l.unit)}</strong></div><div class="pc-split"><div><h4>Linked Sales Orders · ${pcMoney(l.so_demand_qty)}</h4>${pcRequestAlloc(l.id).map(a=>`<div class="pc-message"><b>${pcEsc(a.source_so_no)}</b><span>${pcEsc(a.customer_name)} • ${pcEsc(a.required_date||'-')}</span><strong>${pcMoney(a.allocated_qty)}</strong></div>`).join('')||'<p class="pc-muted">Stock-only replenishment.</p>'}</div><div><h4>Why this quantity?</h4><p>${pcMoney(l.so_demand_qty)} SO + ${pcMoney(l.stock_cover_qty)} cover + ${pcMoney(l.safety_stock_qty)} safety − ${pcMoney(l.available_stock_qty)} stock − ${pcMoney(l.pipeline_qty)} pipeline = <b>${pcMoney(l.recommended_qty)} recommended</b></p><p>Override: ${pcEsc(l.override_reason||'None')}</p></div></div></div>`).join('')}
   </div>
   <div class="pc-split"><div class="pc-card"><h3>Stores ↔ Production Communication</h3>${msgs.map(m=>`<div class="pc-chat"><b>${pcEsc(m.created_by_display||m.created_by)}</b><small>${new Date(m.created_at).toLocaleString()}</small><p>${pcEsc(m.message)}</p></div>`).join('')||'<p class="pc-muted">No messages yet.</p>'}${pcHas('production_control_chat')?`<div class="field"><label>Message</label><textarea id="pcMessageText" placeholder="Material, priority, progress or clarification"></textarea></div><button class="btn primary sm" onclick="pcSendMessage('${r.id}')">Send Update</button>`:''}</div>

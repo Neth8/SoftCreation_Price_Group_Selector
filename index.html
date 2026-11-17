@@ -3,7 +3,12 @@
 <head>
   <!-- SoftCreation v1.1.30 - Modern Glassmorphism & Structured Architecture -->
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="theme-color" content="#087f83"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="manifest.json">
   <title>SoftCreation Quotation & Pro Forma System</title>
 
   <!-- Early Theme Bootstrap (Immediate execution to avoid theme flash) -->
@@ -12,9 +17,10 @@
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/index.css">
   <link rel="stylesheet" href="css/modern-glass.css">
+  <link rel="stylesheet" href="css/mobile-android.css">
 </head>
 <body>
-<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.30</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" value="" autocomplete="off"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div><label class="checkline" style="margin:10px 0"><input id="spgsRememberMe" type="checkbox"> Remember Me (30 days)</label><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
+<div id="loginScreen" class="login-screen"><div class="login-box"><h2>SoftCreation Login | V 1.1.30</h2><div class="hint">Quotation activity will be recorded under the signed-in user.</div><div class="field"><label>Username</label><input id="loginUser" type="text" value="" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text" placeholder="Enter username"></div><div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password" placeholder="Enter password"></div><label class="checkline" style="margin:10px 0"><input id="spgsRememberMe" type="checkbox"> Remember Me (30 days)</label><div class="actions"><button class="btn primary" type="button" onclick="loginUser()">Login</button></div><div id="loginError" class="calc-warning"></div></div></div>
 <div class="app">
   <header class="topbar app-shell-header">
     <div class="topbar-main">
@@ -480,7 +486,7 @@
 
   <section id="quotations" class="view"><div class="panel"><div class="panel-title">Quotation List <button class="btn sm" style="background:#fff;color:#087f83" onclick="newDocument('Q')">+ New</button></div><div class="panel-body"><div class="listbar"><input class="search" id="quoteSearch" placeholder="Search quotation / customer / PO" oninput="renderDocLists()"/><label class="checkline small"><input id="showReplaced" type="checkbox" onchange="renderDocLists()"/> Show replaced revisions</label></div><div id="quoteList"></div></div></div></section>
   <section id="pis" class="view"><div class="panel"><div class="panel-title">Pro Forma Invoice List <button class="btn sm" style="background:#fff;color:#087f83" onclick="newDocument('PI')">+ Standalone PI</button></div><div class="panel-body"><div class="listbar"><input class="search" id="piSearch" placeholder="Search PI / customer / PO" oninput="renderDocLists()"/></div><div id="piList"></div></div></div></section>
-  <section id="customers" class="view"><div class="panel"><div class="panel-title">Customer Master <button class="btn sm" style="background:#fff;color:#087f83" onclick="openCustomerModal()">+ Add Customer</button></div><div class="panel-body"><div class="listbar"><input class="search" id="customerSearch" placeholder="Search customer" oninput="renderCustomers()"/></div><div id="customerList"></div></div></div></section>
+  <section id="customers" class="view"><div class="panel"><div class="panel-title">Customer Master <button class="btn sm" style="background:#fff;color:#087f83" onclick="openCustomerModal()">+ Add Customer</button></div><div class="panel-body"><div class="listbar"><input class="search" id="customerSearch" placeholder="Search customer" oninput="renderCustomers()"/><select id="custCategoryFilter" onchange="renderCustomers()" style="max-width:200px;padding:6px 12px;border-radius:6px;border:1.5px solid #cbd5e1;background:#fff;font-size:12px;font-weight:600;color:#0f172a;cursor:pointer"><option value="">All Categories</option></select><button class="btn ghost sm" type="button" onclick="addNewCustomerCategoryPrompt()" title="Add Custom Category">+ Category</button></div><div id="customerList"></div></div></div></section>
 <section id="items" class="view">
 
   <div class="panel">
@@ -631,6 +637,7 @@
 
   <div class="section">Customer Details</div>
 
+  <div class="field"><label>Customer Category</label><div style="display:flex;gap:6px;align-items:center"><select id="custCategory" style="flex:1"><option value="General">General</option><option value="Wholesale">Wholesale</option><option value="Retail">Retail</option><option value="Corporate">Corporate</option><option value="Distributor">Distributor</option><option value="Dealer">Dealer</option><option value="VIP">VIP</option></select><button type="button" class="btn ghost sm" onclick="addNewCustomerCategoryPrompt()" title="Add Custom Category" style="padding:4px 10px;font-weight:bold">+</button></div><div class="hint">Assign a category for classification and admin filtering.</div></div>
   <div class="field"><label>Customer / Company Name <span class="required-dot">*</span></label><input id="custName" placeholder="Auto-fill or type only if no source"/></div>
   <div class="field"><label>Contact Person</label><input id="custContactPerson" placeholder="Optional"/></div>
   <div class="field"><label>Contact Number <span class="required-dot">*</span></label><input id="custPhone" placeholder="At least phone or email"/></div>
@@ -795,6 +802,7 @@
   <div class="field"><label>Qty per Packing</label><select id="itmPackingQty"><option>10</option><option>20</option><option>25</option><option>50</option><option>100</option><option>200</option></select></div>
   <div class="field"><label>Cash Price</label><input id="itmCash" type="number" step="0.01"/></div><div class="field"><label>Credit Markup %</label><input id="itmCreditMarkup" type="number" step="0.01"/></div>
   <div class="field"><label>Computed Credit Price</label><input id="itmCreditPrice" readonly/></div><div class="field"><label>VAT Inclusive?</label><select id="itmVatIncl"><option value="yes">Yes</option><option value="no">No</option></select></div>
+  <div class="field full"><label>Item Image (Optional)</label><input id="itmImage" type="file" accept="image/*" onchange="previewItemImageV2026(this)"><div id="itmImagePreview" style="margin-top:6px;display:flex;align-items:center;gap:10px"></div></div>
 </div><div class="actions"><button class="btn primary" onclick="saveItem()">Save Item</button><button class="btn red" id="deleteItemBtn" onclick="deleteItem()">Delete</button></div></div></div></div>
 
 <div id="convertModal" class="modal"><div class="modal-card convert-pi-modal" style="width:min(900px,96vw)"><div class="modal-head"><b>Select items for Pro Forma Invoice</b><button class="closex" onclick="closeModal('convertModal')">×</button></div><div class="modal-body">

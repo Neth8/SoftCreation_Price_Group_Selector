@@ -10,11 +10,10 @@
   let financeCloudCacheV1059={jbr:new Map(),packing:new Map(),adjustments:new Map(),loadedAt:0};
 
   function finApiKeyV1059(){
-    let key=localStorage.getItem(FIN_KEY_STORE_V1059)||'';
-    if(!key){
-      key=prompt('SoftCreation cloud setup\n\nPaste the FULL Supabase anon / publishable key for qyxgamverzdmhtvezbft:')||'';
-      key=key.trim();
-      if(key)localStorage.setItem(FIN_KEY_STORE_V1059,key);
+    let key=(localStorage.getItem(FIN_KEY_STORE_V1059)||'').trim();
+    if(!key || key.indexOf('eyJ')===-1){
+      key=window.SPGS_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5eGdhbXZlcnpkbWh0dmV6YmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NjUwMDgsImV4cCI6MjA4MzQ0MTAwOH0.HQhMiD8DwMHMoHj0JtVIXCXhJArfiNnwMfz3a8Z5jyk';
+      try{ localStorage.setItem(FIN_KEY_STORE_V1059,key); }catch(e){}
     }
     return key;
   }

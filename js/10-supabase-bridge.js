@@ -28,12 +28,12 @@ let spgsReady=false,
     spgsEntityHashes={},
     spgsEntityUiTimer=null;
 
+  const SPGS_DEFAULT_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5eGdhbXZlcnpkbWh0dmV6YmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NjUwMDgsImV4cCI6MjA4MzQ0MTAwOH0.HQhMiD8DwMHMoHj0JtVIXCXhJArfiNnwMfz3a8Z5jyk';
   function spgsApiKey(){
-    let key=localStorage.getItem(SPGS_KEY_STORE)||'';
-    if(!key){
-      key=prompt('SoftCreation cloud setup\n\nPaste the FULL Supabase anon / publishable key for qyxgamverzdmhtvezbft:')||'';
-      key=key.trim();
-      if(key)localStorage.setItem(SPGS_KEY_STORE,key);
+    let key=(localStorage.getItem(SPGS_KEY_STORE)||'').trim();
+    if(!key || key.indexOf('eyJ')===-1){
+      key=window.SPGS_SUPABASE_ANON_KEY || SPGS_DEFAULT_ANON_KEY;
+      try{ localStorage.setItem(SPGS_KEY_STORE,key); }catch(e){}
     }
     return key;
   }
