@@ -1304,7 +1304,14 @@
     if(!so)return toast('Sales Order not found');
     const list=so.receiptAttachments?.length?so.receiptAttachments:(so.receiptAttachment?[so.receiptAttachment]:[]);
     const asset=list[receiptIndex]||list[0];
-    if(!asset?.path)return toast('No payment receipt attached');
+    if(!asset)return toast('No payment receipt attached');
+
+    const directUrl = asset.publicUrl || asset.url || asset.fileUrl;
+    if(directUrl){
+      window.open(directUrl, '_blank', 'noopener');
+      return;
+    }
+    if(!asset.path)return toast('No payment receipt path or URL attached');
 
     const popup=window.open('about:blank','_blank');
     try{
@@ -2733,7 +2740,7 @@
             const receipts=so.receiptAttachments?.length ? so.receiptAttachments : (so.receiptAttachment ? [so.receiptAttachment] : []);
             const receiptCount=receipts.length;
             const linesCount=Number(so.lines?.length || 0);
-            const canCancel=(!so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true && (currentUser?.role==='admin' || so.ownerUser===currentUser?.username));
+            const canCancel=(!so.cancelledAt && so.status!=='Cancelled' && so.recoveredStoresOrder!==true && so.readOnly!==true && (currentUser?.role==='admin' || (so.ownerUser===currentUser?.username && Number(so.courierCharge || 0) <= 0)));
             const canEdit=(currentUser?.role === 'admin' && !window.scSOIsCancelledV57?.(so) && so.recoveredStoresOrder !== true && so.readOnly !== true);
             const itemTotal = Number(so.total || 0);
             const courierCharge = Number(so.courierCharge || 0);
@@ -2879,7 +2886,11 @@
                       <button class="btn red sm" type="button" onclick="scOpenCancelOrderV2('${so.id}')">
                         Cancel Order
                       </button>
-                    ` : ''}
+                    ` : (Number(so.courierCharge || 0) > 0 && !so.cancelledAt && so.status !== 'Cancelled' ? `
+                      <span class="small" style="color:#0284c7;font-weight:700;padding:4px 8px;border-radius:6px;background:rgba(2,132,199,0.08);border:1px solid rgba(2,132,199,0.2)">
+                        🔒 Non-cancellable (Courier Added)
+                      </span>
+                    ` : '')}
                   </div>
                 </div>
 
@@ -2961,7 +2972,7 @@
     }
 
     const scCancelBtn=document.getElementById('scCancelViewBtnV2');
-    if(scCancelBtn){ scCancelBtn.style.display=(!so.cancelledAt && String(so.status||'').toLowerCase()!=='cancelled' && (currentUser?.role==='admin'||so.ownerUser===currentUser?.username))?'inline-flex':'none'; scCancelBtn.dataset.soId=so.id; }
+    if(scCancelBtn){ scCancelBtn.style.display=(!so.cancelledAt && String(so.status||'').toLowerCase()!=='cancelled' && (currentUser?.role==='admin'||(so.ownerUser===currentUser?.username && Number(so.courierCharge || 0) <= 0)))?'inline-flex':'none'; scCancelBtn.dataset.soId=so.id; }
     const editBtn=$('bpSoViewEditBtnV1030');
     if(editBtn){
       editBtn.style.display=(currentUser?.role==='admin' && !window.scSOIsCancelledV57?.(so) && so.recoveredStoresOrder!==true && so.readOnly!==true)?'inline-flex':'none';

@@ -16,6 +16,7 @@ window.scOpenCancelOrderV2=function(id){
  const user=currentUser;
  if(!so || !user || !(user.role==='admin'||so.ownerUser===user.username)){window.toast?.('Cancellation is allowed only for Admin or the order creator.');return;}
  if(so.cancelledAt||String(so.status||'').toLowerCase()==='cancelled'){window.toast?.('Already cancelled');return;}
+ if(user.role !== 'admin' && Number(so.courierCharge || 0) > 0){window.toast?.('This order cannot be cancelled because a courier delivery charge has been assigned.');return;}
  selected=so;$('scCancelOrderMetaV2').innerHTML='<b>'+esc(so.soNo||so.id)+'</b><div class="small">'+esc(so.customerName||'')+'</div>';
  $('scCancelReasonV2').value='';$('scCancelPasswordV2').value='';$('scCancelErrorV2').textContent='';
  if(typeof window.openModal==='function')window.openModal('scCancelModalV2');else $('scCancelModalV2').classList.add('show');
@@ -27,6 +28,10 @@ window.scConfirmCancelOrderV2=async function(){
  if(reason.length<5){$('scCancelErrorV2').textContent='Provide a meaningful reason (at least five characters).';return;}
  if(!password){$('scCancelErrorV2').textContent='Password required.';return;}
  const user=currentUser;if(!user)return;
+ if(user.role !== 'admin' && Number(selected.courierCharge || 0) > 0){
+  $('scCancelErrorV2').textContent='Order cannot be cancelled: Courier delivery fee has already been assigned.';
+  return;
+ }
  busy=true;$('scCancelSubmitV2').disabled=true;$('scCancelErrorV2').textContent='Verifying and saving...';
  try{
   if(typeof window.spgsCancelSalesOrderRPCV2!=='function')throw Error('Cloud cancellation service unavailable');

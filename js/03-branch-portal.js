@@ -921,7 +921,41 @@ window.renderBranchRequests=function(){
     `;
 
 };
- window.openBranchRequest=function(id){const r=state.quoteRequests.find(x=>x.id===id);if(!r||!requestVisible(r))return;alert(`${r.requestNo}\nCustomer: ${r.customer.name}\n\n${r.lines.map(l=>`${l.desc} | ${l.size} | ${l.qty} ${l.unit} x LKR ${money(l.price)}`).join('\n')}\n\nNote: ${r.note||'-'}`)};
+ window.openBranchRequest=function(id){
+  const r=state.quoteRequests.find(x=>x.id===id);
+  if(!r||!requestVisible(r))return;
+
+  let modal=$('branchRequestModal');
+  if(!modal){
+    const div=document.createElement('div');
+    div.id='branchRequestModal';
+    div.className='modal';
+    div.innerHTML=`<div class="modal-box" style="max-width:760px;width:95%"><div class="modal-head"><h3 id="brModalTitle">Quotation Request Details</h3><button class="btn ghost sm" onclick="closeModal('branchRequestModal')">✕</button></div><div class="modal-body" id="brModalBody" style="max-height:75vh;overflow-y:auto;padding:16px"></div><div class="modal-foot" id="brModalFoot" style="display:flex;justify-content:flex-end;gap:10px;padding:12px 16px"></div></div>`;
+    document.body.appendChild(div);
+    modal=div;
+  }
+
+  const lines=r.lines||[];
+  const total=Number(r.total)||lines.reduce((s,l)=>s+(Number(l.qty)||0)*(Number(l.price)||0),0);
+  const normPay=(String(r.payMode||'credit').trim().toLowerCase()==='cash')?'Cash':'Credit Account';
+  const normVat=(String(r.vatMode||'none').trim().toLowerCase()==='vat18')?'VAT Breakdown (18%)':'No VAT Breakdown';
+  const canConvert=!r.quoteId&&!r.quoteSerial&&!r.piId&&!r.piSerial&&hasPerm('manage_quote_requests');
+
+  $('brModalTitle').textContent=`Quotation Request — ${r.requestNo||''}`;
+
+  let sepDeliveryHtml='';
+  if(r.customer?.separateDelivery){
+    sepDeliveryHtml=`<div style="background:#eaf7f5;border:1px solid #bce4df;border-radius:8px;padding:10px;margin-top:10px"><b style="color:#087f83">Separate Delivery Location:</b><div class="small" style="margin-top:4px">${r.customer.deliveryCustomerName?`<b>Receiver:</b> ${esc(r.customer.deliveryCustomerName)}<br>`:''}${r.customer.deliveryLine1?`<b>Address:</b> ${esc(r.customer.deliveryLine1)}, ${esc(r.customer.deliveryLine2||'')}<br>`:''}${r.customer.deliveryContact?`<b>Contact:</b> ${esc(r.customer.deliveryContact)} ${r.customer.deliveryContact2?'• '+esc(r.customer.deliveryContact2):''}`:''}</div></div>`;
+  }
+
+  const itemsTableHtml=`<table class="table" style="margin-top:12px;font-size:12.5px;width:100%"><thead><tr><th>#</th><th>Description</th><th>Specification</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>${lines.map((l,i)=>{const spec=[l.size,l.material,l.layout,l.pcs?`${l.pcs} pcs`:''].filter(Boolean).join(' • ');const lineAmt=(Number(l.qty)||0)*(Number(l.price)||0);return `<tr><td>${i+1}</td><td><b>${esc(l.desc||'ELP')}</b></td><td><span class="small">${esc(spec||'-')}</span></td><td style="text-align:right">${money(l.qty)} ${esc(l.unit||'Rolls')}</td><td style="text-align:right"><b>LKR ${money(l.price)}</b></td><td style="text-align:right"><b>LKR ${money(lineAmt)}</b></td></tr>`}).join('')}</tbody><tfoot><tr style="font-weight:bold;background:#f5faf8"><td colspan="3">Total (${lines.length} items)</td><td style="text-align:right">${money(lines.reduce((s,l)=>s+(Number(l.qty)||0),0))}</td><td style="text-align:right">Total Value:</td><td style="text-align:right;color:#087f83;font-size:14px">LKR ${money(total)}</td></tr></tfoot></table>`;
+
+  $('brModalBody').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#f8faf9;padding:12px;border-radius:8px"><div><div class="small"><b>Customer:</b> ${esc(r.customer?.name||'-')}</div><div class="small"><b>Phone:</b> ${esc(r.customer?.phone||'-')}</div><div class="small"><b>Email:</b> ${esc(r.customer?.email||'-')}</div><div class="small"><b>Address:</b> ${esc(r.customer?.address||'-')}</div></div><div><div class="small"><b>Status:</b> <span class="request-status ${(r.status||'').toLowerCase()}">${esc(r.status||'Pending')}</span></div><div class="small"><b>Branch Requester:</b> ${esc(r.requesterName||r.requester||'-')}</div><div class="small"><b>Payment Mode:</b> ${esc(normPay)}</div><div class="small"><b>VAT Mode:</b> ${esc(normVat)}</div>${r.quoteSerial?`<div class="small"><b>Quotation Serial:</b> ${esc(r.quoteSerial)}</div>`:''}</div></div>${sepDeliveryHtml}${r.note?`<div class="notice" style="margin-top:10px"><b>Notes:</b> ${esc(r.note)}</div>`:''}<div style="margin-top:14px"><b>Requested Items & Pricing:</b></div>${itemsTableHtml}`;
+
+  $('brModalFoot').innerHTML=`<button class="btn ghost" onclick="closeModal('branchRequestModal')">Close</button>${canConvert?`<button class="btn primary" onclick="closeModal('branchRequestModal');convertBranchRequest('${r.id}')">Make Quotation</button>`:''}`;
+
+  modal.classList.add('show');
+};
 window.convertBranchRequest=function(id){
 
   const r =
@@ -943,24 +977,25 @@ window.convertBranchRequest=function(id){
   }
 
 
-  let c =
-    state.customers.find(
-      x=>
-        x.ownerUser === currentUser.username &&
-        (
-          (
-            x.phone &&
-            x.phone === r.customer.phone
-          )
-          ||
-          (
-            x.name &&
-            r.customer.name &&
-            x.name.toLowerCase() ===
-            r.customer.name.toLowerCase()
-          )
-        )
+  let c = null;
+  if(r.customerId){
+    c = state.customers.find(x => String(x.id) === String(r.customerId));
+  }
+  if(!c){
+    c = state.customers.find(x =>
+      (x.phone && r.customer?.phone && String(x.phone).trim() === String(r.customer.phone).trim()) ||
+      (x.name && r.customer?.name && String(x.name).trim().toLowerCase() === String(r.customer.name).trim().toLowerCase())
     );
+  }
+  if(!c && currentUser?.role !== 'admin'){
+    c = state.customers.find(x =>
+      x.ownerUser === currentUser.username &&
+      (
+        (x.phone && r.customer?.phone && String(x.phone).trim() === String(r.customer.phone).trim()) ||
+        (x.name && r.customer?.name && String(x.name).trim().toLowerCase() === String(r.customer.name).trim().toLowerCase())
+      )
+    );
+  }
 
 
   /* -----------------------------------------
@@ -971,23 +1006,24 @@ window.convertBranchRequest=function(id){
 
     c = {
 
-      id:uid('cust'),
+      id:
+        r.customerId || uid('cust'),
 
       name:
-        r.customer.name,
+        r.customer?.name || 'Customer',
 
       phone:
-        r.customer.phone,
+        r.customer?.phone || '',
 
       email:
-        r.customer.email,
+        r.customer?.email || '',
 
       address:
-        r.customer.address,
+        r.customer?.address || '',
 
       // NEW
       delivery:
-        r.customer.delivery || '',
+        r.customer?.delivery || '',
 
       map:'',
 
@@ -998,7 +1034,7 @@ window.convertBranchRequest=function(id){
       priceHistory:[],
 
       ownerUser:
-        currentUser.username,
+        currentUser?.username || 'admin',
 
       sourceRequestId:
         r.id
@@ -1064,23 +1100,35 @@ window.convertBranchRequest=function(id){
   if($('deliveryAddress')){
 
     $('deliveryAddress').value =
-      r.customer.delivery ||
+      r.customer?.delivery ||
       c.delivery ||
       '';
 
   }
 
 
+  const normPayMode = (String(r.payMode || 'credit').trim().toLowerCase() === 'cash') ? 'cash' : 'credit';
+  const normVatMode = (String(r.vatMode || 'none').trim().toLowerCase() === 'vat18') ? 'vat18' : 'none';
+
   $('payMode').value =
-    r.payMode;
+    normPayMode;
 
 
   $('vatMode').value =
-    r.vatMode;
+    normVatMode;
 
 
   state.current.sourceBranchRequestId =
     r.id;
+
+  state.current.freezePrices =
+    true;
+
+  state.current.payMode =
+    normPayMode;
+
+  state.current.vatMode =
+    normVatMode;
 
 
   renderLineRows(
@@ -1088,8 +1136,10 @@ window.convertBranchRequest=function(id){
     r.lines.map(
       l=>({
         ...l,
-        use:true,
-        costSnapshot:null
+        price: Number(l.price || 0),
+        frozenPrice: 1,
+        use: true,
+        costSnapshot: null
       })
     )
 
