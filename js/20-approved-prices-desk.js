@@ -3182,6 +3182,16 @@
           <span style="font-size:14px;font-weight:700">Total Amount to Pay: </span>
           <strong style="font-size:18px;color:#047857">LKR ${money(Number(so.total||0) + Number(so.courierCharge||0))}</strong>
         </div>
+        ${Number(so.paidAmount||0) > 0 ? `
+          <div style="margin-top:2px">
+            <span style="font-size:12px;color:#64748b">Amount Paid: </span>
+            <strong style="font-size:14px;color:#059669">✓ LKR ${money(so.paidAmount)}</strong>
+          </div>
+          <div>
+            <span style="font-size:13px;font-weight:700">Remaining Due: </span>
+            <strong style="font-size:15px;color:${Math.max(0, Number(so.total||0)+Number(so.courierCharge||0)-Number(so.paidAmount||0)) > 0.01 ? '#b42318' : '#059669'}">LKR ${money(Math.max(0, Number(so.total||0)+Number(so.courierCharge||0)-Number(so.paidAmount||0)))}</strong>
+          </div>
+        ` : ''}
       </div>
 
       <div class="section">
