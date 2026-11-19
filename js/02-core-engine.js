@@ -136,7 +136,7 @@ async function getFile(id){if(!id)return null;const db=await openADB();return ne
 async function previewStored(id,box){const rec=await getFile(id);if(!rec){box.innerHTML='';return}const url=URL.createObjectURL(rec.blob);box.innerHTML=rec.type.includes('pdf')?`<iframe src="${url}"></iframe>`:`<img src="${url}"/>`}
 function bindFile(id,key,preview){$(id).addEventListener('change',()=>{const f=$(id).files[0];tempFiles[key]=f||null;if(!f){$(preview).innerHTML='';return}const u=URL.createObjectURL(f);$(preview).innerHTML=f.type.includes('pdf')?`<iframe src="${u}"></iframe>`:`<img src="${u}"/>`})}
 
-function showView(id){if(['admin','settings','categories','products'].includes(id)){const p=prompt(`${id==='settings'?'Settings':'Admin'} password:`);if(p===null||!spgsCurrentPasswordOK(p))return toast('Incorrect password');if(id==='admin')loadAdminPanel()}document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.view===id));if(id==='customers')renderCustomers();if(id==='items')renderItems();if(id==='devices')renderDevices();if(id==='categories')renderCategories();if(id==='products')renderProducts();if(id==='quotations'||id==='pis')renderDocLists();if(id==='dashboard'){updateStats();renderDashboardReport()}}
+function showView(id){if(['admin','settings','categories','products'].includes(id)){const p=prompt(`${id==='settings'?'Settings':'Admin'} password:`);if(p===null||!spgsCurrentPasswordOK(p))return toast('Incorrect password');if(id==='admin'){loadAdminPanel();try{renderAdminDeliveryMethods();}catch(_){}}}document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.view===id));if(id==='customers')renderCustomers();if(id==='items')renderItems();if(id==='devices')renderDevices();if(id==='categories')renderCategories();if(id==='products')renderProducts();if(id==='quotations'||id==='pis')renderDocLists();if(id==='dashboard'){updateStats();renderDashboardReport()}}
 document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>{
   if(b.dataset.view==='editor'){
     newDocument('Q');
@@ -2890,10 +2890,10 @@ const renderDocListsV74=renderDocLists;renderDocLists=function(){renderDocListsV
 /* V7.6 - quotation delivery, courier and COD charging */
 function getAllDeliveryMethods(){
   const defaults=[
-    {id:'own',name:'SoftCreation Delivery',isDefault:true},
-    {id:'courier',name:'Courier',isDefault:true},
-    {id:'cod',name:'Cash on Delivery (COD)',isDefault:true},
-    {id:'pickup',name:'Customer Pickup / Not Applicable',isDefault:true}
+    {id:'own',name:'SoftCreation Delivery',isDefault:true,description:'SoftCreation vehicle route delivery (distance calculated from Kurunegala)'},
+    {id:'courier',name:'Courier',isDefault:true,description:'Third-party parcel courier service'},
+    {id:'cod',name:'Cash on Delivery (COD)',isDefault:true,description:'Cash on delivery collection service'},
+    {id:'pickup',name:'Customer Pickup / Not Applicable',isDefault:true,description:'Customer self-collects from factory or delivery not applicable'}
   ];
   const custom=Array.isArray(state.settings?.customDeliveryMethods)?state.settings.customDeliveryMethods:[];
   return [...defaults,...custom];
@@ -2901,23 +2901,130 @@ function getAllDeliveryMethods(){
 window.getAllDeliveryMethods=getAllDeliveryMethods;
 
 function populateDeliveryMethodOptions(selectedVal){
-  const sel=$('qDeliveryMethod');if(!sel)return;
-  const currentVal=selectedVal||sel.value||'pickup';
   const methods=getAllDeliveryMethods();
-  sel.innerHTML=methods.map(m=>`<option value="${m.id}" ${m.id===currentVal?'selected':''}>${esc(m.name)}</option>`).join('');
+
+  // 1. Quotation Editor delivery dropdown
+  const qSel=$('qDeliveryMethod');
+  if(qSel){
+    const currentVal=selectedVal||qSel.value||'pickup';
+    qSel.innerHTML=methods.map(m=>`<option value="${m.id}" ${(m.id===currentVal||m.name===currentVal)?'selected':''}>${esc(m.name)}</option>`).join('');
+    if(qSel.value!==currentVal){
+      const byName=methods.find(m=>m.name.toLowerCase()===String(currentVal).toLowerCase());
+      if(byName)qSel.value=byName.id;
+    }
+  }
+
+  // 2. PI / Sales Order Conversion Modal dropdown (if open or present)
+  const convSel=$('convDeliveryMethod');
+  if(convSel){
+    const curConv=convSel.value;
+    convSel.innerHTML='<option value="">-- Select Delivery Method --</option>'+
+      methods.map(m=>`<option value="${esc(m.name)}" ${(m.name===curConv||m.id===curConv)?'selected':''}>${esc(m.name)}</option>`).join('')+
+      `<option value="WhatsApp PO" ${curConv==='WhatsApp PO'?'selected':''}>WhatsApp PO</option>`;
+  }
+
+  // 3. Admin Sales Order Edit Modal delivery dropdown (if present)
+  const adminEditSel=$('adminEditDeliveryMethod');
+  if(adminEditSel){
+    const curAdminEdit=adminEditSel.value;
+    adminEditSel.innerHTML='<option value="">-- Select Delivery Method --</option>'+
+      methods.map(m=>`<option value="${esc(m.name)}" ${(m.name===curAdminEdit||m.id===curAdminEdit)?'selected':''}>${esc(m.name)}</option>`).join('')+
+      `<option value="WhatsApp PO" ${curAdminEdit==='WhatsApp PO'?'selected':''}>WhatsApp PO</option>`;
+  }
+
+  // 4. Update courier datalists in SO Quick Courier & Admin SO Edit modals
+  const datalistIds=['spgsCourierDatalist','adminCourierList'];
+  const baseCouriers=['Domex Courier','Pronto Lanka','Koombiyo Delivery','Certis Lanka','Fardar Express','PickMe Flash','Prompt Xpress','Direct Delivery'];
+  const customNames=methods.filter(m=>!m.isDefault).map(m=>m.name);
+  const combinedCouriers=Array.from(new Set([...baseCouriers,...customNames]));
+  datalistIds.forEach(id=>{
+    const dl=$(id);
+    if(dl){
+      dl.innerHTML=combinedCouriers.map(c=>`<option value="${esc(c)}">`).join('');
+    }
+  });
 }
 window.populateDeliveryMethodOptions=populateDeliveryMethodOptions;
 
 function deliveryMethodLabel(m){
-  const match=getAllDeliveryMethods().find(x=>x.id===m);
+  if(!m)return 'Customer Pickup';
+  const methods=getAllDeliveryMethods();
+  const match=methods.find(x=>x.id===m||x.name===m||String(x.id).toLowerCase()===String(m).toLowerCase()||String(x.name).toLowerCase()===String(m).toLowerCase());
   if(match)return match.name;
-  return m==='own'?'SoftCreation Delivery':m==='courier'?'Courier':m==='cod'?'Cash on Delivery (COD)':'Customer Pickup';
+  if(m==='own'||m==='Delivery')return 'SoftCreation Delivery';
+  if(m==='courier'||m==='Courier')return 'Courier';
+  if(m==='cod'||m==='COD')return 'Cash on Delivery (COD)';
+  if(m==='pickup'||m==='Pickup')return 'Customer Pickup / Not Applicable';
+  return String(m);
 }
+window.deliveryMethodLabel=deliveryMethodLabel;
 
 function renderAdminDeliveryMethods(){
   const host=$('admDeliveryMethodsList');if(!host)return;
   const methods=getAllDeliveryMethods();
-  host.innerHTML=`<table class="table" style="margin-top:10px"><thead><tr><th>Method Name</th><th>Type</th><th>Action</th></tr></thead><tbody>${methods.map(m=>`<tr><td><b>${esc(m.name)}</b></td><td>${m.isDefault?'<span class="tag green sm">System Default</span>':'<span class="tag blue sm">Custom Admin Method</span>'}</td><td>${m.isDefault?`<span class="small" style="color:#64748b">—</span>`:`<button class="btn red sm" type="button" onclick="adminDeleteDeliveryMethod('${m.id}')">Delete</button>`}</td></tr>`).join('')}</tbody></table>`;
+  const defaultCount=methods.filter(m=>m.isDefault).length;
+  const customCount=methods.length-defaultCount;
+
+  const countBadge=$('admDeliveryCountBadge');
+  if(countBadge){
+    countBadge.innerHTML=`<span>📦</span> <span>${methods.length} Methods (${defaultCount} Default • ${customCount} Custom)</span>`;
+  }
+
+  host.innerHTML=`
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+      <table class="table" style="margin:0;width:100%">
+        <thead style="background:#f1f5f9;border-bottom:1.5px solid #cbd5e1">
+          <tr>
+            <th style="width:48px;text-align:center">#</th>
+            <th style="min-width:180px">Method Name</th>
+            <th style="width:150px;text-align:center">Classification</th>
+            <th style="min-width:220px">Usage & Calculation Mode</th>
+            <th style="width:110px;text-align:right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${methods.map((m,idx)=>`
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="text-align:center;color:#64748b;font-size:12px;font-weight:600">${idx+1}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:9px">
+                  <span style="font-size:17px">${m.id==='own'?'🚛':m.id==='courier'?'📦':m.id==='cod'?'💵':m.id==='pickup'?'🏬':'🚚'}</span>
+                  <div>
+                    <b style="color:#0f172a;font-size:13.5px">${esc(m.name)}</b>
+                    ${m.description?`<div class="small" style="color:#64748b;font-size:11px">${esc(m.description)}</div>`:''}
+                  </div>
+                </div>
+              </td>
+              <td style="text-align:center">
+                ${m.isDefault?`
+                  <span class="tag sm" style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px">✓ System Default</span>
+                `:`
+                  <span class="tag sm" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px">★ Custom Method</span>
+                `}
+              </td>
+              <td>
+                <span style="font-size:11.5px;color:#475569">
+                  ${m.isDefault?(
+                    m.id==='own'?'Distance rate calculation (Kurunegala route) • Quotation & SO':
+                    m.id==='courier'?'Flat / weight courier charge • Quotation & SO':
+                    m.id==='cod'?'Cash collection fee on delivery • Quotation & SO':
+                    'Zero delivery charge • Self pickup • Quotation & SO'
+                  ):'Third-party courier / custom dispatch • Synchronized across Quote, PI & SO selectors'}
+                </span>
+              </td>
+              <td style="text-align:right">
+                ${m.isDefault?`
+                  <span class="small" style="color:#94a3b8;font-weight:600;display:inline-flex;align-items:center;gap:4px">🔒 Protected</span>
+                `:`
+                  <button class="btn red sm" type="button" onclick="adminDeleteDeliveryMethod('${m.id}')" style="padding:4px 10px;font-size:11.5px">Delete</button>
+                `}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 window.renderAdminDeliveryMethods=renderAdminDeliveryMethods;
 
@@ -2929,7 +3036,7 @@ window.adminAddDeliveryMethod=function(){
   if(methods.some(m=>m.name.toLowerCase()===name.toLowerCase()))return toast('A delivery method with this name already exists');
   state.settings.customDeliveryMethods=state.settings.customDeliveryMethods||[];
   const id='dm_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-  state.settings.customDeliveryMethods.push({id,name,createdAt:new Date().toISOString()});
+  state.settings.customDeliveryMethods.push({id,name,description:'Custom delivery method configured in admin',createdAt:new Date().toISOString()});
   saveState();
   input.value='';
   renderAdminDeliveryMethods();
@@ -2938,6 +3045,9 @@ window.adminAddDeliveryMethod=function(){
 };
 
 window.adminDeleteDeliveryMethod=function(id){
+  const target=(state.settings?.customDeliveryMethods||[]).find(m=>m.id===id);
+  if(!target)return;
+  if(!confirm(`Delete delivery method "${target.name}"?`))return;
   state.settings.customDeliveryMethods=(state.settings.customDeliveryMethods||[]).filter(m=>m.id!==id);
   saveState();
   renderAdminDeliveryMethods();
@@ -2954,21 +3064,22 @@ function enhanceQuotationDeliveryV76(){
   const settingsGrid=$('settings')?.querySelector('.panel-body .grid');if(settingsGrid)settingsGrid.insertAdjacentHTML('beforeend',`<div class="section">Delivery Calculation</div><div class="field"><label>Google Maps JavaScript API Key</label><input id="setMapsApiKey" type="password" placeholder="Required only for automatic route distance"></div><div class="field"><label>Delivery Origin</label><input id="setDeliveryOrigin" placeholder="SoftCreation (Pvt) Ltd, Kurunegala"></div><div class="field"><label>Default Free One-way km</label><input id="setDeliveryFreeKm" type="number" step="0.1" value="100"></div><div class="field"><label>Default Delivery Rate / km</label><input id="setDeliveryRate" type="number" step="0.01" value="25"></div><div class="field full"><div class="notice">Google route distance needs a Maps JavaScript API key with Directions enabled. Restrict the key to the hosted system domain. Without a key, open the saved map and enter the one-way route distance manually.</div></div>`)
   ;['qDeliveryMethod','qDeliveryMap','qDeliveryKm','qDeliveryRate','qDeliveryFreeKm','qCourierCharge','qCodCharge','qDeliveryFree'].forEach(id=>$(id)?.addEventListener(id==='qDeliveryFree'?'change':'input',()=>{updateDeliveryUI();renderCurrent()}));$('qDeliveryMethod')?.addEventListener('change',()=>{updateDeliveryUI();renderCurrent()});
 }
-function deliveryMethodLabel(m){return m==='own'?'SoftCreation Delivery':m==='courier'?'Courier':m==='cod'?'Cash on Delivery (COD)':'Customer Pickup'}
+
 function getDeliveryUI(){
   const method=$('qDeliveryMethod')?.value||'pickup',oneWay=Math.max(0,Number($('qDeliveryKm')?.value||0)),rate=Math.max(0,Number($('qDeliveryRate')?.value||state.settings.deliveryRate||25)),freeKm=Math.max(0,Number($('qDeliveryFreeKm')?.value??state.settings.deliveryFreeKm??100)),courier=Math.max(0,Number($('qCourierCharge')?.value||0)),cod=Math.max(0,Number($('qCodCharge')?.value||0)),waived=!!$('qDeliveryFree')?.checked;
   let standardCharge=0,actualCost=0,billableOneWay=0,billableRoundTrip=0;
   if(method==='own'){billableOneWay=Math.max(0,oneWay-freeKm);billableRoundTrip=billableOneWay*2;standardCharge=billableRoundTrip*rate;actualCost=oneWay*2*rate}
-  if(method==='courier'){standardCharge=courier;actualCost=courier}
-  if(method==='cod'){standardCharge=cod;actualCost=cod}
+  else if(method==='cod'){standardCharge=cod;actualCost=cod}
+  else if(method==='pickup'){standardCharge=0;actualCost=0}
+  else{standardCharge=courier;actualCost=courier}
   return {method,label:deliveryMethodLabel(method),map:$('qDeliveryMap')?.value.trim()||$('googleLocation')?.value.trim()||'',oneWayKm:oneWay,freeOneWayKm:freeKm,billableOneWayKm:billableOneWay,billableRoundTripKm:billableRoundTrip,rate,courierCharge:courier,codCharge:cod,standardCharge,waived,payable:waived?0:standardCharge,actualCost,calculatedAt:new Date().toISOString()}
 }
 function updateDeliveryUI(){
-  if(!$('qDeliveryMethod'))return;const d=getDeliveryUI(),own=d.method==='own',courier=d.method==='courier',cod=d.method==='cod';document.querySelectorAll('.own-delivery-field').forEach(x=>x.style.display=own?'flex':'none');document.querySelectorAll('.courier-delivery-field').forEach(x=>x.style.display=courier?'flex':'none');document.querySelectorAll('.cod-delivery-field').forEach(x=>x.style.display=cod?'flex':'none');
-  let msg=d.method==='pickup'?'No delivery charge will be added.':own?`${money(d.oneWayKm)} km one-way − ${money(d.freeOneWayKm)} km free = ${money(d.billableOneWayKm)} km × 2 (up & down) = ${money(d.billableRoundTripKm)} billable km × LKR ${money(d.rate)} = LKR ${money(d.standardCharge)}`:d.method==='cod'?`COD charge: LKR ${money(d.codCharge)}`:`Courier charge: LKR ${money(d.courierCharge)}`;
-  if(d.waived&&d.standardCharge>0)msg+=` • Customer charge waived: FREE (benefit LKR ${money(d.standardCharge)})`;const box=$('qDeliveryResult');box.className='delivery-result'+(d.waived?' free':'');box.textContent=msg;$('qDeliveryApiNote').textContent=state.settings.googleMapsApiKey?'Automatic route lookup is available. Verify the route shown by Google before saving.':'No Google API key saved: use Open and enter the one-way route distance manually.';
+  if(!$('qDeliveryMethod'))return;const d=getDeliveryUI(),own=d.method==='own',cod=d.method==='cod',pickup=d.method==='pickup',courierOrCustom=!own&&!cod&&!pickup;document.querySelectorAll('.own-delivery-field').forEach(x=>x.style.display=own?'flex':'none');document.querySelectorAll('.courier-delivery-field').forEach(x=>x.style.display=courierOrCustom?'flex':'none');document.querySelectorAll('.cod-delivery-field').forEach(x=>x.style.display=cod?'flex':'none');
+  let msg=pickup?'No delivery charge will be added.':own?`${money(d.oneWayKm)} km one-way − ${money(d.freeOneWayKm)} km free = ${money(d.billableOneWayKm)} km × 2 (up & down) = ${money(d.billableRoundTripKm)} billable km × LKR ${money(d.rate)} = LKR ${money(d.standardCharge)}`:cod?`COD charge: LKR ${money(d.codCharge)}`:`${d.label} charge: LKR ${money(d.courierCharge)}`;
+  if(d.waived&&d.standardCharge>0)msg+=` • Customer charge waived: FREE (benefit LKR ${money(d.standardCharge)})`;const box=$('qDeliveryResult');if(box){box.className='delivery-result'+(d.waived?' free':'');box.textContent=msg;}if($('qDeliveryApiNote')){$('qDeliveryApiNote').textContent=state.settings.googleMapsApiKey?'Automatic route lookup is available. Verify the route shown by Google before saving.':'No Google API key saved: use Open and enter the one-way route distance manually.';}
 }
-function setDeliveryUI(d={}){if(!$('qDeliveryMethod'))return;populateDeliveryMethodOptions(d.method||'pickup');$('qDeliveryMethod').value=d.method||'pickup';$('qDeliveryMap').value=d.map||$('googleLocation')?.value||'';$('qDeliveryKm').value=d.oneWayKm??'';$('qDeliveryRate').value=d.rate??state.settings.deliveryRate??25;$('qDeliveryFreeKm').value=d.freeOneWayKm??state.settings.deliveryFreeKm??100;$('qCourierCharge').value=d.courierCharge??'';$('qCodCharge').value=d.codCharge??'';$('qDeliveryFree').checked=!!d.waived;updateDeliveryUI()}
+function setDeliveryUI(d={}){if(!$('qDeliveryMethod'))return;populateDeliveryMethodOptions(d.method||'pickup');$('qDeliveryMethod').value=d.method||'pickup';if($('qDeliveryMethod').value!==(d.method||'pickup')){const match=getAllDeliveryMethods().find(m=>m.name.toLowerCase()===String(d.method).toLowerCase());if(match)$('qDeliveryMethod').value=match.id;}$('qDeliveryMap').value=d.map||$('googleLocation')?.value||'';$('qDeliveryKm').value=d.oneWayKm??'';$('qDeliveryRate').value=d.rate??state.settings.deliveryRate??25;$('qDeliveryFreeKm').value=d.freeOneWayKm??state.settings.deliveryFreeKm??100;$('qCourierCharge').value=d.courierCharge??'';$('qCodCharge').value=d.codCharge??'';$('qDeliveryFree').checked=!!d.waived;updateDeliveryUI()}
 function openDeliveryMap(){const u=$('qDeliveryMap').value.trim()||$('googleLocation').value.trim();if(!u)return toast('Add the customer Google Maps link first');window.open(u,'_blank','noopener')}
 function mapDestination(){const link=$('qDeliveryMap').value.trim()||$('googleLocation').value.trim(),coord=link.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)||link.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);if(coord)return {lat:Number(coord[1]),lng:Number(coord[2])};try{const u=new URL(link),q=u.searchParams.get('q')||u.searchParams.get('query')||u.searchParams.get('destination');if(q)return decodeURIComponent(q)}catch(e){}return $('deliveryAddress').value.trim()||$('customerAddress').value.trim()}
 function loadGoogleMapsV76(key){if(window.google?.maps?.DirectionsService)return Promise.resolve(true);return new Promise(resolve=>{const cb='scMapsReady_'+Date.now();window[cb]=()=>{delete window[cb];resolve(true)};const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=${cb}`;s.async=true;s.onerror=()=>{delete window[cb];resolve(false)};document.head.appendChild(s)})}
@@ -2980,7 +3091,7 @@ const docTotalsV76=docTotals;docTotals=function(doc){const base=docTotalsV76({..
 const collectCurrentV76=collectCurrent;collectCurrent=function(){const d=collectCurrentV76();if(d)d.deliveryCharge=getDeliveryUI();return d};
 const recalcLinesV76=recalcLines;recalcLines=function(){recalcLinesV76();const d=state.current?getDeliveryUI():{payable:0};let itemGross=0;document.querySelectorAll('#lineBody tr').forEach(tr=>itemGross+=Number(tr.querySelector('.lqty').value||0)*Number(tr.querySelector('.lprice').value||0));const charge=Number(d.payable||0),gross=itemGross+charge,r=Number(state.settings.vat||18)/100,itemNet=$('vatMode').value==='vat18'?itemGross/(1+r):itemGross,vat=itemGross-itemNet;$('netTotal').textContent=money(itemNet);$('vatTotal').textContent=money(vat);$('grandTotal').textContent=money(gross)};
 function itemTotalDocRow(doc){const t=docTotals(doc);return doc.vatMode==='vat18'?`<div class="sumrow item-total-row"><span><b>Item Total (Incl. VAT)</b></span><b>LKR ${money(t.itemsGross)}</b></div>`:`<div class="sumrow item-total-row"><span><b>Item Amount Total</b></span><b>LKR ${money(t.itemsGross)}</b></div>`}
-const buildDocHTMLV76=buildDocHTML;buildDocHTML=function(doc,forPrint=false){let h=buildDocHTMLV76(doc,forPrint),rows=itemTotalDocRow(doc)+deliveryDocRow(doc);h=h.replace(/<div class="sumrow grand">/,rows+'<div class="sumrow grand">');if(doc.deliveryCharge?.method&&doc.deliveryCharge.method!=='pickup'){const d=doc.deliveryCharge,note=`<div class="delivery-doc-note"><b>Delivery:</b> ${esc(d.label)}${d.method==='own'?` • One-way ${money(d.oneWayKm)} km • First ${money(d.freeOneWayKm)} km free • Excess calculated up & down`:''}${d.waived&&d.standardCharge>0?` • <span class="delivery-free-tag">LKR ${money(d.standardCharge)} WAIVED — FREE DELIVERY</span>`:''}</div>`;h=h.replace('<div class="terms">',note+'<div class="terms">')}return h};
+const buildDocHTMLV76=buildDocHTML;buildDocHTML=function(doc,forPrint=false){let h=buildDocHTMLV76(doc,forPrint),rows=itemTotalDocRow(doc)+deliveryDocRow(doc);h=h.replace(/<div class="sumrow grand">/,rows+'<div class="sumrow grand">');if(doc.deliveryCharge?.method&&doc.deliveryCharge.method!=='pickup'){const d=doc.deliveryCharge,dLabel=d.label||deliveryMethodLabel(d.method),note=`<div class="delivery-doc-note"><b>Delivery:</b> ${esc(dLabel)}${d.method==='own'?` • One-way ${money(d.oneWayKm)} km • First ${money(d.freeOneWayKm)} km free • Excess calculated up & down`:''}${d.waived&&d.standardCharge>0?` • <span class="delivery-free-tag">LKR ${money(d.standardCharge)} WAIVED — FREE DELIVERY</span>`:''}</div>`;h=h.replace('<div class="terms">',note+'<div class="terms">')}return h};
 const persistCurrentDocumentV76=persistCurrentDocument;persistCurrentDocument=async function(){const check=collectCurrent();if(check&&!validateQuotationDelivery(check))return null;return persistCurrentDocumentV76()};
 const newDocumentV76=newDocument;newDocument=function(type='Q',category='label'){const r=newDocumentV76(type,category);setDeliveryUI({method:'pickup',map:'',rate:state.settings.deliveryRate??25,freeOneWayKm:state.settings.deliveryFreeKm??100});renderCurrent();return r};
 const fillCustomerV76=fillCustomer;fillCustomer=function(id){fillCustomerV76(id);$('qDeliveryMap').value=$('googleLocation').value||'';updateDeliveryUI();renderCurrent()};
@@ -2988,6 +3099,7 @@ const openDocumentV76=openDocument;openDocument=function(id){openDocumentV76(id)
 const saveSettingsV76=saveSettings;saveSettings=function(){state.settings.googleMapsApiKey=$('setMapsApiKey')?.value.trim()||'';state.settings.deliveryOrigin=$('setDeliveryOrigin')?.value.trim()||'SoftCreation (Pvt) Ltd, Kurunegala, Sri Lanka';state.settings.deliveryFreeKm=Number($('setDeliveryFreeKm')?.value||100);state.settings.deliveryRate=Number($('setDeliveryRate')?.value||25);return saveSettingsV76()};
 const loadSettingsUIV76=loadSettingsUI;loadSettingsUI=function(){loadSettingsUIV76();if($('setMapsApiKey')){$('setMapsApiKey').value=state.settings.googleMapsApiKey||'';$('setDeliveryOrigin').value=state.settings.deliveryOrigin||'SoftCreation (Pvt) Ltd, Kurunegala, Sri Lanka';$('setDeliveryFreeKm').value=state.settings.deliveryFreeKm??100;$('setDeliveryRate').value=state.settings.deliveryRate??25}updateDeliveryUI()};
 enhanceQuotationDeliveryV76();
+try{renderAdminDeliveryMethods();populateDeliveryMethodOptions();}catch(_){}
 
 /* V7.9 - locked superseded quotations and complete revision history */
 function enhanceRevisionHistoryV79(){if($('revisionHistoryModal'))return;const s=document.createElement('style');s.textContent='.revision-chain{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.revision-step{padding:5px 9px;border-radius:16px;background:#e8f6f6;color:#075f62;font-weight:900;font-size:10px}.revision-step.old{background:#eef1f2;color:#66757a}.revision-step.active{background:#079c9f;color:#fff}.revision-change{font-size:10px;line-height:1.45;color:#52646a;margin-top:3px}.locked-row{background:#f7f8f8;color:#6d797d}.locked-row td{opacity:.9}.history-note{background:#fff7db;border:1px solid #ebd17b;padding:8px 10px;border-radius:8px;margin:8px 0}';document.head.appendChild(s);document.body.insertAdjacentHTML('beforeend',`<div id="revisionHistoryModal" class="modal"><div class="modal-card" style="max-width:1050px"><div class="modal-head"><div><b>Quotation Revision History</b><div id="revisionHistoryMeta" class="small"></div></div><button class="closex" onclick="closeModal('revisionHistoryModal')">×</button></div><div id="revisionHistoryBody" class="modal-body"></div></div></div>`)}
@@ -3400,6 +3512,22 @@ function installProductionConversionV8(){
       if(custBlock)custBlock.style.display=isCustom?'':'none';
     };
 
+    const quoteDeliveryVal = d.deliveryMethod || d.deliveryPlan?.method || d.deliveryCharge?.method || d.method || '';
+    const quoteDeliveryLabel = (typeof deliveryMethodLabel === 'function') ? deliveryMethodLabel(quoteDeliveryVal) : quoteDeliveryVal;
+    const allDeliveryMethods = (typeof getAllDeliveryMethods === 'function') ? getAllDeliveryMethods() : [];
+
+    const isDeliveryMatched = (m) => {
+      if (!quoteDeliveryVal) return false;
+      if (m.id === quoteDeliveryVal || m.name === quoteDeliveryVal) return true;
+      if (String(m.name).toLowerCase() === String(quoteDeliveryVal).toLowerCase()) return true;
+      if (String(m.name).toLowerCase() === String(quoteDeliveryLabel).toLowerCase()) return true;
+      if (quoteDeliveryVal === 'own' && (m.id === 'own' || m.name === 'SoftCreation Delivery')) return true;
+      if (quoteDeliveryVal === 'courier' && (m.id === 'courier' || m.name === 'Courier')) return true;
+      if (quoteDeliveryVal === 'cod' && (m.id === 'cod' || m.name === 'Cash on Delivery (COD)')) return true;
+      if (quoteDeliveryVal === 'pickup' && (m.id === 'pickup' || m.name === 'Customer Pickup / Not Applicable')) return true;
+      return false;
+    };
+
     $('convertItems').innerHTML=`
       <div class="notice">
         <b>PI + Sales Order:</b>
@@ -3414,11 +3542,8 @@ function installProductionConversionV8(){
             <label for="convDeliveryMethod"><b>Delivery Method *</b></label>
             <select id="convDeliveryMethod">
               <option value="">-- Select Delivery Method --</option>
-              <option value="COD">COD</option>
-              <option value="Courier">Courier</option>
-              <option value="Pickup">Pickup</option>
-              <option value="Delivery">Delivery</option>
-              <option value="WhatsApp PO">WhatsApp PO</option>
+              ${allDeliveryMethods.map(m => `<option value="${esc(m.name)}" ${isDeliveryMatched(m) ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}
+              <option value="WhatsApp PO" ${quoteDeliveryVal === 'WhatsApp PO' ? 'selected' : ''}>WhatsApp PO</option>
             </select>
           </div>
           <div class="field">

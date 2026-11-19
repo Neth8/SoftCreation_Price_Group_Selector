@@ -3582,6 +3582,18 @@
           <label>Required Delivery Date</label>
           <input type="date" value="${adminEditingSO.needDate || ''}" onchange="adminEditUpdateField('needDate', this.value)">
         </div>
+        <div class="field">
+          <label>Delivery Method</label>
+          <select id="adminEditDeliveryMethod" onchange="adminEditUpdateField('deliveryMethod', this.value)">
+            <option value="">-- Select Delivery Method --</option>
+            ${(typeof getAllDeliveryMethods === 'function' ? getAllDeliveryMethods() : []).map(m => {
+              const curM = adminEditingSO.deliveryMethod || '';
+              const isSel = (curM === m.name || curM === m.id || (typeof deliveryMethodLabel === 'function' && deliveryMethodLabel(curM) === m.name));
+              return `<option value="${esc(m.name)}" ${isSel ? 'selected' : ''}>${esc(m.name)}</option>`;
+            }).join('')}
+            <option value="WhatsApp PO" ${adminEditingSO.deliveryMethod === 'WhatsApp PO' ? 'selected' : ''}>WhatsApp PO</option>
+          </select>
+        </div>
         <div class="field full">
           <label>Customer PO / Reference</label>
           <input value="${esc(adminEditingSO.customerRef || '')}" placeholder="Customer PO number or reference" oninput="adminEditUpdateField('customerRef', this.value)">
@@ -4092,6 +4104,7 @@
 
       try{lastProfitDocId=''}catch(_){}
       if(typeof renderProfitReport==='function')renderProfitReport();
+      if(typeof renderAdminDeliveryMethods==='function')renderAdminDeliveryMethods();
     };
 
     try{loadAdminPanel=window.loadAdminPanel}catch(_){}

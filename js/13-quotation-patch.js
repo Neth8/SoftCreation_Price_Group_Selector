@@ -440,6 +440,7 @@
           break;
         case 'admin':
           if(typeof loadAdminPanel==='function')loadAdminPanel();
+          if(typeof renderAdminDeliveryMethods==='function')renderAdminDeliveryMethods();
           break;
         case 'settings':
           if(typeof renderUsers==='function')renderUsers();

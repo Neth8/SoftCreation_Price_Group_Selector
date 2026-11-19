@@ -33,4 +33,43 @@
 
   }catch(e){}
 
+  // Global prevention of mouse wheel altering input values or dropdowns across the whole system
+  (function initGlobalWheelProtection() {
+    function isModifiableOnWheel(el) {
+      if (!el || !el.tagName) return false;
+      const tag = el.tagName.toUpperCase();
+      if (tag === 'SELECT') return true;
+      if (tag === 'INPUT') {
+        const type = (el.type || '').toLowerCase();
+        if (type === 'number' || type === 'range' || type === 'date' || type === 'time' || type === 'datetime-local') return true;
+        if (el.classList && (el.classList.contains('num') || el.classList.contains('tinyin'))) return true;
+      }
+      return false;
+    }
+
+    // Capture phase on window: blur active number input / select before browser can step the value
+    window.addEventListener('wheel', function(e) {
+      const active = document.activeElement;
+      if (isModifiableOnWheel(active)) {
+        active.blur();
+      }
+      if (isModifiableOnWheel(e.target) && document.activeElement === e.target) {
+        e.target.blur();
+      }
+    }, { capture: true, passive: true });
+
+    // Also bind directly on focusin for immediate per-element protection
+    document.addEventListener('focusin', function(e) {
+      const t = e.target;
+      if (isModifiableOnWheel(t) && !t.__scWheelLockActive) {
+        t.__scWheelLockActive = true;
+        t.addEventListener('wheel', function() {
+          if (document.activeElement === t) {
+            t.blur();
+          }
+        }, { passive: true });
+      }
+    }, true);
+  })();
+
 })();
