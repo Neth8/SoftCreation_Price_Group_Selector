@@ -425,6 +425,7 @@
           const finished=Number(r.finishedQty||0);
           const history=(r.history||[]);
           const last=history.length?history[history.length-1]:null;
+          const reqNote=typeof window.getProductionRequestNote==='function'?window.getProductionRequestNote(r):(r.requestNote||'');
           return `<div class="production-work-job ${prodStatusClassV8(r.status)}">
             <div class="production-work-job-head">
               <div>
@@ -440,6 +441,7 @@
               <span><b>Need:</b> ${esc(r.needDate||'-')}</span>
               <span><b>Sales:</b> ${esc(r.ownerDisplay||r.ownerUser||'-')}</span>
             </div>
+            ${reqNote?`<div class="production-work-job-note" style="margin-top:6px;padding:5px 8px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;font-size:11px;color:#92400e;line-height:1.3"><b>Request Note:</b> ${esc(reqNote)}</div>`:''}
             ${last?`<div class="production-work-last-update"><b>Last update:</b> ${esc(last.status||'')} • ${esc(last.by||'')} • ${esc(new Date(last.at).toLocaleString())}${last.note?`<br>${esc(last.note)}`:''}</div>`:''}
             <div class="actions">
               <button class="btn primary sm" onclick="closeModal('productionWorkModal');openProductionV8('${r.id}')">Manage Job</button>

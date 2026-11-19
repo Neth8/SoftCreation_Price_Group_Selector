@@ -7614,11 +7614,6 @@ html[data-theme="dark"] .bp-so-live-note-v1032{
 .pc-simple-stats-v1142>div.pc-kpi-pipeline-nov11{background:#fff2d8;border:1px solid #f1c276;border-left:5px solid #cb850c}
 .pc-simple-stats-v1142>div.pc-kpi-pipeline-nov11 strong{color:#955800}
 .pc-simple-stats-v1142>div>span{font-size:10px;font-weight:600;opacity:.8;line-height:1.45}
-/* Ubuntu CUPS manual-print panel inside existing Printer Connections UI. */
-#spgsCupsPanelNov11{margin-top:15px;padding:15px;border:1px solid #9edce1;border-radius:14px;background:#f3fbfc;color:#17434c}
-#spgsCupsPanelNov11 .spgs-cups-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:12px 0}
-#spgsCupsPanelNov11 select{max-width:100%;min-width:220px;padding:9px;border:1px solid #aacbd0;border-radius:8px}
-#spgsCupsPanelNov11 .spgs-cups-note{font-size:12px;line-height:1.5;color:#385d67}
 
 /* Matching subtle column signals between planner and SO demand detail. */
 .pc-demand-title+.pc-scroll .pc-table thead th:nth-child(5){background:#e7f5ff;color:#125b91}
@@ -8262,3 +8257,204 @@ html[data-theme="dark"] .device-master-image-placeholder span{
 .sc-pagination{
   grid-column:1 / -1;
 }
+
+/* =====================================================================
+   RouteX Translanka ERP Integration Styles
+   ===================================================================== */
+.mi-source-badge.routex {
+  background: #065f46;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: inline-block;
+}
+.mi-source-badge.brylix {
+  background: #f59e0b;
+  color: #0f172a;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  display: inline-block;
+}
+.mi-source-badge.erp {
+  background: #087f83;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-block;
+}
+.mi-source-badge.system {
+  background: #64748b;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.mi-rx-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.mi-rx-modal-backdrop.show {
+  display: flex;
+}
+.mi-rx-modal {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 860px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+html[data-theme="dark"] .mi-rx-modal {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+.mi-rx-modal-head {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mi-rx-modal-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mi-rx-modal-head .close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mi-rx-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+.mi-rx-search-bar {
+  margin-bottom: 14px;
+  position: relative;
+}
+.mi-rx-search-bar input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #f8fafc;
+  outline: none;
+  box-sizing: border-box;
+}
+html[data-theme="dark"] .mi-rx-search-bar input {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+.mi-rx-prod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.mi-rx-prod-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.15s ease;
+}
+html[data-theme="dark"] .mi-rx-prod-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+.mi-rx-prod-card:hover {
+  border-color: #047857;
+  box-shadow: 0 4px 12px rgba(4, 120, 87, 0.12);
+}
+.mi-rx-prod-title {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+html[data-theme="dark"] .mi-rx-prod-title {
+  color: #f8fafc;
+}
+.mi-rx-prod-meta {
+  font-size: 11.5px;
+  color: #64748b;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.mi-rx-stock-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.mi-rx-stock-badge.in-stock {
+  background: #dcfce7;
+  color: #15803d;
+}
+.mi-rx-stock-badge.out-stock {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.mi-rx-prod-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+}
+html[data-theme="dark"] .mi-rx-prod-footer {
+  border-top-color: #334155;
+}
+.mi-rx-prod-price {
+  font-weight: 700;
+  font-size: 14px;
+  color: #047857;
+}
+html[data-theme="dark"] .mi-rx-prod-price {
+  color: #34d399;
+}
+

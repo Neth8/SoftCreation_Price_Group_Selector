@@ -185,6 +185,35 @@ function miInstallUI(){
         <div id="miPayInfo" class="mi-pay-info"></div>
         <div class="actions"><button class="btn ghost" type="button" onclick="miClosePayment()">Cancel</button><button class="btn green" type="button" onclick="miConfirmPayment()">Add Payment</button></div>
       </div>
+    </div>
+    <div id="miRouteXProductModal" class="mi-rx-modal-backdrop">
+      <div class="mi-rx-modal">
+        <div class="mi-rx-modal-head">
+          <h3><span>🌐</span> RouteX Translanka Products & Cashier Stock</h3>
+          <button type="button" class="close-btn" onclick="miCloseRouteXProductPicker()">×</button>
+        </div>
+        <div class="mi-rx-modal-body">
+          <div class="mi-rx-search-bar">
+            <input id="miRouteXSearchInput" type="text" placeholder="Search product name or barcode..." oninput="miFilterRouteXProducts(this.value)">
+          </div>
+          <div id="miRouteXProductGrid" class="mi-rx-prod-grid"></div>
+        </div>
+      </div>
+    </div>
+    <div id="miRouteXSalesModal" class="mi-rx-modal-backdrop">
+      <div class="mi-rx-modal" style="max-width:960px">
+        <div class="mi-rx-modal-head">
+          <h3><span>🌐</span> RouteX Translanka ERP — Live Sales Register</h3>
+          <button type="button" class="close-btn" onclick="miCloseRouteXSalesViewer()">×</button>
+        </div>
+        <div class="mi-rx-modal-body">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <span style="font-size:13px;color:#64748b">Live sales records from RouteX ERP (Cashier: <b>trcashier01</b>)</span>
+            <button class="btn sm ghost" type="button" onclick="miOpenRouteXSalesViewer(true)">↻ Refresh Live RouteX</button>
+          </div>
+          <div id="miRouteXSalesList" class="mi-table-wrap"></div>
+        </div>
+      </div>
     </div>`);
 }
 
@@ -471,13 +500,39 @@ window.miMarkTranslankaERPUpdated=async function(id){
 };
 window.miNewTranslankaInvoice=function(){
   miNewInvoice();
-  setTimeout(()=>{
+  setTimeout(async ()=>{
     const c=mi$('miCompany');
     if(c){
       c.value='translanka';
-      miRefreshEditor();
+      await miCompanyChanged();
     }
   },50);
+};
+
+window.miCompanyChanged=async function(){
+  const comp=mi$('miCompany')?.value||'softcreation';
+  const cBadge=mi$('miCompanyBadge');
+  if(cBadge){
+    cBadge.className='mi-company-chip '+comp;
+    cBadge.textContent=comp==='translanka'?'Translanka Nexus':'SoftCreation';
+  }
+  const rxBtn=mi$('miRouteXPickBtn');
+  if(rxBtn) rxBtn.style.display=(comp==='translanka')?'inline-flex':'none';
+
+  if(comp==='translanka' && !miEditingId && window.RouteXLink){
+    try{
+      const currentNo=String(mi$('miInvoiceNo')?.value||'').trim();
+      if(!currentNo || currentNo.startsWith('INV-')){
+        const nextNo=await window.RouteXLink.getNextInvoiceNo();
+        if(mi$('miInvoiceNo') && (mi$('miCompany')?.value==='translanka')){
+          mi$('miInvoiceNo').value=nextNo;
+        }
+      }
+    }catch(err){
+      console.warn('Auto invoice number fetch from RouteX:',err);
+    }
+  }
+  miRefreshEditor();
 };
 let miCompanyFilter = 'all';
 
@@ -512,6 +567,7 @@ function miListPageHTML(title,sub,list,searchId){
           <button class="btn primary sm" onclick="miNewInvoice()">+ New SoftCreation Invoice</button>
           <button class="btn green sm" onclick="miNewTranslankaInvoice()">+ New Translanka Invoice</button>
         `:''}
+        <button class="btn ghost sm" type="button" onclick="miOpenRouteXSalesViewer()" title="View live invoices stored in RouteX Translanka ERP">🌐 Live RouteX Invoices</button>
       </div>
     </div>
 
@@ -672,7 +728,7 @@ function miEditorHTML(){
         <div class="field full" style="margin-bottom:12px">
           <label style="font-weight:700">Company Letterhead *</label>
           <div style="display:flex;gap:10px;align-items:center">
-            <select id="miCompany" onchange="miRefreshEditor()" ${locked?'disabled':''} style="flex:1;padding:8px 12px;font-size:14px;font-weight:600;border-radius:6px;border:1.5px solid #087f83;background:#f8fafc">
+            <select id="miCompany" onchange="miCompanyChanged()" ${locked?'disabled':''} style="flex:1;padding:8px 12px;font-size:14px;font-weight:600;border-radius:6px;border:1.5px solid #087f83;background:#f8fafc">
               <option value="softcreation">SoftCreation (Pvt) Ltd. (Primary Company • TIN: 103723353)</option>
               <option value="translanka">Translanka Nexus (Pvt) Ltd. (Secondary Company • TIN: 104839210)</option>
             </select>
@@ -713,7 +769,15 @@ function miEditorHTML(){
       </div>
 
       <div class="mi-card">
-        <div class="mi-card-head"><h3>Items</h3>${canEdit?'<button class="btn primary sm" onclick="miAddItem()">+ Add Item</button>':''}</div>
+        <div class="mi-card-head">
+          <h3>Items</h3>
+          ${canEdit?`
+            <div style="display:flex;gap:8px">
+              <button class="btn primary sm" type="button" onclick="miAddItem()">+ Add Item</button>
+              <button class="btn green sm" id="miRouteXPickBtn" type="button" style="${(inv?.company==='translanka'||miCompanyFilter==='translanka')?'':'display:none'}" onclick="miOpenRouteXProductPicker()">🌐 Pick RouteX Product</button>
+            </div>
+          `:''}
+        </div>
         <div class="mi-item-head"><span>Item Code</span><span>Description</span><span>Qty</span><span>Unit Price</span><span>Amount</span><span></span></div>
         <div id="miItems"></div>
         <label class="mi-vat-check"><input type="checkbox" id="miVatEnabled" onchange="miRefreshEditor()" ${locked?'disabled':''}> Show included VAT (18/118 of VAT-inclusive item prices)</label>
@@ -793,12 +857,14 @@ function miAfterEditorRender(){
   miRenderSelectedCustomer();
   miRenderCustomerDocs();
   if(inv?.erpCustomerId){const local=(state.customers||[]).find(c=>String(c.id)===String(inv.erpCustomerId));if(local){const pick=mi$('miCustomerAddressPick');if(pick)pick.innerHTML='<option value="0">System customer billing address</option>';}else miLoadAddresses(inv.erpCustomerId,inv.customerAddress);}
+  miCompanyChanged();
   miRefreshEditor();
 }
-window.miAddItem=function(item={code:'',desc:'',qty:1,unitPrice:0},refresh=true){
+window.miAddItem=function(item={code:'',desc:'',qty:1,unitPrice:0,product_id:''},refresh=true){
   if(miLocked)return;
   const d=document.createElement('div');
   d.className='mi-item-row';
+  if(item.product_id) d.dataset.productId=item.product_id;
   d.innerHTML=`<input class="mi-it-code" placeholder="Code" value="${miEsc(item.code||'')}" oninput="miRefreshEditor()"><input class="mi-it-desc" placeholder="Item description" value="${miEsc(item.desc||'')}" oninput="miRefreshEditor()"><input class="mi-it-qty" type="number" step="0.001" min="0" value="${miNum(item.qty||1)}" oninput="miRefreshEditor()"><input class="mi-it-price" type="number" step="0.01" min="0" value="${miNum(item.unitPrice).toFixed(2)}" oninput="miRefreshEditor()"><input class="mi-it-amount" readonly><button class="mi-remove-item" title="Remove" onclick="this.parentElement.remove();miRefreshEditor()">×</button>`;
   mi$('miItems')?.appendChild(d);
   if(refresh)miRefreshEditor();
@@ -825,7 +891,8 @@ function miDraft(){
       code:String(r.querySelector('.mi-it-code')?.value||'').trim(),
       desc:String(r.querySelector('.mi-it-desc')?.value||'').trim(),
       qty:miNum(r.querySelector('.mi-it-qty')?.value),
-      unitPrice:miNum(r.querySelector('.mi-it-price')?.value)
+      unitPrice:miNum(r.querySelector('.mi-it-price')?.value),
+      product_id:r.dataset?.productId||''
     })).filter(i=>i.code||i.desc||i.qty||i.unitPrice),
     payments:miDraftPayments.map(x=>({...x})),
     fulfilmentType:mi$('miFulfilmentType')?.value||'Direct Supplier → Customer',
@@ -916,6 +983,34 @@ window.miSaveInvoice=async function(silent=false){
   if(!miCan('manual_invoice_create'))return requirePerm('manual_invoice_create','save manual invoices');
   const inv=miDraft(),err=miValidate(inv);
   if(err)return toast(err);
+
+  let rxResult = null;
+  if(inv.company === 'translanka' && window.RouteXLink){
+    try {
+      if(!silent) toast('Syncing with Translanka RouteX ERP database...', 2000);
+      rxResult = await window.RouteXLink.createSale({
+        invoice_no: inv.invoiceNo,
+        sale_date: inv.invoiceDate,
+        payment_mode: inv.paymentMode,
+        customer_id: inv.erpCustomerId,
+        customer_name: inv.customerName,
+        customer_phone: inv.customerPhone,
+        customer_address: inv.customerAddress,
+        items: inv.items,
+        delivery_charge: inv.deliveryCharge,
+        amount_given: miPaid(inv)
+      });
+      if(rxResult && rxResult.invoiceNo && rxResult.invoiceNo !== inv.invoiceNo){
+        inv.invoiceNo = rxResult.invoiceNo;
+        if(mi$('miInvoiceNo')) mi$('miInvoiceNo').value = rxResult.invoiceNo;
+      }
+    } catch(rxErr) {
+      console.error('RouteX sync failed:', rxErr);
+      const cont = confirm(`RouteX ERP Sync Notice:\n${rxErr.message || rxErr}\n\nDo you want to continue saving this invoice locally in SPGS?`);
+      if(!cont) return;
+    }
+  }
+
   const payload={
     workspace:MI_WORKSPACE,
     id:miEditingId||null,
@@ -925,8 +1020,9 @@ window.miSaveInvoice=async function(silent=false){
     customer_name:inv.customerName,customer_tin:inv.customerTIN,customer_email:inv.customerEmail,
     customer_phone:inv.customerPhone,customer_address:inv.customerAddress,
     fulfilment_type:inv.fulfilmentType,supplier_source:inv.supplierSource,
-    supplier_bill_ref:inv.supplierBill,courier_ref:inv.courierRef,erp_ref:inv.erpRef,
-    internal_note:`[COMPANY:${inv.company||'softcreation'}] `+(inv.internalNote||''),
+    supplier_bill_ref:inv.supplierBill,courier_ref:inv.courierRef,
+    erp_ref: rxResult?.invoiceNo ? `RouteX: ${rxResult.invoiceNo}` : inv.erpRef,
+    internal_note:`[COMPANY:${inv.company||'softcreation'}]` + (rxResult?.saleId ? ` [ROUTEX_SALE:${rxResult.saleId}]` : '') + ' ' + (inv.internalNote||''),
     company:inv.company||'softcreation',
     user:{username:currentUser?.username||'',display_name:currentUser?.display||currentUser?.username||''},
     lines:[...inv.items.map((x,i)=>({line_no:i+1,item_code:x.code,description:x.desc,qty:x.qty,unit_price:x.unitPrice})),
@@ -945,7 +1041,13 @@ window.miSaveInvoice=async function(silent=false){
     if(!saved)throw new Error('Save RPC returned invoice ID '+confirmedId+', but it is not visible after reload. Check permissions before trying again.');
     miEditingId=confirmedId;
     miDraftPayments=(saved?.payments||[]).map(x=>({...x}));
-    if(!silent)toast(`${result?.invoice_no||inv.invoiceNo} saved`);
+    if(!silent){
+      if(rxResult?.saleId){
+        toast(`✅ ${result?.invoice_no||inv.invoiceNo} saved & synced directly to RouteX Translanka ERP!`);
+      }else{
+        toast(`${result?.invoice_no||inv.invoiceNo} saved`);
+      }
+    }
     miRender();
   }catch(e){console.error('Manual invoice save failed:',e);const message=String(e?.message||'').trim();toast(message&&message!=='.'?`Invoice NOT saved: ${message}`:'Invoice NOT saved. Supabase returned an unidentified error; check browser Console and Network response.')}
 };
@@ -1108,14 +1210,33 @@ function miSystemCustomerRows(q){
 function miShowCustomerResults(rows,error=''){
   const box=mi$('miCustomerSuggestions');if(!box)return;
   miCustomerRows=rows;
-  box.innerHTML=rows.length?rows.map((c,i)=>`<button type="button" class="mi-customer-option" onclick="miSelectCustomer(${i})"><b>${miEsc(c.name||'-')}</b><span>${miEsc(c.phone||'No phone')} ${c.email?'• '+miEsc(c.email):''}</span><small>${c.source==='system'?'SYSTEM':'ERP'} • ID: ${miEsc(c.id||'-')}</small></button>`).join(''):(error?`<div class="mi-customer-message error">${miEsc(error)}</div>`:'<div class="mi-customer-message">No matching customer found.</div>');
+  box.innerHTML=rows.length?rows.map((c,i)=>{
+    const tag = c.source==='routex' ? '🌐 ROUTEX' : c.source==='brylix' ? '⚡ BRYLIX ERP' : c.source==='system' ? 'SYSTEM' : 'ERP';
+    const tagCls = c.source==='routex' ? 'routex' : c.source==='brylix' ? 'brylix' : c.source==='system' ? 'system' : 'erp';
+    return `<button type="button" class="mi-customer-option" onclick="miSelectCustomer(${i})">
+      <b>${miEsc(c.name||'-')}</b>
+      <span>${miEsc(c.phone||'No phone')} ${c.email?'• '+miEsc(c.email):''}</span>
+      <small><span class="mi-source-badge ${tagCls}">${tag}</span> • ID: ${miEsc(c.id||c.code||'-')}</small>
+    </button>`;
+  }).join(''):(error?`<div class="mi-customer-message error">${miEsc(error)}</div>`:'<div class="mi-customer-message">No matching customer found.</div>');
   box.classList.add('show');
 }
 async function miLoadCustomers(q){
   const seq=++miCustomerSeq;
+  const isTranslanka = mi$('miCompany')?.value === 'translanka';
   const local=miSystemCustomerRows(q);
   miShowCustomerResults(local);
+
   try{
+    if(isTranslanka && window.RouteXLink){
+      // Search combined: both Translanka RouteX customers AND Brylix ERP customers!
+      const combined = await window.RouteXLink.searchCombinedCustomers(q);
+      if(seq!==miCustomerSeq)return;
+      const ids = new Set(combined.map(c => String(c.id)));
+      miShowCustomerResults([...combined, ...local.filter(c => !ids.has(String(c.id)))]);
+      return;
+    }
+
     const r=await miEdge({action:'search',q,limit:12});
     if(seq!==miCustomerSeq)return;
     const remote=(Array.isArray(r?.customers)?r.customers:[]).map(c=>({...c,source:'erp'}));
@@ -1123,8 +1244,8 @@ async function miLoadCustomers(q){
     miShowCustomerResults([...local,...remote.filter(c=>!ids.has(String(c.id)))]);
   }catch(e){
     if(seq!==miCustomerSeq)return;
-    console.error('ERP customer lookup:',e);
-    miShowCustomerResults(local,local.length?'':('ERP search unavailable: '+(e.message||'unknown error')));
+    console.error('Customer lookup:',e);
+    miShowCustomerResults(local,local.length?'':((isTranslanka?'RouteX / Brylix':'ERP')+' search unavailable: '+(e.message||'unknown error')));
   }
 }
 window.miCustomerFocus=function(){
@@ -1132,8 +1253,28 @@ window.miCustomerFocus=function(){
 };
 function miHideCustomerSuggestions(){mi$('miCustomerSuggestions')?.classList.remove('show')}
 window.miSelectCustomer=async function(i){
-  const c=miCustomerRows[i];if(!c)return;
+  let c=miCustomerRows[i];if(!c)return;
   miCustomerSeq++;clearTimeout(miCustomerTimer);
+  const isTranslanka = mi$('miCompany')?.value === 'translanka';
+
+  // If customer is from Brylix ERP in Translanka mode, link/ensure in RouteX
+  if(c.source === 'brylix' && isTranslanka && window.RouteXLink){
+    try {
+      toast(`Linking Brylix customer "${c.name}" to RouteX Translanka...`, 2000);
+      const linked = await window.RouteXLink.ensureBrylixCustomerInRouteX(c);
+      c = {
+        ...c,
+        id: linked.id,
+        phone: linked.phone || c.phone,
+        address: linked.address || c.address,
+        isLinkedToRouteX: true
+      };
+      toast(`Linked to Translanka RouteX as customer: ${c.name}`, 2000);
+    } catch(linkErr) {
+      console.warn('Failed to auto-link Brylix customer into RouteX:', linkErr);
+    }
+  }
+
   miSelectedErpCustomer=c;
   mi$('miErpCustomerId').value=String(c.id||'');
   mi$('miErpCustomerCode').value=String(c.code||c.customer_id||'');
@@ -1145,7 +1286,13 @@ window.miSelectCustomer=async function(i){
   miHideCustomerSuggestions();
   miRenderSelectedCustomer();
   miRenderCustomerDocs();
-  if(c.source==='system'){
+  if(c.source==='routex' || c.source==='brylix'){
+    const address=String(c.address||'').trim();
+    const pick=mi$('miCustomerAddressPick');
+    const label = c.source==='brylix' ? 'Brylix ERP customer primary address' : 'RouteX customer primary address';
+    if(pick){pick.innerHTML=`<option value="0">${label}</option>`;pick.dataset.rows='';}
+    mi$('miCustomerAddress').value=address;
+  }else if(c.source==='system'){
     const address=String(c.address||c.delivery||'').trim();
     const pick=mi$('miCustomerAddressPick');
     if(pick){pick.innerHTML='<option value="0">System customer billing address</option>';pick.dataset.rows='';}
@@ -1156,7 +1303,21 @@ window.miSelectCustomer=async function(i){
 function miRenderSelectedCustomer(){
   const box=mi$('miCustomerSelected');if(!box)return;
   const c=miSelectedErpCustomer;
-  box.innerHTML=c?.id?`<div><span>${c.source==='system'?'SYSTEM CUSTOMER SELECTED':'ERP CUSTOMER SELECTED'}</span><b>${miEsc(c.name||'')}</b><small>ID ${miEsc(c.id)}${c.code?' • '+miEsc(c.code):''}</small></div><strong>${c.source==='system'?'SYSTEM':'LIVE ERP'}</strong>`:'<div class="mi-muted">Select the customer from ERP suggestions.</div>';
+  let srcLabel = 'ERP CUSTOMER SELECTED';
+  let tagLabel = 'LIVE ERP';
+
+  if(c?.source==='routex'){
+    srcLabel = '🌐 ROUTEX TRANSLANKA CUSTOMER';
+    tagLabel = 'ROUTEX ERP';
+  } else if(c?.source==='brylix'){
+    srcLabel = '⚡ BRYLIX ERP CUSTOMER (LINKED TO TRANSLANKA ROUTEX)';
+    tagLabel = 'BRYLIX ERP';
+  } else if(c?.source==='system'){
+    srcLabel = 'SYSTEM CUSTOMER SELECTED';
+    tagLabel = 'SYSTEM';
+  }
+
+  box.innerHTML=c?.id?`<div><span>${srcLabel}</span><b>${miEsc(c.name||'')}</b><small>ID: ${miEsc(c.id)}${c.code?' • Code: '+miEsc(c.code):''}${c.brylixId?' • Brylix ID: '+miEsc(c.brylixId):''}</small></div><strong>${tagLabel}</strong>`:'<div class="mi-muted">Select the customer from ERP suggestions.</div>';
 }
 async function miLoadAddresses(customerId,preferred){
   const select=mi$('miCustomerAddressPick');if(!select)return;
@@ -1399,6 +1560,144 @@ async function miDoPrint(inv){
   window.addEventListener('afterprint',cleanup);
   requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));
 }
+
+/* ---------------- RouteX Translanka Product Picker & Sales Viewer ---------------- */
+let miCachedRxProducts = [];
+
+window.miOpenRouteXProductPicker = async function(){
+  const modal = mi$('miRouteXProductModal');
+  if(!modal) return;
+  modal.classList.add('show');
+  const grid = mi$('miRouteXProductGrid');
+  if(grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#64748b">Loading Translanka products & live stock from RouteX...</div>';
+  if(mi$('miRouteXSearchInput')) mi$('miRouteXSearchInput').value = '';
+
+  try {
+    if(window.RouteXLink){
+      miCachedRxProducts = await window.RouteXLink.searchProducts('');
+      miRenderRouteXProductGrid(miCachedRxProducts);
+    }
+  } catch(e) {
+    if(grid) grid.innerHTML = `<div style="grid-column:1/-1;color:#b91c1c;padding:20px">Failed to load RouteX products: ${miEsc(e.message)}</div>`;
+  }
+};
+
+window.miCloseRouteXProductPicker = function(){
+  mi$('miRouteXProductModal')?.classList.remove('show');
+};
+
+window.miFilterRouteXProducts = function(term){
+  const q = String(term||'').trim().toLowerCase();
+  if(!q) {
+    miRenderRouteXProductGrid(miCachedRxProducts);
+    return;
+  }
+  const filtered = miCachedRxProducts.filter(p =>
+    (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)
+  );
+  miRenderRouteXProductGrid(filtered);
+};
+
+window.miRenderRouteXProductGrid = function(list){
+  const grid = mi$('miRouteXProductGrid');
+  if(!grid) return;
+  if(!list || !list.length){
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:#64748b">No products found matching your search.</div>';
+    return;
+  }
+  grid.innerHTML = list.map((p, idx) => {
+    const inStock = p.stock > 0;
+    return `
+      <div class="mi-rx-prod-card">
+        <div>
+          <div class="mi-rx-prod-title">${miEsc(p.name)}</div>
+          <div class="mi-rx-prod-meta">
+            <span>Code: <b>${miEsc(p.code||'-')}</b></span>
+            <span class="mi-rx-stock-badge ${inStock ? 'in-stock' : 'out-stock'}">
+              ${inStock ? `${p.stock} on Cashier` : 'Out of Stock'}
+            </span>
+          </div>
+        </div>
+        <div class="mi-rx-prod-footer">
+          <span class="mi-rx-prod-price">Rs. ${miMoney(p.unitPrice)}</span>
+          <button type="button" class="btn sm primary" onclick="miSelectRouteXProduct(${idx})">+ Add Line</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.miSelectRouteXProduct = function(idx){
+  const p = miCachedRxProducts[idx];
+  if(!p) return;
+  const rows = [...document.querySelectorAll('#miItems .mi-item-row')];
+  if(rows.length === 1 && !rows[0].querySelector('.mi-it-desc')?.value.trim() && !rows[0].querySelector('.mi-it-code')?.value.trim()){
+    rows[0].remove();
+  }
+  miAddItem({
+    code: p.code || '',
+    desc: p.name || '',
+    qty: 1,
+    unitPrice: p.unitPrice || 0,
+    product_id: p.id || ''
+  }, true);
+  miCloseRouteXProductPicker();
+  toast(`Added ${p.name} from RouteX`);
+};
+
+window.miOpenRouteXSalesViewer = async function(refresh = false){
+  const modal = mi$('miRouteXSalesModal');
+  if(!modal) return;
+  modal.classList.add('show');
+  const host = mi$('miRouteXSalesList');
+  if(host) host.innerHTML = '<div style="padding:30px;text-align:center;color:#64748b">Loading live sales records from Translanka RouteX...</div>';
+
+  try {
+    if(window.RouteXLink){
+      const sales = await window.RouteXLink.fetchTranslankaSales(40);
+      if(!sales || !sales.length){
+        if(host) host.innerHTML = '<div class="mi-empty">No sales records found in RouteX database.</div>';
+        return;
+      }
+      if(host) host.innerHTML = `
+        <table class="mi-table">
+          <thead>
+            <tr>
+              <th>RouteX Invoice</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Type</th>
+              <th class="num">Items</th>
+              <th class="num">Total Amount</th>
+              <th class="num">Due Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sales.map(s => `
+              <tr>
+                <td><b>${miEsc(s.invoice_no)}</b><br><small style="color:#047857">trcashier01</small></td>
+                <td>${miEsc(String(s.sale_date||s.created_at).slice(0, 10))}</td>
+                <td><b>${miEsc(s.routex_customers?.name || 'Walk-in Customer')}</b><br><small>${miEsc(s.routex_customers?.phone || '')}</small></td>
+                <td><span class="mi-status ${s.sale_type==='cash'?'paid':s.sale_type==='cheque'?'partial':'unpaid'}">${miEsc(s.sale_type||'cash')}</span></td>
+                <td class="num">${miEsc(s.total_items||0)}</td>
+                <td class="num strong">Rs. ${miMoney(s.total_amount)}</td>
+                <td class="num">Rs. ${miMoney(s.due_amount||0)}</td>
+                <td><span class="mi-status ${s.status==='active'?'updated':'pending'}">${miEsc(s.status||'active')}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+  } catch(e) {
+    if(host) host.innerHTML = `<div class="mi-customer-message error">Failed to query RouteX sales: ${miEsc(e.message)}</div>`;
+  }
+};
+
+window.miCloseRouteXSalesViewer = function(){
+  mi$('miRouteXSalesModal')?.classList.remove('show');
+};
 
 /* ---------------- integration ---------------- */
 const miShowBase=window.showView;

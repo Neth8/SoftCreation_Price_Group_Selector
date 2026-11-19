@@ -437,7 +437,7 @@
       capture=document.createElement('div');
       capture.className='sc-quote-capture-host';
       document.body.appendChild(capture);
-      // Lower peak canvas memory for device quotations and mobile/Ubuntu browsers.
+      // Lower peak canvas memory for device quotations and mobile browsers.
       // Pages retain the exact original A4 proportions and text layout.
       const lowerMemory=doc.category==='device' || (typeof navigator.deviceMemory==='number' && navigator.deviceMemory<=4);
       const resolution=lowerMemory?1:1.25;
