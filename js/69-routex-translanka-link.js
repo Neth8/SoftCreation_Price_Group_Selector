@@ -395,9 +395,9 @@
       };
     },
 
-    async searchProducts(query = ''){
+    async searchProducts(query = '', limit = 500){
       const q = String(query || '').trim();
-      let path = `/routex_products?company_id=eq.${ROUTEX_CONFIG.translankaCompanyId}&active=eq.true&select=id,name,barcode,stock,default_price&order=name.asc&limit=40`;
+      let path = `/routex_products?company_id=eq.${ROUTEX_CONFIG.translankaCompanyId}&active=eq.true&select=id,name,barcode,stock,default_price&order=name.asc&limit=${limit}`;
       if (q) {
         const encoded = encodeURIComponent(q);
         path += `&or=(name.ilike.*${encoded}*,barcode.ilike.*${encoded}*)`;
@@ -595,7 +595,7 @@
       };
     },
 
-    async fetchTranslankaSales(limit = 50){
+    async fetchTranslankaSales(limit = 250){
       const path = `/routex_sales?company_id=eq.${ROUTEX_CONFIG.translankaCompanyId}&order=created_at.desc&limit=${limit}&select=*,routex_customers(name,phone,address),routex_sale_items(*)`;
       return await apiFetch(path);
     }

@@ -187,21 +187,27 @@ function miInstallUI(){
       </div>
     </div>
     <div id="miRouteXProductModal" class="mi-rx-modal-backdrop">
-      <div class="mi-rx-modal">
+      <div class="mi-rx-modal" style="max-width:980px">
         <div class="mi-rx-modal-head">
           <h3><span>🌐</span> RouteX Translanka Products & Cashier Stock</h3>
           <button type="button" class="close-btn" onclick="miCloseRouteXProductPicker()">×</button>
         </div>
         <div class="mi-rx-modal-body">
-          <div class="mi-rx-search-bar">
-            <input id="miRouteXSearchInput" type="text" placeholder="Search product name or barcode..." oninput="miFilterRouteXProducts(this.value)">
+          <div class="mi-rx-search-bar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input id="miRouteXSearchInput" type="text" placeholder="Search product name or barcode..." oninput="miFilterRouteXProducts(this.value)" style="flex:1;min-width:240px">
+            <select id="miRouteXStockFilter" onchange="miFilterRouteXProducts()" style="padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:#1e293b;cursor:pointer">
+              <option value="all">All Stock Statuses</option>
+              <option value="instock">In-Stock Only (Cashier > 0)</option>
+              <option value="outstock">Out of Stock</option>
+            </select>
           </div>
           <div id="miRouteXProductGrid" class="mi-rx-prod-grid"></div>
+          <div id="miRouteXProductPagination" style="margin-top:16px"></div>
         </div>
       </div>
     </div>
     <div id="miRouteXSalesModal" class="mi-rx-modal-backdrop">
-      <div class="mi-rx-modal" style="max-width:960px">
+      <div class="mi-rx-modal" style="max-width:1080px">
         <div class="mi-rx-modal-head">
           <h3><span>🌐</span> RouteX Translanka ERP — Live Sales Register</h3>
           <button type="button" class="close-btn" onclick="miCloseRouteXSalesViewer()">×</button>
@@ -211,7 +217,22 @@ function miInstallUI(){
             <span style="font-size:13px;color:#64748b">Live sales records from RouteX ERP (Cashier: <b>trcashier01</b>)</span>
             <button class="btn sm ghost" type="button" onclick="miOpenRouteXSalesViewer(true)">↻ Refresh Live RouteX</button>
           </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+            <input id="miRouteXSalesSearchInput" type="text" placeholder="Search by invoice no, customer, phone, amount..." oninput="miFilterRouteXSales(this.value)" style="flex:1;min-width:240px;padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px">
+            <select id="miRouteXSalesTypeFilter" onchange="miFilterRouteXSales()" style="padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:#1e293b;cursor:pointer">
+              <option value="">All Payment Types</option>
+              <option value="cash">Cash</option>
+              <option value="cheque">Cheque</option>
+              <option value="credit">Credit</option>
+            </select>
+            <select id="miRouteXSalesStatusFilter" onchange="miFilterRouteXSales()" style="padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:#1e293b;cursor:pointer">
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
           <div id="miRouteXSalesList" class="mi-table-wrap"></div>
+          <div id="miRouteXSalesPagination" style="margin-top:16px"></div>
         </div>
       </div>
     </div>`);
@@ -1561,21 +1582,49 @@ async function miDoPrint(inv){
   requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));
 }
 
-/* ---------------- RouteX Translanka Product Picker & Sales Viewer ---------------- */
+/* ---------------- RouteX Translanka Product Picker & Sales Viewer (Paginated) ---------------- */
 let miCachedRxProducts = [];
+let miRxProductsPage = 1;
+let miRxProductsPageSize = 12; // 12 items fits 2, 3, 4 column grid layouts evenly
+let miRxProductsSearch = '';
+let miRxProductsStockFilter = 'all';
+
+function miGetFilteredRxProducts(){
+  let list = miCachedRxProducts || [];
+  if(miRxProductsStockFilter === 'instock'){
+    list = list.filter(p => Number(p.stock || 0) > 0);
+  } else if(miRxProductsStockFilter === 'outstock'){
+    list = list.filter(p => !(Number(p.stock || 0) > 0));
+  }
+  if(miRxProductsSearch){
+    const q = miRxProductsSearch.toLowerCase();
+    list = list.filter(p =>
+      (p.name||'').toLowerCase().includes(q) ||
+      (p.code||'').toLowerCase().includes(q) ||
+      (p.id||'').toLowerCase().includes(q)
+    );
+  }
+  return list;
+}
 
 window.miOpenRouteXProductPicker = async function(){
   const modal = mi$('miRouteXProductModal');
   if(!modal) return;
   modal.classList.add('show');
   const grid = mi$('miRouteXProductGrid');
+  const pager = mi$('miRouteXProductPagination');
+  if(pager) pager.innerHTML = '';
   if(grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#64748b">Loading Translanka products & live stock from RouteX...</div>';
   if(mi$('miRouteXSearchInput')) mi$('miRouteXSearchInput').value = '';
+  if(mi$('miRouteXStockFilter')) mi$('miRouteXStockFilter').value = 'all';
+  miRxProductsSearch = '';
+  miRxProductsStockFilter = 'all';
+  miRxProductsPage = 1;
 
   try {
     if(window.RouteXLink){
-      miCachedRxProducts = await window.RouteXLink.searchProducts('');
-      miRenderRouteXProductGrid(miCachedRxProducts);
+      miCachedRxProducts = await window.RouteXLink.searchProducts('', 500) || [];
+      miRenderRouteXProductGrid();
     }
   } catch(e) {
     if(grid) grid.innerHTML = `<div style="grid-column:1/-1;color:#b91c1c;padding:20px">Failed to load RouteX products: ${miEsc(e.message)}</div>`;
@@ -1587,26 +1636,52 @@ window.miCloseRouteXProductPicker = function(){
 };
 
 window.miFilterRouteXProducts = function(term){
-  const q = String(term||'').trim().toLowerCase();
-  if(!q) {
-    miRenderRouteXProductGrid(miCachedRxProducts);
-    return;
+  if(typeof term !== 'undefined'){
+    miRxProductsSearch = String(term || '').trim();
+  } else {
+    miRxProductsSearch = String(mi$('miRouteXSearchInput')?.value || '').trim();
   }
-  const filtered = miCachedRxProducts.filter(p =>
-    (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)
-  );
-  miRenderRouteXProductGrid(filtered);
+  miRxProductsStockFilter = mi$('miRouteXStockFilter')?.value || 'all';
+  miRxProductsPage = 1;
+  miRenderRouteXProductGrid();
 };
 
-window.miRenderRouteXProductGrid = function(list){
+window.miSetRxProductsPage = function(page){
+  const filtered = miGetFilteredRxProducts();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / miRxProductsPageSize));
+  miRxProductsPage = Math.max(1, Math.min(page, totalPages));
+  miRenderRouteXProductGrid();
+};
+
+window.miSetRxProductsPageSize = function(size){
+  miRxProductsPageSize = Math.max(1, Number(size) || 12);
+  miRxProductsPage = 1;
+  miRenderRouteXProductGrid();
+};
+
+window.miRenderRouteXProductGrid = function(){
   const grid = mi$('miRouteXProductGrid');
+  const pager = mi$('miRouteXProductPagination');
   if(!grid) return;
-  if(!list || !list.length){
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:#64748b">No products found matching your search.</div>';
+
+  const filtered = miGetFilteredRxProducts();
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / miRxProductsPageSize));
+  if(miRxProductsPage > totalPages) miRxProductsPage = totalPages;
+
+  const startIdx = (miRxProductsPage - 1) * miRxProductsPageSize;
+  const endIdx = Math.min(total, startIdx + miRxProductsPageSize);
+  const paged = filtered.slice(startIdx, endIdx);
+
+  if(!total){
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px 20px;color:#64748b">No Translanka products found matching your search.</div>';
+    if(pager) pager.innerHTML = '';
     return;
   }
-  grid.innerHTML = list.map((p, idx) => {
-    const inStock = p.stock > 0;
+
+  grid.innerHTML = paged.map(p => {
+    const inStock = Number(p.stock || 0) > 0;
+    const pid = miEsc(p.id);
     return `
       <div class="mi-rx-prod-card">
         <div>
@@ -1620,15 +1695,31 @@ window.miRenderRouteXProductGrid = function(list){
         </div>
         <div class="mi-rx-prod-footer">
           <span class="mi-rx-prod-price">Rs. ${miMoney(p.unitPrice)}</span>
-          <button type="button" class="btn sm primary" onclick="miSelectRouteXProduct(${idx})">+ Add Line</button>
+          <button type="button" class="btn sm primary" onclick="miSelectRouteXProduct('${pid}')">+ Add Line</button>
         </div>
       </div>
     `;
   }).join('');
+
+  if(pager){
+    const sizes = [8, 12, 24, 48];
+    const sizeOptions = sizes.map(n => `<option value="${n}" ${n === miRxProductsPageSize ? 'selected' : ''}>${n}</option>`).join('');
+    pager.innerHTML = `
+      <div class="sc-pagination">
+        <div class="sc-pagination-summary">Showing <b>${startIdx + 1}-${endIdx}</b> of <b>${total}</b> products</div>
+        <div class="sc-pagination-actions">
+          <label>Show <select onchange="miSetRxProductsPageSize(this.value)">${sizeOptions}</select></label>
+          <button class="btn ghost sm" type="button" onclick="miSetRxProductsPage(${miRxProductsPage - 1})" ${miRxProductsPage <= 1 ? 'disabled' : ''}>← Previous</button>
+          <span class="sc-page-number">Page <b>${miRxProductsPage}</b> / ${totalPages}</span>
+          <button class="btn ghost sm" type="button" onclick="miSetRxProductsPage(${miRxProductsPage + 1})" ${miRxProductsPage >= totalPages ? 'disabled' : ''}>Next →</button>
+        </div>
+      </div>
+    `;
+  }
 };
 
-window.miSelectRouteXProduct = function(idx){
-  const p = miCachedRxProducts[idx];
+window.miSelectRouteXProduct = function(productId){
+  const p = (miCachedRxProducts || []).find(x => x.id === productId);
   if(!p) return;
   const rows = [...document.querySelectorAll('#miItems .mi-item-row')];
   if(rows.length === 1 && !rows[0].querySelector('.mi-it-desc')?.value.trim() && !rows[0].querySelector('.mi-it-code')?.value.trim()){
@@ -1645,58 +1736,164 @@ window.miSelectRouteXProduct = function(idx){
   toast(`Added ${p.name} from RouteX`);
 };
 
+/* ---------------- RouteX Translanka ERP Live Sales Viewer (Paginated) ---------------- */
+let miCachedRxSales = [];
+let miRxSalesPage = 1;
+let miRxSalesPageSize = 10;
+let miRxSalesSearch = '';
+let miRxSalesTypeFilter = '';
+let miRxSalesStatusFilter = '';
+
+function miGetFilteredRxSales(){
+  let list = miCachedRxSales || [];
+  if(miRxSalesTypeFilter){
+    list = list.filter(s => String(s.sale_type || '').toLowerCase() === miRxSalesTypeFilter.toLowerCase());
+  }
+  if(miRxSalesStatusFilter){
+    list = list.filter(s => String(s.status || '').toLowerCase() === miRxSalesStatusFilter.toLowerCase());
+  }
+  if(miRxSalesSearch){
+    const q = miRxSalesSearch.toLowerCase();
+    list = list.filter(s =>
+      (s.invoice_no||'').toLowerCase().includes(q) ||
+      (s.routex_customers?.name||'').toLowerCase().includes(q) ||
+      (s.routex_customers?.phone||'').toLowerCase().includes(q) ||
+      String(s.total_amount||'').includes(q) ||
+      (s.status||'').toLowerCase().includes(q) ||
+      (s.sale_type||'').toLowerCase().includes(q)
+    );
+  }
+  return list;
+}
+
 window.miOpenRouteXSalesViewer = async function(refresh = false){
   const modal = mi$('miRouteXSalesModal');
   if(!modal) return;
   modal.classList.add('show');
   const host = mi$('miRouteXSalesList');
-  if(host) host.innerHTML = '<div style="padding:30px;text-align:center;color:#64748b">Loading live sales records from Translanka RouteX...</div>';
+  const pager = mi$('miRouteXSalesPagination');
+  if(pager) pager.innerHTML = '';
 
-  try {
-    if(window.RouteXLink){
-      const sales = await window.RouteXLink.fetchTranslankaSales(40);
-      if(!sales || !sales.length){
-        if(host) host.innerHTML = '<div class="mi-empty">No sales records found in RouteX database.</div>';
-        return;
-      }
-      if(host) host.innerHTML = `
-        <table class="mi-table">
-          <thead>
-            <tr>
-              <th>RouteX Invoice</th>
-              <th>Date</th>
-              <th>Customer</th>
-              <th>Type</th>
-              <th class="num">Items</th>
-              <th class="num">Total Amount</th>
-              <th class="num">Due Amount</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${sales.map(s => `
-              <tr>
-                <td><b>${miEsc(s.invoice_no)}</b><br><small style="color:#047857">trcashier01</small></td>
-                <td>${miEsc(String(s.sale_date||s.created_at).slice(0, 10))}</td>
-                <td><b>${miEsc(s.routex_customers?.name || 'Walk-in Customer')}</b><br><small>${miEsc(s.routex_customers?.phone || '')}</small></td>
-                <td><span class="mi-status ${s.sale_type==='cash'?'paid':s.sale_type==='cheque'?'partial':'unpaid'}">${miEsc(s.sale_type||'cash')}</span></td>
-                <td class="num">${miEsc(s.total_items||0)}</td>
-                <td class="num strong">Rs. ${miMoney(s.total_amount)}</td>
-                <td class="num">Rs. ${miMoney(s.due_amount||0)}</td>
-                <td><span class="mi-status ${s.status==='active'?'updated':'pending'}">${miEsc(s.status||'active')}</span></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
-    }
-  } catch(e) {
-    if(host) host.innerHTML = `<div class="mi-customer-message error">Failed to query RouteX sales: ${miEsc(e.message)}</div>`;
+  if(refresh){
+    if(mi$('miRouteXSalesSearchInput')) mi$('miRouteXSalesSearchInput').value = '';
+    if(mi$('miRouteXSalesTypeFilter')) mi$('miRouteXSalesTypeFilter').value = '';
+    if(mi$('miRouteXSalesStatusFilter')) mi$('miRouteXSalesStatusFilter').value = '';
+    miRxSalesSearch = '';
+    miRxSalesTypeFilter = '';
+    miRxSalesStatusFilter = '';
+    miRxSalesPage = 1;
   }
+
+  if(!miCachedRxSales.length || refresh){
+    if(host) host.innerHTML = '<div style="padding:30px;text-align:center;color:#64748b">Loading live sales records from Translanka RouteX...</div>';
+    try {
+      if(window.RouteXLink){
+        miCachedRxSales = await window.RouteXLink.fetchTranslankaSales(250) || [];
+      }
+    } catch(e) {
+      if(host) host.innerHTML = `<div class="mi-customer-message error">Failed to query RouteX sales: ${miEsc(e.message)}</div>`;
+      return;
+    }
+  }
+
+  miRenderRouteXSalesList();
 };
 
 window.miCloseRouteXSalesViewer = function(){
   mi$('miRouteXSalesModal')?.classList.remove('show');
+};
+
+window.miFilterRouteXSales = function(term){
+  if(typeof term !== 'undefined'){
+    miRxSalesSearch = String(term || '').trim();
+  } else {
+    miRxSalesSearch = String(mi$('miRouteXSalesSearchInput')?.value || '').trim();
+  }
+  miRxSalesTypeFilter = mi$('miRouteXSalesTypeFilter')?.value || '';
+  miRxSalesStatusFilter = mi$('miRouteXSalesStatusFilter')?.value || '';
+  miRxSalesPage = 1;
+  miRenderRouteXSalesList();
+};
+
+window.miSetRxSalesPage = function(page){
+  const filtered = miGetFilteredRxSales();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / miRxSalesPageSize));
+  miRxSalesPage = Math.max(1, Math.min(page, totalPages));
+  miRenderRouteXSalesList();
+};
+
+window.miSetRxSalesPageSize = function(size){
+  miRxSalesPageSize = Math.max(1, Number(size) || 10);
+  miRxSalesPage = 1;
+  miRenderRouteXSalesList();
+};
+
+window.miRenderRouteXSalesList = function(){
+  const host = mi$('miRouteXSalesList');
+  const pager = mi$('miRouteXSalesPagination');
+  if(!host) return;
+
+  const filtered = miGetFilteredRxSales();
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / miRxSalesPageSize));
+  if(miRxSalesPage > totalPages) miRxSalesPage = totalPages;
+
+  const startIdx = (miRxSalesPage - 1) * miRxSalesPageSize;
+  const endIdx = Math.min(total, startIdx + miRxSalesPageSize);
+  const paged = filtered.slice(startIdx, endIdx);
+
+  if(!total){
+    host.innerHTML = '<div class="mi-empty">No sales records found matching the filter.</div>';
+    if(pager) pager.innerHTML = '';
+    return;
+  }
+
+  host.innerHTML = `
+    <table class="mi-table">
+      <thead>
+        <tr>
+          <th>RouteX Invoice</th>
+          <th>Date & Time</th>
+          <th>Customer</th>
+          <th>Type</th>
+          <th class="num">Items</th>
+          <th class="num">Total Amount</th>
+          <th class="num">Due Amount</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${paged.map(s => `
+          <tr>
+            <td><b>${miEsc(s.invoice_no)}</b><br><small style="color:#047857">trcashier01</small></td>
+            <td>${miEsc(String(s.sale_date||s.created_at).slice(0, 16).replace('T', ' '))}</td>
+            <td><b>${miEsc(s.routex_customers?.name || 'Walk-in Customer')}</b><br><small>${miEsc(s.routex_customers?.phone || '')}</small></td>
+            <td><span class="mi-status ${s.sale_type==='cash'?'paid':s.sale_type==='cheque'?'partial':'unpaid'}">${miEsc(s.sale_type||'cash')}</span></td>
+            <td class="num">${miEsc(s.total_items||0)}</td>
+            <td class="num strong">Rs. ${miMoney(s.total_amount)}</td>
+            <td class="num">Rs. ${miMoney(s.due_amount||0)}</td>
+            <td><span class="mi-status ${s.status==='active'?'updated':'pending'}">${miEsc(s.status||'active')}</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  if(pager){
+    const sizes = [10, 25, 50, 100];
+    const sizeOptions = sizes.map(n => `<option value="${n}" ${n === miRxSalesPageSize ? 'selected' : ''}>${n}</option>`).join('');
+    pager.innerHTML = `
+      <div class="sc-pagination">
+        <div class="sc-pagination-summary">Showing <b>${startIdx + 1}-${endIdx}</b> of <b>${total}</b> live sales</div>
+        <div class="sc-pagination-actions">
+          <label>Show <select onchange="miSetRxSalesPageSize(this.value)">${sizeOptions}</select></label>
+          <button class="btn ghost sm" type="button" onclick="miSetRxSalesPage(${miRxSalesPage - 1})" ${miRxSalesPage <= 1 ? 'disabled' : ''}>← Previous</button>
+          <span class="sc-page-number">Page <b>${miRxSalesPage}</b> / ${totalPages}</span>
+          <button class="btn ghost sm" type="button" onclick="miSetRxSalesPage(${miRxSalesPage + 1})" ${miRxSalesPage >= totalPages ? 'disabled' : ''}>Next →</button>
+        </div>
+      </div>
+    `;
+  }
 };
 
 /* ---------------- integration ---------------- */
